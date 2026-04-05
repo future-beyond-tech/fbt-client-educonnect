@@ -1,0 +1,32 @@
+{
+  "name": "educonnect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "School communication platform — attendance, homework, notices",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "pnpm build:web && pnpm build:api",
+    "lint": "pnpm --dir apps/web lint",
+    "type-check": "pnpm --dir apps/web type-check",
+    "test": "pnpm test:web && pnpm test:api",
+    "test:web": "pnpm lint && pnpm type-check && NEXT_PUBLIC_APP_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:5000 pnpm --dir apps/web build",
+    "test:api": "dotnet test apps/api/tests/EduConnect.Api.Tests/EduConnect.Api.Tests.csproj -c Release",
+    "local:backend:run": "bash ./scripts/run-backend-local.sh",
+    "local:frontend:run": "bash ./scripts/run-frontend-local.sh",
+    "local:backend:test": "bash ./scripts/test-backend-local.sh",
+    "local:frontend:test": "bash ./scripts/test-frontend-local.sh",
+    "clean": "turbo clean",
+    "dev:web": "turbo dev --filter=@educonnect/web",
+    "dev:api": "dotnet run --project apps/api/src/EduConnect.Api/EduConnect.Api.csproj",
+    "build:web": "NEXT_PUBLIC_APP_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:5000 turbo build --filter=@educonnect/web",
+    "build:api": "dotnet publish apps/api/src/EduConnect.Api/EduConnect.Api.csproj -c Release",
+    "openapi:generate": "pnpm --dir packages/api-client run generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

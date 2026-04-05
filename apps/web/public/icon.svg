@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+  <g fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Book shape -->
+    <path d="M160 120 L160 392 C160 392 220 360 256 360 C292 360 352 392 352 392 L352 120 C352 120 292 88 256 88 C220 88 160 120 160 120Z"/>
+    <!-- Center spine -->
+    <line x1="256" y1="88" x2="256" y2="360"/>
+    <!-- Connection dots -->
+    <circle cx="208" cy="200" r="8" fill="#ffffff" stroke="none"/>
+    <circle cx="304" cy="200" r="8" fill="#ffffff" stroke="none"/>
+    <circle cx="208" cy="264" r="8" fill="#ffffff" stroke="none"/>
+    <circle cx="304" cy="264" r="8" fill="#ffffff" stroke="none"/>
+    <!-- Wifi/signal arc above book -->
+    <path d="M220 148 Q256 128 292 148" fill="none"/>
+  </g>
+</svg>

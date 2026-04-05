@@ -1,0 +1,62 @@
+services:
+  # ── PostgreSQL ─────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: educonnect-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: educonnect
+      POSTGRES_USER: educonnect
+      POSTGRES_PASSWORD: educonnect_dev
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U educonnect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── .NET API ───────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: educonnect-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DATABASE_URL: "Host=db;Port=5432;Database=educonnect;Username=educonnect;Password=educonnect_dev"
+      JWT_SECRET: "dev-secret-key-minimum-64-characters-long-for-hmac-sha256-signing-requirement"
+      JWT_ISSUER: educonnect-api
+      JWT_AUDIENCE: educonnect-client
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+      SENTRY_DSN: ""
+
+  # ── Next.js Web ────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+        NEXT_PUBLIC_API_URL: http://localhost:5000
+        NEXT_PUBLIC_SENTRY_DSN: ""
+    container_name: educonnect-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+
+volumes:
+  pgdata:

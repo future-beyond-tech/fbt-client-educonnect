@@ -1,0 +1,58 @@
+using EduConnect.Api.Common.Auth;
+using EduConnect.Api.Infrastructure.Database;
+using MediatR;
+
+namespace EduConnect.Api.Features.Notices.GetNotices;
+
+public class GetNoticesQueryHandler : IRequestHandler<GetNoticesQuery, List<NoticeDto>>
+{
+    private readonly AppDbContext _context;
+    private readonly CurrentUserService _currentUserService;
+
+    public GetNoticesQueryHandler(AppDbContext context, CurrentUserService currentUserService)
+    {
+        _context = context;
+        _currentUserService = currentUserService;
+    }
+
+    public async Task<List<NoticeDto>> Handle(GetNoticesQuery request, CancellationToken cancellationToken)
+    {
+        var query = _context.Notices
+            .Where(n => n.SchoolId == _currentUserService.SchoolId && !n.IsDeleted)
+            .AsQueryable();
+
+        if (_currentUserService.Role == "Parent")
+        {
+            var studentClassIds = await _context.ParentStudentLinks
+                .Where(psl =>
+                    psl.SchoolId == _currentUserService.SchoolId &&
+                    psl.ParentId == _currentUserService.UserId)
+                .Join(_context.Students, psl => psl.StudentId, s => s.Id, (psl, s) => s.ClassId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            query = query.Where(n =>
+                n.IsPublished &&
+                (n.TargetAudience == "All" ||
+                (n.TargetAudience == "Class" && n.TargetClassId != null && studentClassIds.Contains(n.TargetClassId.Value)) ||
+                (n.TargetAudience == "Section" && n.TargetClassId != null && studentClassIds.Contains(n.TargetClassId.Value))))
+                .Where(n => n.ExpiresAt == null || n.ExpiresAt > DateTimeOffset.UtcNow);
+        }
+
+        var notices = await query
+            .OrderByDescending(n => n.PublishedAt ?? n.CreatedAt)
+            .Select(n => new NoticeDto(
+                n.Id,
+                n.Title,
+                n.Body,
+                n.TargetAudience,
+                n.TargetClassId,
+                n.IsPublished,
+                n.PublishedAt,
+                n.ExpiresAt,
+                n.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return notices;
+    }
+}

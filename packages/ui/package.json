@@ -1,0 +1,16 @@
+{
+  "name": "@educonnect/ui",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./tokens/index.ts",
+  "types": "./tokens/index.ts",
+  "exports": {
+    ".": "./tokens/index.ts",
+    "./colors": "./tokens/colors.ts",
+    "./spacing": "./tokens/spacing.ts",
+    "./typography": "./tokens/typography.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

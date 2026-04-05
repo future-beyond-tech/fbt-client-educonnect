@@ -1,0 +1,11 @@
+{
+  "name": "@educonnect/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "eslint/index.js",
+  "exports": {
+    "./eslint": "./eslint/index.js",
+    "./tailwind": "./tailwind/preset.js",
+    "./typescript": "./typescript/base.json"
+  }
+}

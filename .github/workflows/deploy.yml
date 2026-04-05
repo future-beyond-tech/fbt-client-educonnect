@@ -1,0 +1,86 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Gate: CI must pass first ───────────────
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # ── Deploy API to Railway ──────────────────
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: ci
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy API service
+        run: railway up --service educonnect-api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ── Deploy Web to Railway ──────────────────
+  deploy-web:
+    name: Deploy Web
+    runs-on: ubuntu-latest
+    needs: ci
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy Web service
+        run: railway up --service educonnect-web --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ── Post-deploy health check ───────────────
+  health-check:
+    name: Post-deploy verification
+    runs-on: ubuntu-latest
+    needs: [deploy-api, deploy-web]
+
+    steps:
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Check API health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.API_URL }}/health" || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "API health check failed with status: $STATUS"
+            exit 1
+          fi
+          echo "API health check passed"
+
+      - name: Check Web health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.WEB_URL }}/login" || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "Web health check failed with status: $STATUS"
+            exit 1
+          fi
+          echo "Web health check passed"

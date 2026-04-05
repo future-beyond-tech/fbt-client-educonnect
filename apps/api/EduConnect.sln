@@ -1,0 +1,25 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.0.0
+MinimumVisualStudioVersion = 10.0.0.0
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7557}") = "EduConnect.Api", "src\EduConnect.Api\EduConnect.Api.csproj", "{7F8C0B1A-2D3E-4F5G-6H7I-8J9K0L1M2N3O}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7557}") = "EduConnect.Api.Tests", "tests\EduConnect.Api.Tests\EduConnect.Api.Tests.csproj", "{8G9H0I1J-3K4L-5M6N-7O8P-9Q0R1S2T3U4V}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7F8C0B1A-2D3E-4F5G-6H7I-8J9K0L1M2N3O}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F8C0B1A-2D3E-4F5G-6H7I-8J9K0L1M2N3O}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F8C0B1A-2D3E-4F5G-6H7I-8J9K0L1M2N3O}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F8C0B1A-2D3E-4F5G-6H7I-8J9K0L1M2N3O}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8G9H0I1J-3K4L-5M6N-7O8P-9Q0R1S2T3U4V}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8G9H0I1J-3K4L-5M6N-7O8P-9Q0R1S2T3U4V}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8G9H0I1J-3K4L-5M6N-7O8P-9Q0R1S2T3U4V}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8G9H0I1J-3K4L-5M6N-7O8P-9Q0R1S2T3U4V}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
