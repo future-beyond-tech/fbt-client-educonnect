@@ -1,4 +1,4 @@
-import { getAuthToken } from "@/providers/auth-provider";
+import { getAccessToken } from "@/lib/auth/session";
 
 interface ProblemDetails {
   type: string;
@@ -30,7 +30,7 @@ async function apiRequest<T>(
   }
 
   const url = `${baseUrl}${endpoint}`;
-  const token = getAuthToken();
+  const token = getAccessToken();
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",

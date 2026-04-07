@@ -25,7 +25,8 @@ export function ClassSelector({
   error,
   id,
 }: ClassSelectorProps): React.ReactElement {
-  const selectId = id || `class-selector-${React.useId()}`;
+  const generatedId = React.useId();
+  const selectId = id || `class-selector-${generatedId}`;
   const errorId = error ? `${selectId}-error` : undefined;
 
   return (

@@ -9,6 +9,7 @@ export interface StudentCardProps {
   className: string;
   section: string;
   isActive: boolean;
+  showInactiveBadge?: boolean;
   onClick?: () => void;
 }
 
@@ -18,6 +19,7 @@ export function StudentCard({
   className,
   section,
   isActive,
+  showInactiveBadge = true,
   onClick,
 }: StudentCardProps): React.ReactElement {
   const Wrapper = onClick ? "button" : "div";
@@ -41,7 +43,9 @@ export function StudentCard({
           {className}
           {section ? ` ${section}` : ""}
         </Badge>
-        {!isActive && <Badge variant="destructive">Inactive</Badge>}
+        {showInactiveBadge && !isActive && (
+          <Badge variant="destructive">Inactive</Badge>
+        )}
       </div>
     </Wrapper>
   );

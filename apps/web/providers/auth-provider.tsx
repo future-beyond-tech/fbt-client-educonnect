@@ -8,29 +8,13 @@ import React, {
   useMemo,
   useState,
 } from "react";
-
-type RoleValue = "Parent" | "Teacher" | "Admin";
-
-interface JwtPayload {
-  sub: string;
-  userId: string;
-  schoolId: string;
-  role: RoleValue;
-  name: string;
-  iat: number;
-  exp: number;
-}
-
-interface User {
-  userId: string;
-  schoolId: string;
-  role: RoleValue;
-  name: string;
-}
+import type { AuthUser } from "@/lib/auth/jwt";
+import { decodeJwtPayload, getUserFromToken } from "@/lib/auth/jwt";
+import { clearAccessToken, setAccessToken } from "@/lib/auth/session";
 
 interface AuthContextType {
   token: string | null;
-  user: User | null;
+  user: AuthUser | null;
   isLoading: boolean;
   login: (token: string) => void;
   logout: () => Promise<void>;
@@ -39,58 +23,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-let accessToken: string | null = null;
-
-export function getAuthToken(): string | null {
-  return accessToken;
-}
-
-function decodeJwtPayload(token: string): JwtPayload | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    const payloadSegment = parts[1];
-    if (!payloadSegment) {
-      return null;
-    }
-
-    const base64 = payloadSegment
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(payloadSegment.length / 4) * 4, "=");
-    const decoded = atob(base64);
-    const payload = JSON.parse(decoded) as JwtPayload;
-
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
   const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const clearAuthState = useCallback((): void => {
+    clearAccessToken();
+    setToken(null);
+    setUser(null);
+  }, []);
+
   const login = useCallback((newToken: string): void => {
-    const payload = decodeJwtPayload(newToken);
-    if (!payload) {
+    const nextUser = getUserFromToken(newToken);
+    if (!nextUser) {
       return;
     }
 
-    accessToken = newToken;
+    setAccessToken(newToken);
     setToken(newToken);
-    setUser({
-      userId: payload.userId,
-      schoolId: payload.schoolId,
-      role: payload.role,
-      name: payload.name,
-    });
+    setUser(nextUser);
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
@@ -109,10 +65,8 @@ export function AuthProvider({
       // Logout API failure should not prevent local cleanup
     }
 
-    accessToken = null;
-    setToken(null);
-    setUser(null);
-  }, [token]);
+    clearAuthState();
+  }, [clearAuthState, token]);
 
   const refreshToken = useCallback(async (): Promise<void> => {
     try {
@@ -128,20 +82,16 @@ export function AuthProvider({
       );
 
       if (!response.ok) {
-        accessToken = null;
-        setToken(null);
-        setUser(null);
+        clearAuthState();
         return;
       }
 
       const data = (await response.json()) as { accessToken: string };
       login(data.accessToken);
     } catch {
-      accessToken = null;
-      setToken(null);
-      setUser(null);
+      clearAuthState();
     }
-  }, [login]);
+  }, [clearAuthState, login]);
 
   useEffect(() => {
     refreshToken().finally(() => {
