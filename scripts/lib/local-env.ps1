@@ -46,11 +46,49 @@ function Set-EnvDefault {
     }
 }
 
+function Resolve-DbMode {
+    # EDUCONNECT_DB_MODE controls which Postgres the backend connects to:
+    #   docker  → containerized Postgres started by docker compose (default)
+    #   local   → native Postgres on the host
+    #   remote  → use whatever DATABASE_URL is already in .env
+    if (-not $env:EDUCONNECT_DB_MODE) {
+        if ($env:DB_MODE) {
+            $env:EDUCONNECT_DB_MODE = $env:DB_MODE
+        } else {
+            $env:EDUCONNECT_DB_MODE = 'docker'
+        }
+    }
+
+    switch ($env:EDUCONNECT_DB_MODE) {
+        'docker' {
+            if (-not $env:POSTGRES_HOST_PORT) { $env:POSTGRES_HOST_PORT = '5433' }
+            $env:DATABASE_URL = "postgresql://educonnect:educonnect_dev@localhost:$($env:POSTGRES_HOST_PORT)/educonnect"
+        }
+        'local' {
+            if (-not $env:POSTGRES_HOST_PORT) { $env:POSTGRES_HOST_PORT = '5432' }
+            if (-not $env:LOCAL_DB_USER)      { $env:LOCAL_DB_USER     = 'educonnect' }
+            if (-not $env:LOCAL_DB_PASSWORD)  { $env:LOCAL_DB_PASSWORD = 'educonnect_dev' }
+            if (-not $env:LOCAL_DB_NAME)      { $env:LOCAL_DB_NAME     = 'educonnect' }
+            $env:DATABASE_URL = "postgresql://$($env:LOCAL_DB_USER):$($env:LOCAL_DB_PASSWORD)@localhost:$($env:POSTGRES_HOST_PORT)/$($env:LOCAL_DB_NAME)"
+        }
+        'remote' {
+            if (-not $env:DATABASE_URL) {
+                Write-Error 'EDUCONNECT_DB_MODE=remote but DATABASE_URL is not set.'
+                exit 1
+            }
+            if (-not $env:POSTGRES_HOST_PORT) { $env:POSTGRES_HOST_PORT = 'remote' }
+        }
+        default {
+            Write-Error "Unknown EDUCONNECT_DB_MODE='$($env:EDUCONNECT_DB_MODE)'. Use docker | local | remote."
+            exit 1
+        }
+    }
+}
+
 function Set-BackendDefaults {
     Set-EnvDefault 'ASPNETCORE_ENVIRONMENT' 'Development'
     Set-EnvDefault 'API_PORT' '5000'
-    Set-EnvDefault 'POSTGRES_HOST_PORT' '5433'
-    Set-EnvDefault 'DATABASE_URL' "postgresql://educonnect:educonnect_dev@localhost:$($env:POSTGRES_HOST_PORT)/educonnect"
+    Resolve-DbMode
     Set-EnvDefault 'JWT_SECRET' 'dev-secret-key-minimum-64-characters-long-for-hmac-sha256-signing-requirement'
     Set-EnvDefault 'JWT_ISSUER' 'educonnect-api'
     Set-EnvDefault 'JWT_AUDIENCE' 'educonnect-client'
@@ -70,6 +108,7 @@ function Set-FrontendDefaults {
 function Print-BackendSummary {
     Write-Host "Repo root: $($script:RepoRoot)"
     Write-Host "API URL:   $($env:ASPNETCORE_URLS)"
+    Write-Host "DB mode:   $($env:EDUCONNECT_DB_MODE)"
     Write-Host "DB:        $($env:DATABASE_URL)"
     Write-Host "DB Port:   $($env:POSTGRES_HOST_PORT)"
     Write-Host "CORS:      $($env:CORS_ALLOWED_ORIGINS)"

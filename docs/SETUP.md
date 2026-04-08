@@ -72,18 +72,53 @@ pnpm local:backend:run         # macOS / Linux
 pnpm local:backend:run:win     # Windows PowerShell
 ```
 
-If you change profiles you should re-run migrations against the newly
-active `DATABASE_URL` (see below).
+### Migrations run automatically on startup
 
-### Run Migrations
+You do **not** run migrations manually. The API applies all pending SQL
+files from `apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/`
+on every startup, using `SqlMigrationRunner`. This applies to every
+environment: local native DB, Docker DB, staging, prod.
 
-```bash
-# From project root, using psql:
-psql "$DATABASE_URL" -f apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/001_foundation_tables.sql
+Layout:
 
-# Seed development data (development only!):
-psql "$DATABASE_URL" -f apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/002_seed_development_data.sql
 ```
+Migrations/
+├── schema/         ← runs in every environment
+│   ├── 001_foundation_tables.sql
+│   ├── 003_remove_otp_add_pin.sql
+│   └── …
+└── seed/           ← runs only when ASPNETCORE_ENVIRONMENT=Development
+    ├── 002_seed_development_data.sql
+    └── …
+```
+
+Adding a new migration is a pure code change:
+
+1. Drop a new file into `schema/` (or `seed/` if it's dev-only data).
+2. Use a numeric prefix so alphabetical sort = execution order
+   (e.g. `010_add_foo.sql`).
+3. Write it to be idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF
+   NOT EXISTS`, `ON CONFLICT DO NOTHING`, etc.). This is the repo's rule,
+   not optional — it keeps the runner safe to retry.
+4. Restart the API (`pnpm local:backend:run`). The runner applies the new
+   file, records it in `schema_migrations` with a SHA-256 checksum, and
+   moves on.
+
+How the runner behaves on each state:
+
+| Database state | Runner action |
+|----------------|---------------|
+| Fresh (no tables) | Creates `schema_migrations`, applies every schema file in order. |
+| Existing schema, no `schema_migrations` | Probes for `users` table, sees it exists, **auto-bootstraps** `schema_migrations` with every current file marked as already-applied. No manual seeding needed. |
+| Existing `schema_migrations` | Diffs disk against the table, applies only the pending files. |
+| An applied file was edited on disk | **Startup fails** with a drift error — revert or author a new migration. |
+| Multiple replicas cold-start together | A Postgres advisory lock serializes them; only one runs migrations. |
+| Non-Development environment | `Migrations/seed/*` is skipped entirely. |
+
+Default dev credentials after first startup (seed applied):
+
+- Admin / Teachers: password `EduConnect@2026`
+- Parents: PIN `1234`
 
 ### Verify Tables Created
 
@@ -91,7 +126,8 @@ psql "$DATABASE_URL" -f apps/api/src/EduConnect.Api/Infrastructure/Database/Migr
 psql "$DATABASE_URL" -c "\dt"
 ```
 
-You should see 11 tables: schools, users, classes, students, teacher_class_assignments, parent_student_links, attendance_records, homework, notices, refresh_tokens, _migrations.
+You should see the expected tables plus `schema_migrations` (and
+`seed_migrations` in dev).
 
 ## 3. Environment Variables
 

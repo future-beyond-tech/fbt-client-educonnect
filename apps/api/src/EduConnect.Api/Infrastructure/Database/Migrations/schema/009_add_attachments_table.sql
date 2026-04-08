@@ -1,6 +1,7 @@
--- Migration: 009_add_attachments_table
--- Description: Creates attachments table for file uploads on homework and notices
--- Date: 2026-04-05
+-- ============================================================================
+-- Migration 009: Attachments table
+-- Fully idempotent — safe to retry.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS attachments (
     id              UUID PRIMARY KEY,
@@ -12,7 +13,7 @@ CREATE TABLE IF NOT EXISTS attachments (
     content_type    VARCHAR(100) NOT NULL,
     size_bytes      INT NOT NULL,
     uploaded_by     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT chk_attachment_entity_type CHECK (
         entity_type IS NULL OR entity_type IN ('homework', 'notice')
@@ -32,9 +33,5 @@ CREATE INDEX IF NOT EXISTS ix_attachments_school_id
 CREATE INDEX IF NOT EXISTS ix_attachments_uploaded_by
     ON attachments (uploaded_by);
 
--- Index for orphan cleanup: unattached uploads older than 24h
 CREATE INDEX IF NOT EXISTS ix_attachments_orphan_cleanup
     ON attachments (uploaded_at) WHERE entity_id IS NULL;
-
-INSERT INTO _migrations (name, applied_at)
-VALUES ('009_add_attachments_table', now());

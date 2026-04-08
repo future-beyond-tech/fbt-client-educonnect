@@ -1,6 +1,7 @@
--- Migration: 008_add_notifications_table
--- Description: Creates notifications table for in-app notification delivery
--- Date: 2026-04-05
+-- ============================================================================
+-- Migration 008: Notifications table
+-- Fully idempotent — safe to retry.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS notifications (
     id              UUID PRIMARY KEY,
@@ -11,8 +12,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     body            VARCHAR(500),
     entity_id       UUID,
     entity_type     VARCHAR(50),
-    is_read         BOOLEAN NOT NULL DEFAULT false,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT chk_notification_type CHECK (
         type IN ('notice_published', 'homework_assigned', 'absence_marked')
@@ -27,6 +28,3 @@ CREATE INDEX IF NOT EXISTS ix_notifications_user_read_created
 
 CREATE INDEX IF NOT EXISTS ix_notifications_school_id
     ON notifications (school_id);
-
-INSERT INTO _migrations (name, applied_at)
-VALUES ('008_add_notifications_table', now());

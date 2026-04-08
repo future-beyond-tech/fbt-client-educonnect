@@ -30,8 +30,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Infrastructure\Database\Migrations\*.sql">
-      <Link>Migrations\%(Filename)%(Extension)</Link>
+    <Content Include="Infrastructure\Database\Migrations\schema\*.sql">
+      <Link>Migrations\schema\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Infrastructure\Database\Migrations\seed\*.sql">
+      <Link>Migrations\seed\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

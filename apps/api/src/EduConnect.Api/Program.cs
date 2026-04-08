@@ -193,9 +193,10 @@ var app = builder.Build();
 
 // Apply pending SQL migrations on startup. Safe across replicas via pg advisory lock.
 // Halts startup on failure so a misconfigured / broken schema cannot serve traffic.
+// Seeds only run when ASPNETCORE_ENVIRONMENT=Development.
 {
     var migrationLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SqlMigrationRunner");
-    await SqlMigrationRunner.ApplyAsync(app.Services, migrationLogger);
+    await SqlMigrationRunner.ApplyAsync(app.Services, app.Environment, migrationLogger);
 }
 
 app.UseRouting();

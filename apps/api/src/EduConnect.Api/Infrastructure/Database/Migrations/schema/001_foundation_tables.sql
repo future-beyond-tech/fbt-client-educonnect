@@ -1,9 +1,8 @@
 -- ============================================================================
 -- Migration 001: Foundation Tables
 -- EduConnect — Product Genesis
--- Date: 2026-04-03
 -- Description: Creates all foundation tables for EduConnect MVP.
---              Additive-only discipline starts NOW from the first migration.
+--              Fully idempotent — safe to retry.
 -- ============================================================================
 
 BEGIN;
@@ -28,8 +27,7 @@ CREATE TABLE IF NOT EXISTS schools (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uix_schools_code
-    ON schools(code);
+CREATE UNIQUE INDEX IF NOT EXISTS uix_schools_code ON schools(code);
 
 -- ══════════════════════════════════════════════
 -- TABLE: users (parents, teachers, admins)
@@ -40,8 +38,8 @@ CREATE TABLE IF NOT EXISTS users (
     phone           VARCHAR(20) NOT NULL,
     name            VARCHAR(200) NOT NULL,
     role            VARCHAR(20) NOT NULL,
-    password_hash   VARCHAR(500),                      -- NULL for parents (PIN-based auth)
-    pin_hash        VARCHAR(500),                      -- NULL for teachers/admins (password-based auth)
+    password_hash   VARCHAR(500),
+    pin_hash        VARCHAR(500),
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -49,14 +47,9 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT chk_users_role CHECK (role IN ('Parent', 'Teacher', 'Admin'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uix_users_school_phone
-    ON users(school_id, phone);
-
-CREATE INDEX IF NOT EXISTS idx_users_school_id
-    ON users(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_users_phone
-    ON users(phone);
+CREATE UNIQUE INDEX IF NOT EXISTS uix_users_school_phone ON users(school_id, phone);
+CREATE INDEX IF NOT EXISTS idx_users_school_id ON users(school_id);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 
 -- ══════════════════════════════════════════════
 -- TABLE: classes
@@ -73,9 +66,7 @@ CREATE TABLE IF NOT EXISTS classes (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uix_classes_school_name_section_year
     ON classes(school_id, name, section, academic_year);
-
-CREATE INDEX IF NOT EXISTS idx_classes_school_id
-    ON classes(school_id);
+CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id);
 
 -- ══════════════════════════════════════════════
 -- TABLE: teacher_class_assignments
@@ -91,15 +82,9 @@ CREATE TABLE IF NOT EXISTS teacher_class_assignments (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uix_tca_teacher_class_subject
     ON teacher_class_assignments(teacher_id, class_id, subject);
-
-CREATE INDEX IF NOT EXISTS idx_tca_school_id
-    ON teacher_class_assignments(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_tca_teacher_id
-    ON teacher_class_assignments(teacher_id);
-
-CREATE INDEX IF NOT EXISTS idx_tca_class_id
-    ON teacher_class_assignments(class_id);
+CREATE INDEX IF NOT EXISTS idx_tca_school_id ON teacher_class_assignments(school_id);
+CREATE INDEX IF NOT EXISTS idx_tca_teacher_id ON teacher_class_assignments(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_tca_class_id ON teacher_class_assignments(class_id);
 
 -- ══════════════════════════════════════════════
 -- TABLE: students
@@ -116,15 +101,11 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uix_students_school_class_roll
     ON students(school_id, class_id, roll_number);
-
-CREATE INDEX IF NOT EXISTS idx_students_school_id
-    ON students(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_students_class_id
-    ON students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_id ON students(school_id);
+CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id);
 
 -- ══════════════════════════════════════════════
--- TABLE: parent_student_links (immutable binding)
+-- TABLE: parent_student_links
 -- ══════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS parent_student_links (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -136,18 +117,12 @@ CREATE TABLE IF NOT EXISTS parent_student_links (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uix_psl_parent_student
     ON parent_student_links(parent_id, student_id);
-
-CREATE INDEX IF NOT EXISTS idx_psl_school_id
-    ON parent_student_links(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_psl_parent_id
-    ON parent_student_links(parent_id);
-
-CREATE INDEX IF NOT EXISTS idx_psl_student_id
-    ON parent_student_links(student_id);
+CREATE INDEX IF NOT EXISTS idx_psl_school_id ON parent_student_links(school_id);
+CREATE INDEX IF NOT EXISTS idx_psl_parent_id ON parent_student_links(parent_id);
+CREATE INDEX IF NOT EXISTS idx_psl_student_id ON parent_student_links(student_id);
 
 -- ══════════════════════════════════════════════
--- TABLE: attendance_records (append-only, soft delete)
+-- TABLE: attendance_records
 -- ══════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS attendance_records (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -166,25 +141,18 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     CONSTRAINT chk_attendance_entered_by_role CHECK (entered_by_role IN ('Parent', 'Admin'))
 );
 
--- One active record per student per day (soft-delete aware)
 CREATE UNIQUE INDEX IF NOT EXISTS uix_attendance_student_date_active
     ON attendance_records(student_id, date)
     WHERE is_deleted = FALSE;
-
-CREATE INDEX IF NOT EXISTS idx_attendance_school_id
-    ON attendance_records(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_attendance_student_id
-    ON attendance_records(student_id);
-
+CREATE INDEX IF NOT EXISTS idx_attendance_school_id ON attendance_records(school_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_student_id ON attendance_records(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_school_student_date
     ON attendance_records(school_id, student_id, date);
-
 CREATE INDEX IF NOT EXISTS idx_attendance_entered_by
     ON attendance_records(entered_by_id);
 
 -- ══════════════════════════════════════════════
--- TABLE: homework (soft delete)
+-- TABLE: homework
 -- ══════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS homework (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -203,24 +171,16 @@ CREATE TABLE IF NOT EXISTS homework (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_homework_school_id
-    ON homework(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_homework_class_id
-    ON homework(class_id);
-
-CREATE INDEX IF NOT EXISTS idx_homework_assigned_by
-    ON homework(assigned_by_id);
-
-CREATE INDEX IF NOT EXISTS idx_homework_due_date
-    ON homework(due_date);
-
+CREATE INDEX IF NOT EXISTS idx_homework_school_id ON homework(school_id);
+CREATE INDEX IF NOT EXISTS idx_homework_class_id ON homework(class_id);
+CREATE INDEX IF NOT EXISTS idx_homework_assigned_by ON homework(assigned_by_id);
+CREATE INDEX IF NOT EXISTS idx_homework_due_date ON homework(due_date);
 CREATE INDEX IF NOT EXISTS idx_homework_class_not_deleted
     ON homework(class_id, is_deleted)
     WHERE is_deleted = FALSE;
 
 -- ══════════════════════════════════════════════
--- TABLE: notices (immutable after publish, soft delete)
+-- TABLE: notices
 -- ══════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS notices (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -241,15 +201,9 @@ CREATE TABLE IF NOT EXISTS notices (
     CONSTRAINT chk_notices_target_audience CHECK (target_audience IN ('All', 'Class', 'Section'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_notices_school_id
-    ON notices(school_id);
-
-CREATE INDEX IF NOT EXISTS idx_notices_published_by
-    ON notices(published_by_id);
-
-CREATE INDEX IF NOT EXISTS idx_notices_target_class
-    ON notices(target_class_id);
-
+CREATE INDEX IF NOT EXISTS idx_notices_school_id ON notices(school_id);
+CREATE INDEX IF NOT EXISTS idx_notices_published_by ON notices(published_by_id);
+CREATE INDEX IF NOT EXISTS idx_notices_target_class ON notices(target_class_id);
 CREATE INDEX IF NOT EXISTS idx_notices_school_published
     ON notices(school_id, is_published, is_deleted)
     WHERE is_published = TRUE AND is_deleted = FALSE;
@@ -268,25 +222,10 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     replaced_by_id  UUID REFERENCES refresh_tokens(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user
-    ON refresh_tokens(user_id);
-
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_active
     ON refresh_tokens(user_id, is_revoked)
     WHERE is_revoked = FALSE;
-
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires
-    ON refresh_tokens(expires_at);
-
--- ══════════════════════════════════════════════
--- MIGRATION TRACKING
--- ══════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS _migrations (
-    id              SERIAL PRIMARY KEY,
-    name            VARCHAR(200) NOT NULL UNIQUE,
-    applied_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO _migrations (name) VALUES ('001_foundation_tables');
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 
 COMMIT;

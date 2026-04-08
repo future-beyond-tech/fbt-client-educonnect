@@ -8,12 +8,58 @@ source "${SCRIPT_DIR}/lib/local-env.sh"
 
 ensure_toolchain_path
 load_repo_env
+
+# ── Args: --db <docker|local|remote>, --dry-run, --no-db-autostart ────
+DRY_RUN=false
+AUTO_START_DB=true
+DB_MODE_CLI=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --db)               DB_MODE_CLI="$2"; shift 2 ;;
+    --db=*)             DB_MODE_CLI="${1#*=}"; shift ;;
+    --no-db-autostart)  AUTO_START_DB=false; shift ;;
+    --dry-run)          DRY_RUN=true; shift ;;
+    -h|--help)
+      cat <<'USAGE'
+Usage: scripts/run-backend-local.sh [options]
+
+Options:
+  --db docker|local|remote   Choose Postgres backend (default: docker)
+  --no-db-autostart          Don't auto-start the docker Postgres container
+  --dry-run                  Print resolved env and exit
+  -h, --help                 Show this help
+USAGE
+      exit 0
+      ;;
+    *) echo "Unknown argument: $1" >&2; exit 1 ;;
+  esac
+done
+
+# An explicit --db flag overrides anything loaded from .env. Clear inherited
+# DB env vars so resolve_db_mode rebuilds them from the CLI-chosen mode.
+if [[ -n "${DB_MODE_CLI}" ]]; then
+  export EDUCONNECT_DB_MODE="${DB_MODE_CLI}"
+  unset DATABASE_URL POSTGRES_HOST_PORT
+fi
+
 set_backend_defaults
 
-if [[ "${1:-}" == "--dry-run" ]]; then
+if [[ "${DRY_RUN}" == "true" ]]; then
   print_backend_summary
   echo "Command: dotnet run --project ${REPO_ROOT}/apps/api/src/EduConnect.Api/EduConnect.Api.csproj"
   exit 0
+fi
+
+# In docker mode, transparently bring up the Postgres container so the user
+# never has to remember `docker compose up db -d`. The .NET API will then
+# auto-apply migrations on startup via SqlMigrationRunner.
+if [[ "${EDUCONNECT_DB_MODE}" == "docker" && "${AUTO_START_DB}" == "true" ]]; then
+  if command -v docker >/dev/null 2>&1; then
+    echo "Ensuring docker Postgres is up..."
+    "${SCRIPT_DIR}/db.sh" --db docker up
+  else
+    echo "WARNING: docker not found on PATH; skipping auto-start. Set DB_MODE=local or install Docker." >&2
+  fi
 fi
 
 print_backend_summary

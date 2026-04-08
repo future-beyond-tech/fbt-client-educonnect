@@ -1,7 +1,12 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    [ValidateSet('docker', 'local', 'remote')]
+    [string]$Db,
+
+    [switch]$NoDbAutostart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,6 +14,13 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\local-env.ps1')
 
 Load-RepoEnv
+if ($Db) {
+    # Explicit -Db flag overrides anything loaded from .env. Clear the
+    # inherited DB env vars so Resolve-DbMode rebuilds them from scratch.
+    $env:EDUCONNECT_DB_MODE = $Db
+    Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:POSTGRES_HOST_PORT -ErrorAction SilentlyContinue
+}
 Set-BackendDefaults
 
 $repoRoot = Get-RepoRoot
@@ -18,6 +30,16 @@ if ($DryRun) {
     Print-BackendSummary
     Write-Host "Command: dotnet run --project $projectPath"
     exit 0
+}
+
+# In docker mode, transparently bring up the Postgres container.
+if ($env:EDUCONNECT_DB_MODE -eq 'docker' -and -not $NoDbAutostart) {
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        Write-Host 'Ensuring docker Postgres is up...'
+        & (Join-Path $PSScriptRoot 'db.ps1') -Command up -Db docker
+    } else {
+        Write-Warning 'docker not found on PATH; skipping auto-start. Use -Db local or install Docker.'
+    }
 }
 
 Print-BackendSummary
