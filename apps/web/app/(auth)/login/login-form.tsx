@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiPost } from "@/lib/api-client";
@@ -281,6 +282,24 @@ export function LoginForm(): React.ReactElement {
             "Login"
           )}
         </Button>
+
+        <div className="text-center text-sm">
+          {mode === "parent" ? (
+            <Link
+              href="/forgot-pin"
+              className="text-primary hover:underline"
+            >
+              Forgot your PIN?
+            </Link>
+          ) : (
+            <Link
+              href="/forgot-password"
+              className="text-primary hover:underline"
+            >
+              Forgot your password?
+            </Link>
+          )}
+        </div>
       </form>
     </div>
   );

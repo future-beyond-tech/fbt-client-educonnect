@@ -74,9 +74,16 @@ builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<PinService>();
 builder.Services.AddScoped<PasswordHasher>();
+builder.Services.AddScoped<ResetTokenService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDateTimeProvider, DateTimeProvider>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// Resend transactional email (used by forgot/reset password & PIN flows).
+builder.Services.AddHttpClient<IEmailService, ResendEmailService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // S3 storage for attachments (compatible with AWS S3, Cloudflare R2, MinIO)
 var s3ServiceUrl = builder.Configuration["S3_SERVICE_URL"];

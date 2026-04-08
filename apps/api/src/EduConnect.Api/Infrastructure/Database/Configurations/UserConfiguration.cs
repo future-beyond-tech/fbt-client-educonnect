@@ -14,6 +14,7 @@ public class UserConfiguration : IEntityTypeConfiguration<UserEntity>
 
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Phone).IsRequired().HasMaxLength(20);
+        builder.Property(x => x.Email).HasMaxLength(256);
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
         builder.Property(x => x.Role).IsRequired().HasMaxLength(50);
         builder.Property(x => x.PasswordHash).HasMaxLength(500);
@@ -22,6 +23,7 @@ public class UserConfiguration : IEntityTypeConfiguration<UserEntity>
 
         builder.HasIndex(x => new { x.SchoolId, x.Phone }).IsUnique();
         builder.HasIndex(x => x.SchoolId);
+        builder.HasIndex(x => x.Email);
 
         builder.HasOne(x => x.School)
             .WithMany(x => x.Users)

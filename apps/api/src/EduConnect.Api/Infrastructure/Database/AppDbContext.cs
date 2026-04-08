@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
     public DbSet<NotificationEntity> Notifications { get; set; }
     public DbSet<AttachmentEntity> Attachments { get; set; }
     public DbSet<RefreshTokenEntity> RefreshTokens { get; set; }
+    public DbSet<AuthResetTokenEntity> AuthResetTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +68,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RefreshTokenEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       (entity.User != null && entity.User.SchoolId == _currentUserService.SchoolId));
+        modelBuilder.Entity<AuthResetTokenEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
+                                      entity.SchoolId == _currentUserService.SchoolId);
 
         ApplySnakeCaseNamingConventions(modelBuilder);
     }
@@ -76,6 +80,7 @@ public class AppDbContext : DbContext
         var entries = ChangeTracker
             .Entries()
             .Where(e => e.Entity is not RefreshTokenEntity &&
+                        e.Entity is not AuthResetTokenEntity &&
                         e.State == EntityState.Modified);
 
         foreach (var entry in entries)
