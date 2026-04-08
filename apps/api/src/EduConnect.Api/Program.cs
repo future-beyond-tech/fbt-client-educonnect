@@ -191,6 +191,13 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Apply pending SQL migrations on startup. Safe across replicas via pg advisory lock.
+// Halts startup on failure so a misconfigured / broken schema cannot serve traffic.
+{
+    var migrationLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SqlMigrationRunner");
+    await SqlMigrationRunner.ApplyAsync(app.Services, migrationLogger);
+}
+
 app.UseRouting();
 
 if (!string.IsNullOrWhiteSpace(sentryDsn))

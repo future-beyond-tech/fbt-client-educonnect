@@ -38,6 +38,43 @@ docker compose up db -d
 # Connection string: postgresql://educonnect:educonnect_dev@localhost:5433/educonnect
 ```
 
+### Switching between Local and Docker Postgres
+
+The repo ships two ready-to-use env profiles so you can flip between a
+native Postgres (port `5432`) and the Docker Postgres (host port `5433`)
+without hand-editing `.env`:
+
+| File | Profile | DATABASE_URL |
+|------|---------|--------------|
+| `.env.local`  | Native Postgres  | `postgresql://educonnect:educonnect_dev@localhost:5432/educonnect` |
+| `.env.docker` | Docker Postgres  | `postgresql://educonnect:educonnect_dev@localhost:5433/educonnect` |
+
+Switch with:
+
+```bash
+# Use natively installed Postgres (localhost:5432)
+pnpm db:use:local
+
+# Use Docker Postgres (localhost:5433); start it first with:
+pnpm db:docker:up
+pnpm db:use:docker
+
+# Stop the Docker DB when done
+pnpm db:docker:down
+```
+
+`pnpm db:use:*` copies the chosen profile file on top of `.env`
+(backing up the previous one to `.env.bak`). After switching, run the
+backend as usual:
+
+```bash
+pnpm local:backend:run         # macOS / Linux
+pnpm local:backend:run:win     # Windows PowerShell
+```
+
+If you change profiles you should re-run migrations against the newly
+active `DATABASE_URL` (see below).
+
 ### Run Migrations
 
 ```bash

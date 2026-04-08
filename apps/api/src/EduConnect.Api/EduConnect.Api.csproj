@@ -29,4 +29,11 @@
     <PackageReference Include="AWSSDK.S3" Version="3.7.402.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Infrastructure\Database\Migrations\*.sql">
+      <Link>Migrations\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
