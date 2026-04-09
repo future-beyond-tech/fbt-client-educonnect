@@ -17,14 +17,14 @@ RUN dotnet publish src/EduConnect.Api/EduConnect.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 
-# Security: run as non-root
+# Security: create non-root user (but don't switch yet)
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
 
 COPY --from=build /app/publish .
 
-# Create logs directory (writable by appuser)
-RUN mkdir -p /app/logs
+# Create logs directory and hand /app to appuser, then drop privileges
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
+USER appuser
 
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
