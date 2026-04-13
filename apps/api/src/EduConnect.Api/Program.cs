@@ -196,7 +196,7 @@ var app = builder.Build();
 // Seeds only run when ASPNETCORE_ENVIRONMENT=Development.
 {
     var migrationLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SqlMigrationRunner");
-    await SqlMigrationRunner.ApplyAsync(app.Services, app.Environment, migrationLogger);
+    await SqlMigrationRunner.ApplyAsync(app.Services, app.Environment, app.Configuration, migrationLogger);
 }
 
 app.UseRouting();

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 
 namespace EduConnect.Api.Infrastructure.Database;
@@ -31,6 +32,7 @@ public static class SqlMigrationRunner
     private const string MigrationsRoot = "Migrations";
     private const string SchemaSubfolder = "schema";
     private const string SeedSubfolder = "seed";
+    private const string RunSeedsConfigKey = "EDUCONNECT_RUN_SEEDS";
 
     // A table that only exists if 001_foundation_tables has been applied.
     // Used by the bootstrap probe to decide whether an "untracked" DB is
@@ -40,6 +42,7 @@ public static class SqlMigrationRunner
     public static async Task ApplyAsync(
         IServiceProvider services,
         IHostEnvironment environment,
+        IConfiguration configuration,
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
@@ -98,7 +101,8 @@ public static class SqlMigrationRunner
                 cancellationToken);
 
             // ── Seed track (Development only) ─────────────────────────────
-            if (environment.IsDevelopment())
+            var runSeeds = environment.IsDevelopment() || configuration.GetValue<bool>(RunSeedsConfigKey);
+            if (runSeeds)
             {
                 await EnsureTrackingTableAsync(connection, "seed_migrations", cancellationToken);
                 await ApplyTrackAsync(
@@ -112,8 +116,8 @@ public static class SqlMigrationRunner
             else if (seedFiles.Count > 0)
             {
                 logger.LogInformation(
-                    "Skipping {Count} seed file(s) because environment is {Env}",
-                    seedFiles.Count, environment.EnvironmentName);
+                    "Skipping {Count} seed file(s) because environment is {Env} and {Key} is false",
+                    seedFiles.Count, environment.EnvironmentName, RunSeedsConfigKey);
             }
         }
         finally
