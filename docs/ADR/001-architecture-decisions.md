@@ -11,7 +11,9 @@
 
 EduConnect is a school communication platform replacing WhatsApp groups, paper circulars, and verbal messages with a single trusted digital system for attendance, homework, and notices. This ADR captures all foundational architecture decisions made during Product Genesis.
 
-**Stack:** Next.js 15 + Expo | .NET 8 (Minimal API) | PostgreSQL (Railway)
+Implementation status note: the checked-in repo currently contains the Next.js web app and the .NET API only. The earlier Expo/mobile track remains deferred, and current setup/deployment details now live in `docs/SETUP.md` and `docs/RAILWAY_DEPLOYMENT.md`.
+
+**Stack:** Next.js 15 web app | .NET 8 (Minimal API) | PostgreSQL (Railway)
 **Team:** Solo developer
 **Timeline:** 6–8 weeks to MVP
 

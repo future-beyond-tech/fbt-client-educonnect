@@ -15,6 +15,7 @@ export interface TeacherProfile {
   id: string;
   name: string;
   phone: string;
+  email: string;
   isActive: boolean;
   createdAt: string;
   assignments: TeacherAssignment[];
@@ -26,6 +27,7 @@ export interface TeacherAssignment {
   className: string;
   section: string;
   subject: string;
+  isClassTeacher: boolean;
   assignedAt: string;
 }
 
@@ -34,6 +36,7 @@ export interface TeacherClassItem {
   className: string;
   section: string;
   subject: string;
+  isClassTeacher: boolean;
 }
 
 export interface SubjectItem {
@@ -44,8 +47,22 @@ export interface SubjectItem {
 export interface AssignClassRequest {
   classId: string;
   subject: string;
+  isClassTeacher: boolean;
 }
 
 export interface CreateSubjectRequest {
   name: string;
+}
+
+export interface CreateTeacherRequest {
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+}
+
+export interface TeacherMutationResponse {
+  teacherId?: string;
+  assignmentId?: string;
+  message: string;
 }

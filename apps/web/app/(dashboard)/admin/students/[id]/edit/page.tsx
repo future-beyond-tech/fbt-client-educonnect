@@ -6,10 +6,12 @@ import { ApiError, apiGet, apiPut } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { ClassSelector } from "@/components/shared/class-selector";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { StatusBanner } from "@/components/shared/status-banner";
 import { ArrowLeft } from "lucide-react";
 import type {
   StudentDetail,
@@ -119,25 +121,27 @@ export default function EditStudentPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push(`/admin/students/${studentId}`)}
-          aria-label="Back to student"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Student</h1>
-          <p className="text-muted-foreground">Update student information.</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title="Edit Student"
+        description="Update student details, class placement, and core profile information."
+        backAction={(
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/admin/students/${studentId}`)}
+            aria-label="Back to student"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Student
+          </Button>
+        )}
+      />
 
-      <Card>
-        <CardContent className="p-4 md:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
+      <PageSection>
+        <CardContent className="p-0">
+          <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
             <Input
               label="Student Name"
               value={name}
@@ -162,7 +166,7 @@ export default function EditStudentPage(): React.ReactElement {
               disabled={isSubmitting}
             />
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <StatusBanner variant="error">{error}</StatusBanner>}
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={isSubmitting}>
@@ -179,7 +183,7 @@ export default function EditStudentPage(): React.ReactElement {
             </div>
           </form>
         </CardContent>
-      </Card>
-    </div>
+      </PageSection>
+    </PageShell>
   );
 }

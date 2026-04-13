@@ -29,8 +29,12 @@ public class TenantIsolationMiddleware
         {
             var userIdClaim = context.User.FindFirst("userId")?.Value;
             var schoolIdClaim = context.User.FindFirst("schoolId")?.Value;
-            var roleClaim = context.User.FindFirst("role")?.Value;
-            var nameClaim = context.User.FindFirst("name")?.Value;
+            var roleClaim =
+                context.User.FindFirst("role")?.Value ??
+                context.User.FindFirst(ClaimTypes.Role)?.Value;
+            var nameClaim =
+                context.User.FindFirst("name")?.Value ??
+                context.User.FindFirst(ClaimTypes.Name)?.Value;
 
             if (Guid.TryParse(userIdClaim, out var userId) && Guid.TryParse(schoolIdClaim, out var schoolId))
             {

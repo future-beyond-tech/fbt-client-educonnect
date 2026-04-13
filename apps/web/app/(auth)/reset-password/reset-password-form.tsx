@@ -7,6 +7,7 @@ import { ApiError, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { StatusBanner } from "@/components/shared/status-banner";
 
 interface ResetPasswordResponse {
   message: string;
@@ -23,6 +24,8 @@ export function ResetPasswordForm(): React.ReactElement {
   const [success, setSuccess] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
+  const secureFieldClassName =
+    "flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-26px_rgba(15,23,42,0.42)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement>
@@ -75,13 +78,13 @@ export function ResetPasswordForm(): React.ReactElement {
       </div>
 
       {!token && (
-        <p className="text-sm font-medium text-destructive">
+        <StatusBanner variant="error">
           This reset link is missing a token. Please request a new one from the{" "}
           <Link href="/forgot-password" className="underline">
             forgot password
           </Link>{" "}
           page.
-        </p>
+        </StatusBanner>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -105,13 +108,13 @@ export function ResetPasswordForm(): React.ReactElement {
               }}
               disabled={isLoading || !token}
               aria-invalid={!!error}
-              className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              className={secureFieldClassName}
             />
             <button
               type="button"
               onClick={(): void => setShowPassword(!showPassword)}
               disabled={isLoading || !token}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? "Hide" : "Show"}
@@ -141,17 +144,15 @@ export function ResetPasswordForm(): React.ReactElement {
             }}
             disabled={isLoading || !token}
             aria-invalid={!!error}
-            className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+            className={secureFieldClassName}
           />
         </div>
 
         {error && (
-          <p id="form-error" className="text-sm font-medium text-destructive">
-            {error}
-          </p>
+          <StatusBanner id="form-error" variant="error">{error}</StatusBanner>
         )}
         {success && (
-          <p className="text-sm font-medium text-green-700">{success}</p>
+          <StatusBanner variant="success">{success}</StatusBanner>
         )}
 
         <Button

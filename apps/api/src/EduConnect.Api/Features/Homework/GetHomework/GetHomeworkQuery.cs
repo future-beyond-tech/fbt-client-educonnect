@@ -10,4 +10,13 @@ public record HomeworkDto(
     string Description,
     DateOnly DueDate,
     bool IsEditable,
+    string Status,
+    DateTimeOffset? SubmittedAt,
+    DateTimeOffset? ApprovedAt,
+    Guid? ApprovedById,
+    DateTimeOffset? RejectedAt,
+    Guid? RejectedById,
+    string? RejectedReason,
+    bool CanSubmitForApproval,
+    bool CanApproveOrReject,
     DateTimeOffset PublishedAt);

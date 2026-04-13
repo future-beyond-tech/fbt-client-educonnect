@@ -4,12 +4,13 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ApiError, apiGet, apiPut, apiDelete } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { ParentLinkList } from "@/components/shared/parent-link-list";
+import { StatusBanner } from "@/components/shared/status-banner";
 import {
   ArrowLeft,
   Pencil,
@@ -121,133 +122,130 @@ export default function AdminStudentDetailPage(): React.ReactElement {
   if (!student) return <></>;
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/students")}
-          aria-label="Back to students"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {student.name}
-            </h1>
-            {!student.isActive && <Badge variant="destructive">Inactive</Badge>}
-          </div>
-          <p className="text-muted-foreground">
-            Roll: {student.rollNumber} &middot; {student.className}
-            {student.section ? ` ${student.section}` : ""}
-          </p>
-        </div>
-      </div>
-
-      {successMessage && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-          {successMessage}
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push(`/admin/students/${studentId}/edit`)}
-        >
-          <Pencil className="mr-1 h-4 w-4" />
-          Edit
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            router.push(`/admin/students/${studentId}/link-parent`)
-          }
-        >
-          <LinkIcon className="mr-1 h-4 w-4" />
-          Link Parent
-        </Button>
-        {student.isActive && (
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title={student.name}
+        description={`Roll ${student.rollNumber} • ${student.className}${student.section ? ` ${student.section}` : ""}`}
+        backAction={(
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
-            onClick={handleDeactivate}
-            disabled={isDeactivating}
+            onClick={() => router.push("/admin/students")}
+            aria-label="Back to students"
           >
-            {isDeactivating ? (
-              <Spinner size="sm" />
-            ) : (
-              <>
-                <UserMinus className="mr-1 h-4 w-4" />
-                Deactivate
-              </>
-            )}
+            <ArrowLeft className="h-4 w-4" />
+            Back to Students
           </Button>
         )}
-      </div>
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/admin/students/${studentId}/edit`)}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                router.push(`/admin/students/${studentId}/link-parent`)
+              }
+            >
+              <LinkIcon className="h-4 w-4" />
+              Link Parent
+            </Button>
+            {student.isActive && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeactivate}
+                disabled={isDeactivating}
+              >
+                {isDeactivating ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <>
+                    <UserMinus className="h-4 w-4" />
+                    Deactivate
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+        stats={[
+          { label: "Academic year", value: student.academicYear || "—" },
+          { label: "Parents linked", value: student.parentLinks.length.toString() },
+        ]}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
+      {!student.isActive && (
+        <StatusBanner variant="warning">This student is currently inactive.</StatusBanner>
+      )}
+      {successMessage && (
+        <StatusBanner variant="success">{successMessage}</StatusBanner>
+      )}
+      {error && (
+        <StatusBanner variant="error">{error}</StatusBanner>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PageSection>
+          <CardHeader className="px-0 pt-0">
             <CardTitle className="text-lg">Personal Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between">
+          <CardContent className="space-y-4 px-0 pb-0">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">Full Name</span>
-              <span className="text-sm font-medium">{student.name}</span>
+              <span className="text-sm font-medium text-right">{student.name}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">Roll Number</span>
-              <span className="text-sm font-medium">{student.rollNumber}</span>
+              <span className="text-sm font-medium text-right">{student.rollNumber}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">Class</span>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium text-right">
                 {student.className}
                 {student.section ? ` ${student.section}` : ""}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">
                 Academic Year
               </span>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium text-right">
                 {student.academicYear || "—"}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">
                 Date of Birth
               </span>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium text-right">
                 {student.dateOfBirth
                   ? formatDate(student.dateOfBirth)
                   : "—"}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">Enrolled</span>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium text-right">
                 {formatDate(student.createdAt)}
               </span>
             </div>
           </CardContent>
-        </Card>
+        </PageSection>
 
-        <Card>
-          <CardHeader>
+        <PageSection>
+          <CardHeader className="px-0 pt-0">
             <CardTitle className="text-lg">Linked Parents</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0 pb-0">
             <ParentLinkList
               links={student.parentLinks}
               canUnlink
@@ -255,8 +253,8 @@ export default function AdminStudentDetailPage(): React.ReactElement {
               isUnlinking={isUnlinking}
             />
           </CardContent>
-        </Card>
+        </PageSection>
       </div>
-    </div>
+    </PageShell>
   );
 }

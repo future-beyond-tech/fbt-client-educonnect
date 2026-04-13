@@ -1,17 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Manrope, Space_Grotesk } from "next/font/google";
 import { APP_NAME } from "@/lib/constants";
 import { validateEnv } from "@/lib/validate-env";
 import { AuthProvider } from "@/providers/auth-provider";
+import { ThemeProvider } from "@/providers/theme-provider";
 import { ServiceWorkerRegistrar } from "@/components/pwa/sw-registrar";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import "@/app/globals.css";
 
 validateEnv();
 
-const inter = Inter({
+const manrope = Manrope({
   subsets: ["latin"],
   display: "swap",
+  variable: "--font-sans",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -44,9 +52,39 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#2563eb",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#165888" },
+    { media: "(prefers-color-scheme: dark)", color: "#08121f" },
+  ],
   viewportFit: "cover",
 };
+
+const themeScript = `
+  (function () {
+    try {
+      var storageKey = "educonnect-theme";
+      var storedTheme = window.localStorage.getItem(storageKey);
+      var theme =
+        storedTheme === "dark" || storedTheme === "light"
+          ? storedTheme
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+      var root = document.documentElement;
+      root.dataset.theme = theme;
+      root.style.colorScheme = theme;
+      var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute(
+          "content",
+          theme === "dark" ? "#08121f" : "#165888"
+        );
+      }
+    } catch (error) {
+      void error;
+    }
+  })();
+`;
 
 export default function RootLayout({
   children,
@@ -55,10 +93,15 @@ export default function RootLayout({
 }): React.ReactElement {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable} antialiased`}>
+        <ThemeProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ThemeProvider>
         <ServiceWorkerRegistrar />
         <InstallPrompt />
       </body>

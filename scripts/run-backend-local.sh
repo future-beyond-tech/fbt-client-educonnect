@@ -56,7 +56,7 @@ fi
 if [[ "${EDUCONNECT_DB_MODE}" == "docker" && "${AUTO_START_DB}" == "true" ]]; then
   if command -v docker >/dev/null 2>&1; then
     echo "Ensuring docker Postgres is up..."
-    "${SCRIPT_DIR}/db.sh" --db docker up
+    "${REPO_ROOT}/scripts/db.sh" --db docker up
   else
     echo "WARNING: docker not found on PATH; skipping auto-start. Set DB_MODE=local or install Docker." >&2
   fi

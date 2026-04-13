@@ -96,6 +96,11 @@ function Set-BackendDefaults {
     Set-EnvDefault 'PIN_MAX_LENGTH' '6'
     Set-EnvDefault 'CORS_ALLOWED_ORIGINS' 'http://localhost:3000'
     Set-EnvDefault 'RATE_LIMIT_API_PER_USER_PER_MINUTE' '60'
+    Set-EnvDefault 'NEXT_PUBLIC_APP_URL' 'http://localhost:3000'
+    # Dev-safe placeholders keep the API bootable locally; replace them with
+    # real Resend credentials before testing forgot/reset email delivery.
+    Set-EnvDefault 'RESEND_API_KEY' 'dev-resend-api-key'
+    Set-EnvDefault 'RESEND_FROM_EMAIL' 'EduConnect <no-reply@example.com>'
     Set-EnvDefault 'ASPNETCORE_URLS' "http://localhost:$($env:API_PORT)"
 }
 
@@ -108,6 +113,7 @@ function Set-FrontendDefaults {
 function Print-BackendSummary {
     Write-Host "Repo root: $($script:RepoRoot)"
     Write-Host "API URL:   $($env:ASPNETCORE_URLS)"
+    Write-Host "App URL:   $($env:NEXT_PUBLIC_APP_URL)"
     Write-Host "DB mode:   $($env:EDUCONNECT_DB_MODE)"
     Write-Host "DB:        $($env:DATABASE_URL)"
     Write-Host "DB Port:   $($env:POSTGRES_HOST_PORT)"

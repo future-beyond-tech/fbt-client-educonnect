@@ -1,8 +1,33 @@
 # EduConnect — Product Genesis Blueprint
 
+> Historical note: this document captures the sprint-zero blueprint from 2026-04-03. It is no longer the operational source of truth. For current setup and deployment behavior, use [`docs/SETUP.md`](./SETUP.md) and [`docs/RAILWAY_DEPLOYMENT.md`](./RAILWAY_DEPLOYMENT.md).
+>
+> Current implementation differences from this blueprint:
+> - the checked-in repo currently ships `apps/web` and `apps/api` only; there is no `apps/mobile` app yet
+> - the API uses additive SQL files under `Infrastructure/Database/Migrations/` with auto-apply on startup, not EF migration scaffolding as the primary workflow
+> - features added after genesis now exist in code, including subjects, teacher management, student management, notifications, attachments, and password/PIN reset flows
+
 **Date:** 2026-04-03
 **Phase:** Idea → Sprint Zero
-**Stack:** Next.js 15 (PPR) + Expo | .NET 8 Minimal API (VSA + CQRS + MediatR) | PostgreSQL (Railway)
+**Initial Target Stack:** Next.js 15 (PPR) + Expo | .NET 8 Minimal API (VSA + CQRS + MediatR) | PostgreSQL (Railway)
+
+## Current Repository Snapshot (2026-04-13)
+
+```text
+fbt-client-educonnect/
+├── apps/
+│   ├── web/            # checked-in Next.js 15 frontend
+│   └── api/            # checked-in ASP.NET Core 8 API
+├── packages/
+│   ├── api-client/     # placeholder package; client generation not wired yet
+│   ├── ui/
+│   └── config/
+├── docs/
+│   ├── SETUP.md
+│   ├── RAILWAY_DEPLOYMENT.md
+│   └── ADR/
+└── scripts/            # local run/test/db helpers for macOS/Linux + Windows
+```
 
 ---
 

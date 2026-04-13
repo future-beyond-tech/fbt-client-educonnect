@@ -17,6 +17,8 @@ public class GetHomeworkQueryHandler : IRequestHandler<GetHomeworkQuery, List<Ho
 
     public async Task<List<HomeworkDto>> Handle(GetHomeworkQuery request, CancellationToken cancellationToken)
     {
+        var userId = _currentUserService.UserId;
+        var classTeacherClassIds = new List<Guid>();
         var query = _context.Homeworks
             .Where(h => h.SchoolId == _currentUserService.SchoolId && !h.IsDeleted)
             .AsQueryable();
@@ -32,18 +34,31 @@ public class GetHomeworkQueryHandler : IRequestHandler<GetHomeworkQuery, List<Ho
                 .ToListAsync(cancellationToken);
 
             query = query.Where(h => studentClassIds.Contains(h.ClassId));
+            query = query.Where(h => h.Status == "Published");
         }
         else if (_currentUserService.Role == "Teacher")
         {
             var assignedClassIds = await _context.TeacherClassAssignments
                 .Where(tca =>
                     tca.SchoolId == _currentUserService.SchoolId &&
-                    tca.TeacherId == _currentUserService.UserId)
+                    tca.TeacherId == userId)
                 .Select(tca => tca.ClassId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            query = query.Where(h => assignedClassIds.Contains(h.ClassId));
+            classTeacherClassIds = await _context.TeacherClassAssignments
+                .Where(tca =>
+                    tca.SchoolId == _currentUserService.SchoolId &&
+                    tca.TeacherId == userId &&
+                    tca.IsClassTeacher)
+                .Select(tca => tca.ClassId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            query = query.Where(h =>
+                (assignedClassIds.Contains(h.ClassId) && h.Status == "Published")
+                || h.AssignedById == userId
+                || (classTeacherClassIds.Contains(h.ClassId) && h.Status == "PendingApproval"));
         }
 
         if (request.ClassId.HasValue)
@@ -66,6 +81,19 @@ public class GetHomeworkQueryHandler : IRequestHandler<GetHomeworkQuery, List<Ho
                 h.Description,
                 h.DueDate,
                 h.IsEditable,
+                h.Status,
+                h.SubmittedAt,
+                h.ApprovedAt,
+                h.ApprovedById,
+                h.RejectedAt,
+                h.RejectedById,
+                h.RejectedReason,
+                _currentUserService.Role == "Teacher"
+                    && h.AssignedById == userId
+                    && (h.Status == "Draft" || h.Status == "Rejected"),
+                _currentUserService.Role == "Teacher"
+                    && classTeacherClassIds.Contains(h.ClassId)
+                    && h.Status == "PendingApproval",
                 h.PublishedAt ?? DateTimeOffset.UtcNow))
             .ToListAsync(cancellationToken);
 

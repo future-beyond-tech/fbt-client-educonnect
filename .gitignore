@@ -39,6 +39,8 @@ Thumbs.db
 # Testing
 coverage/
 *.lcov
+apps/web/test-results/
+apps/web/playwright-report/
 
 # Logs
 logs/

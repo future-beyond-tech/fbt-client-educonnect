@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import {
   BookOpen,
   ChevronLeft,
@@ -67,130 +68,159 @@ export default function AdminTeachersPage(): React.ReactElement {
   }, [fetchTeachers]);
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Teachers</h1>
-          <p className="text-muted-foreground">
-            Manage teacher information and class assignments.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push("/admin/subjects")}
-        >
-          Manage Subjects
-        </Button>
-      </div>
-
-      <div className="max-w-md">
-        <Input
-          placeholder="Search by name or phone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search teachers"
-        />
-      </div>
-
-      {isLoading ? (
-        <div className="flex min-h-96 items-center justify-center">
-          <Spinner size="lg" />
-        </div>
-      ) : error ? (
-        <ErrorState title="Error" message={error} onRetry={fetchTeachers} />
-      ) : teachers.length === 0 ? (
-        <EmptyState
-          title="No teachers found"
-          description={
-            debouncedSearch
-              ? "Try adjusting your search."
-              : "No teachers are registered in this school yet."
-          }
-          icon={
-            <BookOpen
-              className="h-8 w-8 text-muted-foreground"
-              aria-hidden="true"
-            />
-          }
-        />
-      ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            {totalCount} teacher{totalCount !== 1 ? "s" : ""}
-          </p>
-          <div className="space-y-2">
-            {teachers.map((teacher) => (
-              <button
-                key={teacher.id}
-                onClick={() =>
-                  router.push(`/admin/teachers/${teacher.id}`)
-                }
-                className="flex w-full items-center justify-between rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label={`Teacher ${teacher.name}`}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">
-                    {teacher.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {teacher.phone}
-                  </p>
-                </div>
-                <div className="ml-3 flex shrink-0 items-center gap-2">
-                  {teacher.assignedClassCount > 0 ? (
-                    <Badge variant="secondary">
-                      {teacher.assignedClassCount} class
-                      {teacher.assignedClassCount !== 1 ? "es" : ""}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Unassigned</Badge>
-                  )}
-                  {teacher.subjects.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {teacher.subjects.slice(0, 3).join(", ")}
-                      {teacher.subjects.length > 3 ? "..." : ""}
-                    </span>
-                  )}
-                  {!teacher.isActive && (
-                    <Badge variant="destructive">Inactive</Badge>
-                  )}
-                </div>
-              </button>
-            ))}
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title="Teachers"
+        description="Manage teacher accounts, search by name or phone, and review active assignments."
+        icon={<BookOpen className="h-6 w-6" aria-hidden="true" />}
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => router.push("/admin/teachers/new")}
+            >
+              Add Teacher
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/admin/classes")}
+            >
+              Manage Classes
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/admin/subjects")}
+            >
+              Manage Subjects
+            </Button>
           </div>
+        )}
+        stats={[
+          { label: "Teachers", value: totalCount.toString() },
+          { label: "Page", value: totalPages > 0 ? `${page}/${totalPages}` : "1/1" },
+        ]}
+      />
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setPage((p) => Math.min(totalPages, p + 1))
+      <PageSection className="space-y-4">
+        <div className="max-w-md">
+          <Input
+            placeholder="Search by name or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search teachers"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="flex min-h-96 items-center justify-center">
+            <Spinner size="lg" />
+          </div>
+        ) : error ? (
+          <ErrorState title="Error" message={error} onRetry={fetchTeachers} />
+        ) : teachers.length === 0 ? (
+          <EmptyState
+            title="No teachers found"
+            description={
+              debouncedSearch
+                ? "Try adjusting your search."
+                : "No teachers are registered in this school yet."
+            }
+            icon={
+              <BookOpen
+                className="h-8 w-8 text-muted-foreground"
+                aria-hidden="true"
+              />
+            }
+            action={
+              !debouncedSearch
+                ? {
+                    label: "Add Teacher",
+                    onClick: () => router.push("/admin/teachers/new"),
                   }
-                  disabled={page >= totalPages}
-                  aria-label="Next page"
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {totalCount} teacher{totalCount !== 1 ? "s" : ""}
+            </p>
+            <div className="space-y-3">
+              {teachers.map((teacher) => (
+                <button
+                  key={teacher.id}
+                  onClick={() =>
+                    router.push(`/admin/teachers/${teacher.id}`)
+                  }
+                  className="flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92"
+                  aria-label={`Teacher ${teacher.name}`}
                 >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-foreground">
+                      {teacher.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {teacher.phone}
+                    </p>
+                  </div>
+                  <div className="ml-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {teacher.assignedClassCount > 0 ? (
+                      <Badge variant="secondary">
+                        {teacher.assignedClassCount} class
+                        {teacher.assignedClassCount !== 1 ? "es" : ""}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Unassigned</Badge>
+                    )}
+                    {teacher.subjects.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {teacher.subjects.slice(0, 3).join(", ")}
+                        {teacher.subjects.length > 3 ? "..." : ""}
+                      </span>
+                    )}
+                    {!teacher.isActive && (
+                      <Badge variant="destructive">Inactive</Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-          )}
-        </>
-      )}
-    </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={page >= totalPages}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </PageSection>
+    </PageShell>
   );
 }

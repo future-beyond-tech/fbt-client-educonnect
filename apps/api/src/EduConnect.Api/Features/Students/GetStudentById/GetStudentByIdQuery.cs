@@ -20,5 +20,6 @@ public record ParentLinkDto(
     Guid ParentId,
     string ParentName,
     string ParentPhone,
+    string ParentEmail,
     string Relationship,
     DateTimeOffset LinkedAt);

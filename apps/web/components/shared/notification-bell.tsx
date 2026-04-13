@@ -32,33 +32,40 @@ export function NotificationBell(): React.ReactElement {
   }, [fetchNotifications]);
 
   return (
-    <div className="relative">
+    <div className="relative z-[60]">
       <Button
         variant="ghost"
         size="icon"
         onClick={handleToggle}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-        className="h-11 w-11"
+        className="relative h-11 w-11"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+          <span className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground shadow-[0_10px_18px_-10px_rgba(214,69,69,0.95)]">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </Button>
 
       {isOpen && (
-        <NotificationPanel
-          notifications={notifications}
-          isLoading={isLoading}
-          error={error}
-          onClose={handleClose}
-          onMarkRead={markRead}
-          onMarkAllRead={markAllRead}
-          onLoadNotifications={handleLoadNotifications}
-          unreadCount={unreadCount}
-        />
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-slate-950/16 backdrop-blur-[2px]"
+            onClick={handleClose}
+            aria-hidden="true"
+          />
+          <NotificationPanel
+            notifications={notifications}
+            isLoading={isLoading}
+            error={error}
+            onClose={handleClose}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onLoadNotifications={handleLoadNotifications}
+            unreadCount={unreadCount}
+          />
+        </>
       )}
     </div>
   );

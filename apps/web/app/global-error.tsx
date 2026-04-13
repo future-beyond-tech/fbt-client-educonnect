@@ -2,6 +2,8 @@
 
 import { captureException } from "@sentry/nextjs";
 import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function GlobalError({
   error,
@@ -17,39 +19,27 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "100vh",
-            padding: "20px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
-          }}
-        >
-          <h1 style={{ marginBottom: "10px", color: "#dc2626" }}>
-            Critical Error
-          </h1>
-          <p style={{ marginBottom: "20px", color: "#666" }}>
-            An unexpected error occurred. Our team has been notified.
-          </p>
-          <button
-            type="button"
-            onClick={reset}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "16px",
-              minHeight: "44px",
-            }}
-          >
-            Try Again
-          </button>
+        <div className="flex min-h-screen items-center justify-center px-4 py-10">
+          <Card className="max-w-lg">
+            <CardContent className="space-y-5 p-8 text-center">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-destructive">
+                  Critical error
+                </p>
+                <h1 className="text-3xl font-semibold text-foreground">
+                  Something went wrong
+                </h1>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  An unexpected error occurred. Our team has been notified.
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <Button type="button" onClick={reset}>
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </body>
     </html>

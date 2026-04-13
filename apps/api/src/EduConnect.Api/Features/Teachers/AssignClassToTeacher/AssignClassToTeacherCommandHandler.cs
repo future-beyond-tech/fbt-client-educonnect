@@ -92,16 +92,32 @@ public class AssignClassToTeacherCommandHandler : IRequestHandler<AssignClassToT
             TeacherId = request.TeacherId,
             ClassId = request.ClassId,
             Subject = request.Subject,
+            IsClassTeacher = request.IsClassTeacher,
             AssignedById = _currentUserService.UserId,
             CreatedAt = DateTimeOffset.UtcNow
         };
+
+        if (request.IsClassTeacher)
+        {
+            var existingClassTeacher = await _context.TeacherClassAssignments
+                .FirstOrDefaultAsync(tca =>
+                    tca.SchoolId == _currentUserService.SchoolId &&
+                    tca.ClassId == request.ClassId &&
+                    tca.IsClassTeacher,
+                    cancellationToken);
+
+            if (existingClassTeacher != null)
+            {
+                existingClassTeacher.IsClassTeacher = false;
+            }
+        }
 
         _context.TeacherClassAssignments.Add(assignment);
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Teacher {TeacherId} assigned to class {ClassId} for subject '{Subject}' by admin {AdminId}",
-            request.TeacherId, request.ClassId, request.Subject, _currentUserService.UserId);
+            "Teacher {TeacherId} assigned to class {ClassId} for subject '{Subject}' by admin {AdminId}. ClassTeacher={IsClassTeacher}",
+            request.TeacherId, request.ClassId, request.Subject, _currentUserService.UserId, request.IsClassTeacher);
 
         return new AssignClassToTeacherResponse(assignment.Id, "Teacher assigned successfully.");
     }

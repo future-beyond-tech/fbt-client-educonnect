@@ -6,4 +6,5 @@ public record TeacherClassDto(
     Guid ClassId,
     string ClassName,
     string Section,
-    string Subject);
+    string Subject,
+    bool IsClassTeacher);

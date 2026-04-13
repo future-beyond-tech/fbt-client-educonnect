@@ -52,17 +52,12 @@ public class UpdateHomeworkCommandHandler : IRequestHandler<UpdateHomeworkComman
             throw new ForbiddenException("You can only edit homework you created.");
         }
 
-        var publishedDate = homework.PublishedAt.HasValue
-            ? DateOnly.FromDateTime(homework.PublishedAt.Value.UtcDateTime)
-            : DateOnly.FromDateTime(DateTime.UtcNow);
-        var todayDate = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        if (!homework.IsEditable || publishedDate != todayDate)
+        if (homework.Status != "Draft" && homework.Status != "Rejected")
         {
             _logger.LogWarning(
-                "Attempt to edit homework {HomeworkId} outside edit window. IsEditable: {IsEditable}, PublishedDate: {PublishedDate}, Today: {Today}",
-                request.HomeworkId, homework.IsEditable, publishedDate, todayDate);
-            throw new ForbiddenException("Homework can only be edited on the same day it was published.");
+                "Attempt to edit homework {HomeworkId} in status {Status}",
+                request.HomeworkId, homework.Status);
+            throw new ForbiddenException("Homework can only be edited while it is a draft or after it is rejected.");
         }
 
         homework.Title = request.Title;

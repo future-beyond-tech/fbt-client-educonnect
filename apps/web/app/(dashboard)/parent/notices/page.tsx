@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { Bell } from "lucide-react";
 import { AttachmentList } from "@/components/shared/attachment-list";
 
@@ -55,13 +56,14 @@ export default function ParentNoticesPage(): React.ReactElement {
   };
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Notices</h1>
-        <p className="text-muted-foreground">
-          Important announcements from the school.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Family updates"
+        title="Notices"
+        description="Catch every announcement, circular, and school-wide update in one place."
+        icon={<Bell className="h-6 w-6" aria-hidden="true" />}
+        stats={[{ label: "Active notices", value: notices.length.toString() }]}
+      />
 
       {isLoading ? (
         <div className="flex min-h-96 items-center justify-center">
@@ -76,7 +78,7 @@ export default function ParentNoticesPage(): React.ReactElement {
           icon={<Bell className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
         />
       ) : (
-        <div className="space-y-3">
+        <PageSection className="space-y-4">
           {notices.map((notice) => (
             <Card
               key={notice.noticeId}
@@ -100,7 +102,7 @@ export default function ParentNoticesPage(): React.ReactElement {
               </CardHeader>
               {expandedId === notice.noticeId && (
                 <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{notice.body}</p>
+                  <p className="whitespace-pre-wrap text-sm">{notice.body}</p>
                   <div className="mt-3">
                     <AttachmentList entityId={notice.noticeId} entityType="notice" />
                   </div>
@@ -113,8 +115,8 @@ export default function ParentNoticesPage(): React.ReactElement {
               )}
             </Card>
           ))}
-        </div>
+        </PageSection>
       )}
-    </div>
+    </PageShell>
   );
 }

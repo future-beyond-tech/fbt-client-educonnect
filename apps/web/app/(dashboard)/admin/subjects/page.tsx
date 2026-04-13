@@ -6,10 +6,12 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { StatusBanner } from "@/components/shared/status-banner";
 import { ArrowLeft, Plus, BookOpen } from "lucide-react";
 import type { SubjectItem, CreateSubjectRequest } from "@/lib/types/teacher";
 import type { MutationResponse } from "@/lib/types/student";
@@ -83,64 +85,59 @@ export default function AdminSubjectsPage(): React.ReactElement {
   };
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/teachers")}
-          aria-label="Back to teachers"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">Subjects</h1>
-          <p className="text-muted-foreground">
-            Manage subjects available for teacher assignments.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setShowCreateForm(!showCreateForm);
-            setCreateError("");
-          }}
-        >
-          <Plus className="mr-1 h-4 w-4" />
-          Add Subject
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title="Subjects"
+        description="Manage the subject catalog used when assigning teachers to classes."
+        backAction={(
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/admin/teachers")}
+            aria-label="Back to teachers"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Teachers
+          </Button>
+        )}
+        actions={(
+          <Button
+            size="sm"
+            onClick={() => {
+              setShowCreateForm(!showCreateForm);
+              setCreateError("");
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Subject
+          </Button>
+        )}
+        icon={<BookOpen className="h-6 w-6" aria-hidden="true" />}
+        stats={[{ label: "Subjects", value: subjects.length.toString() }]}
+      />
 
       {successMessage && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-          {successMessage}
-        </div>
+        <StatusBanner variant="success">{successMessage}</StatusBanner>
       )}
 
       {showCreateForm && (
-        <Card>
-          <CardHeader>
+        <PageSection>
+          <CardHeader className="px-0 pt-0">
             <CardTitle className="text-lg">New Subject</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0 pb-0">
             <form onSubmit={handleCreate} className="space-y-3">
-              <div className="space-y-2">
-                <label
-                  htmlFor="subjectName"
-                  className="block text-sm font-medium"
-                >
-                  Subject Name
-                </label>
-                <Input
-                  id="subjectName"
-                  value={newSubjectName}
-                  onChange={(e) => setNewSubjectName(e.target.value)}
-                  placeholder="e.g. Mathematics"
-                  disabled={isCreating}
-                  maxLength={80}
-                  autoFocus
-                />
-              </div>
+              <Input
+                id="subjectName"
+                label="Subject Name"
+                value={newSubjectName}
+                onChange={(e) => setNewSubjectName(e.target.value)}
+                placeholder="e.g. Mathematics"
+                disabled={isCreating}
+                maxLength={80}
+                autoFocus
+              />
               {createError && (
                 <p className="text-sm text-destructive">{createError}</p>
               )}
@@ -164,7 +161,7 @@ export default function AdminSubjectsPage(): React.ReactElement {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </PageSection>
       )}
 
       {isLoading ? (
@@ -185,15 +182,15 @@ export default function AdminSubjectsPage(): React.ReactElement {
           }
         />
       ) : (
-        <>
+        <PageSection className="space-y-4">
           <p className="text-sm text-muted-foreground">
             {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
           </p>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {subjects.map((subject) => (
               <div
                 key={subject.id}
-                className="flex items-center rounded-lg border bg-card p-4"
+                className="flex items-center rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,23,42,0.42)] dark:bg-card/90"
               >
                 <BookOpen
                   className="mr-3 h-5 w-5 shrink-0 text-muted-foreground"
@@ -205,8 +202,8 @@ export default function AdminSubjectsPage(): React.ReactElement {
               </div>
             ))}
           </div>
-        </>
+        </PageSection>
       )}
-    </div>
+    </PageShell>
   );
 }

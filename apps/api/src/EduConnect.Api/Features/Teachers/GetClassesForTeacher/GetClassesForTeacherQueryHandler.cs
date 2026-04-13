@@ -34,7 +34,8 @@ public class GetClassesForTeacherQueryHandler : IRequestHandler<GetClassesForTea
                 tca.ClassId,
                 tca.Class != null ? tca.Class.Name : string.Empty,
                 tca.Class != null ? tca.Class.Section : string.Empty,
-                tca.Subject))
+                tca.Subject,
+                tca.IsClassTeacher))
             .ToListAsync(cancellationToken);
 
         return assignments;

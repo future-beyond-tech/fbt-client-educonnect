@@ -6,9 +6,11 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ClassSelector } from "@/components/shared/class-selector";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { StatusBanner } from "@/components/shared/status-banner";
 import { ArrowLeft } from "lucide-react";
 import type {
   ClassItem,
@@ -88,27 +90,33 @@ export default function EnrollStudentPage(): React.ReactElement {
   };
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/admin/students")}
-          aria-label="Back to students"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Enroll Student</h1>
-          <p className="text-muted-foreground">
-            Add a new student to the school.
-          </p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title="Enroll Student"
+        description="Create a new student profile and place them in the correct class."
+        backAction={(
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/admin/students")}
+            aria-label="Back to students"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Students
+          </Button>
+        )}
+        stats={[{ label: "Classes", value: classes.length.toString() }]}
+      />
 
-      <Card>
-        <CardContent className="p-4 md:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
+      <PageSection>
+        <CardContent className="p-0">
+          <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
+            {classes.length === 0 && (
+              <StatusBanner variant="warning">
+                No classes are available yet. Create a class first, then return here to enroll the student.
+              </StatusBanner>
+            )}
             <Input
               label="Student Name"
               placeholder="Enter student's full name"
@@ -143,12 +151,21 @@ export default function EnrollStudentPage(): React.ReactElement {
               disabled={isSubmitting}
             />
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <StatusBanner variant="error">{error}</StatusBanner>}
 
             <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || classes.length === 0}>
                 {isSubmitting ? <Spinner size="sm" /> : "Enroll Student"}
               </Button>
+              {classes.length === 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push("/admin/classes")}
+                >
+                  Manage Classes
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -160,7 +177,7 @@ export default function EnrollStudentPage(): React.ReactElement {
             </div>
           </form>
         </CardContent>
-      </Card>
-    </div>
+      </PageSection>
+    </PageShell>
   );
 }

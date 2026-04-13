@@ -9,6 +9,7 @@ import { API_ENDPOINTS, defaultRouteByRole } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { StatusBanner } from "@/components/shared/status-banner";
 
 interface LoginResponse {
   accessToken: string;
@@ -27,6 +28,8 @@ export function LoginForm(): React.ReactElement {
   const [error, setError] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
+  const secureFieldClassName =
+    "flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-26px_rgba(15,23,42,0.42)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
   React.useEffect(() => {
     if (user) {
@@ -122,17 +125,18 @@ export function LoginForm(): React.ReactElement {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {isAuthLoading && (
-        <p className="text-sm text-muted-foreground">
+        <StatusBanner variant="info">
           Restoring your previous session...
-        </p>
+        </StatusBanner>
       )}
-      <div className="flex gap-2">
+      <div className="rounded-[24px] border border-border/70 bg-card/70 p-2 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:bg-card/86">
+        <div className="grid grid-cols-2 gap-2">
         <Button
           type="button"
-          variant={mode === "parent" ? "default" : "outline"}
-          className="flex-1 h-11 min-h-11"
+          variant={mode === "parent" ? "default" : "ghost"}
+          className="h-11 min-h-11"
           onClick={() => handleModeSwitch("parent")}
           disabled={isLoading || isAuthLoading}
           aria-pressed={mode === "parent"}
@@ -141,27 +145,22 @@ export function LoginForm(): React.ReactElement {
         </Button>
         <Button
           type="button"
-          variant={mode === "staff" ? "default" : "outline"}
-          className="flex-1 h-11 min-h-11"
+          variant={mode === "staff" ? "default" : "ghost"}
+          className="h-11 min-h-11"
           onClick={() => handleModeSwitch("staff")}
           disabled={isLoading || isAuthLoading}
           aria-pressed={mode === "staff"}
         >
           I&apos;m Staff
         </Button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {mode === "parent" ? (
-          <div className="space-y-2">
-            <label
-              htmlFor="rollNumber"
-              className="block text-sm font-medium text-foreground"
-            >
-              Child&apos;s Roll Number
-            </label>
             <Input
               id="rollNumber"
+              label="Child's Roll Number"
               type="text"
               placeholder="e.g. 2024001"
               value={rollNumber}
@@ -169,21 +168,15 @@ export function LoginForm(): React.ReactElement {
               disabled={isLoading || isAuthLoading}
               aria-invalid={!!error}
               aria-describedby={error ? "form-error" : undefined}
+              hint="Enter the roll number provided by the school."
             />
-            <p className="text-xs text-muted-foreground">
-              Enter the roll number provided by the school
-            </p>
-          </div>
         ) : (
           <div className="space-y-2">
-            <label
-              htmlFor="phone"
-              className="block text-sm font-medium text-foreground"
-            >
+            <label htmlFor="phone" className="block text-sm font-medium text-foreground">
               Phone Number
             </label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">
+            <div className="flex items-center gap-3 rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 shadow-[0_12px_30px_-26px_rgba(15,23,42,0.42)] backdrop-blur-sm">
+              <span className="text-sm font-semibold text-muted-foreground">
                 +91
               </span>
               <Input
@@ -197,6 +190,7 @@ export function LoginForm(): React.ReactElement {
                 aria-describedby={error ? "form-error" : undefined}
                 maxLength={10}
                 inputMode="numeric"
+                className="min-h-0 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </div>
           </div>
@@ -204,10 +198,7 @@ export function LoginForm(): React.ReactElement {
 
         {mode === "parent" ? (
           <div className="space-y-2">
-            <label
-              htmlFor="pin"
-              className="block text-sm font-medium text-foreground"
-            >
+            <label htmlFor="pin" className="block text-sm font-medium text-foreground">
               PIN
             </label>
             <input
@@ -222,7 +213,7 @@ export function LoginForm(): React.ReactElement {
               aria-describedby={error ? "form-error" : undefined}
               maxLength={6}
               pattern="[0-9]*"
-              className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              className={secureFieldClassName}
             />
             <p className="text-xs text-muted-foreground">
               4-6 digit PIN for parents
@@ -246,13 +237,13 @@ export function LoginForm(): React.ReactElement {
                 disabled={isLoading || isAuthLoading}
                 aria-invalid={!!error}
                 aria-describedby={error ? "form-error" : undefined}
-                className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                className={secureFieldClassName}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading || isAuthLoading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? "Hide" : "Show"}
@@ -262,14 +253,14 @@ export function LoginForm(): React.ReactElement {
         )}
 
         {error && (
-          <p id="form-error" className="text-sm font-medium text-destructive">
+          <StatusBanner id="form-error" variant="error">
             {error}
-          </p>
+          </StatusBanner>
         )}
 
         <Button
           type="submit"
-          className="w-full h-11 min-h-11"
+          className="w-full h-12 min-h-12"
           disabled={isLoading || isAuthLoading}
           size="default"
         >

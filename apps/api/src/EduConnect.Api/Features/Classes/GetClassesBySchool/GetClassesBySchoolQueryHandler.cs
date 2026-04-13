@@ -17,15 +17,16 @@ public class GetClassesBySchoolQueryHandler : IRequestHandler<GetClassesBySchool
     public async Task<List<ClassDto>> Handle(GetClassesBySchoolQuery request, CancellationToken cancellationToken)
     {
         var classes = await _context.Classes
+            .AsNoTracking()
             .Where(c => c.SchoolId == _currentUserService.SchoolId)
+            .OrderBy(c => c.Name)
+            .ThenBy(c => c.Section)
             .Select(c => new ClassDto(
                 c.Id,
                 c.Name,
                 c.Section,
                 c.AcademicYear,
                 c.Students.Count(s => s.IsActive)))
-            .OrderBy(c => c.Name)
-            .ThenBy(c => c.Section)
             .ToListAsync(cancellationToken);
 
         return classes;

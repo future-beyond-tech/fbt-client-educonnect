@@ -7,6 +7,7 @@ public class TeacherClassAssignmentEntity
     public Guid TeacherId { get; set; }
     public Guid ClassId { get; set; }
     public string Subject { get; set; } = string.Empty;
+    public bool IsClassTeacher { get; set; } = false;
     public Guid? AssignedById { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -40,6 +40,8 @@ export const API_ENDPOINTS = {
   attachmentsRequestUpload: "/api/attachments/request-upload-url",
   attachmentsAttach: "/api/attachments/attach",
   attachments: "/api/attachments",
+  leaveApplications: "/api/attendance/leave",
+  parents: "/api/parents",
 } as const;
 
 export const navigationByRole: Record<RoleType, NavItem[]> = {
@@ -57,6 +59,7 @@ export const navigationByRole: Record<RoleType, NavItem[]> = {
   Admin: [
     { label: "Notices", href: "/admin/notices", icon: "Bell" },
     { label: "Students", href: "/admin/students", icon: "Users" },
+    { label: "Classes", href: "/admin/classes", icon: "School" },
     { label: "Teachers", href: "/admin/teachers", icon: "BookOpen" },
   ],
 };
@@ -65,4 +68,75 @@ export const defaultRouteByRole: Record<RoleType, string> = {
   Parent: "/parent/attendance",
   Teacher: "/teacher/homework",
   Admin: "/admin/notices",
+};
+
+/** Zeigarnik-style checklist steps (visit route to mark complete); chunked per role. */
+export interface RetentionStep {
+  id: string;
+  label: string;
+  href: string;
+}
+
+export const retentionStepsByRole: Record<RoleType, RetentionStep[]> = {
+  Parent: [
+    {
+      id: "attendance",
+      label: "Review attendance",
+      href: "/parent/attendance",
+    },
+    {
+      id: "homework",
+      label: "Check homework",
+      href: "/parent/homework",
+    },
+    {
+      id: "notices",
+      label: "Read notices",
+      href: "/parent/notices",
+    },
+  ],
+  Teacher: [
+    {
+      id: "homework",
+      label: "Review homework",
+      href: "/teacher/homework",
+    },
+    {
+      id: "attendance",
+      label: "Take attendance",
+      href: "/teacher/attendance",
+    },
+    {
+      id: "students",
+      label: "See your students",
+      href: "/teacher/students",
+    },
+    {
+      id: "profile",
+      label: "Confirm assignments",
+      href: "/teacher/profile",
+    },
+  ],
+  Admin: [
+    {
+      id: "notices",
+      label: "Manage notices",
+      href: "/admin/notices",
+    },
+    {
+      id: "students",
+      label: "Review students",
+      href: "/admin/students",
+    },
+    {
+      id: "classes",
+      label: "Manage classes",
+      href: "/admin/classes",
+    },
+    {
+      id: "teachers",
+      label: "Review teachers",
+      href: "/admin/teachers",
+    },
+  ],
 };

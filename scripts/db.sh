@@ -83,15 +83,21 @@ require_psql() {
 }
 
 probe_db() {
-  # Returns 0 if reachable, 1 otherwise. Uses pg_isready when available, falls
-  # back to a TCP probe.
-  local host="localhost"
-  local port="${POSTGRES_HOST_PORT}"
+  # Returns 0 if reachable, 1 otherwise. Prefer libpq-aware tools so URI and
+  # key/value connection strings both work, including remote mode.
   if command -v pg_isready >/dev/null 2>&1; then
-    pg_isready -h "${host}" -p "${port}" -U educonnect -t 1 >/dev/null 2>&1
-  else
-    (echo > "/dev/tcp/${host}/${port}") >/dev/null 2>&1
+    pg_isready -d "${DATABASE_URL}" -t 1 >/dev/null 2>&1 && return 0
   fi
+
+  if command -v psql >/dev/null 2>&1; then
+    PSQLRC=/dev/null psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -qAt -c 'SELECT 1;' >/dev/null 2>&1 && return 0
+  fi
+
+  if [[ "${EDUCONNECT_DB_MODE}" == "remote" ]]; then
+    return 1
+  fi
+
+  (echo > "/dev/tcp/localhost/${POSTGRES_HOST_PORT}") >/dev/null 2>&1
 }
 
 # ── Commands ──────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
-using EduConnect.Api.Infrastructure.Services;
 using MediatR;
 
 namespace EduConnect.Api.Features.Homework.CreateHomework;
@@ -11,18 +10,15 @@ public class CreateHomeworkCommandHandler : IRequestHandler<CreateHomeworkComman
 {
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
-    private readonly INotificationService _notificationService;
     private readonly ILogger<CreateHomeworkCommandHandler> _logger;
 
     public CreateHomeworkCommandHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
-        INotificationService notificationService,
         ILogger<CreateHomeworkCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -62,7 +58,8 @@ public class CreateHomeworkCommandHandler : IRequestHandler<CreateHomeworkComman
             Description = request.Description,
             AssignedById = _currentUserService.UserId,
             DueDate = request.DueDate,
-            PublishedAt = DateTimeOffset.UtcNow,
+            Status = "Draft",
+            PublishedAt = null,
             IsEditable = true,
             IsDeleted = false,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -72,33 +69,10 @@ public class CreateHomeworkCommandHandler : IRequestHandler<CreateHomeworkComman
         _context.Homeworks.Add(homework);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Notify parents of active students in this class
-        var parentIds = await _context.ParentStudentLinks
-            .Where(psl => psl.SchoolId == _currentUserService.SchoolId
-                && psl.Student != null
-                && psl.Student.ClassId == request.ClassId
-                && psl.Student.IsActive)
-            .Select(psl => psl.ParentId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (parentIds.Count > 0)
-        {
-            await _notificationService.SendBatchAsync(
-                _currentUserService.SchoolId,
-                parentIds,
-                "homework_assigned",
-                $"New Homework: {request.Title}",
-                $"{request.Subject} — due {request.DueDate:yyyy-MM-dd}",
-                homework.Id,
-                "homework",
-                cancellationToken);
-        }
-
         _logger.LogInformation(
-            "Homework created: {HomeworkId} for class {ClassId} by teacher {TeacherId}, notified {Count} parents",
-            homework.Id, request.ClassId, _currentUserService.UserId, parentIds.Count);
+            "Homework created (draft): {HomeworkId} for class {ClassId} by teacher {TeacherId}",
+            homework.Id, request.ClassId, _currentUserService.UserId);
 
-        return new CreateHomeworkResponse(homework.Id, "Homework created successfully.");
+        return new CreateHomeworkResponse(homework.Id, "Homework saved as draft. Submit for approval to publish.");
     }
 }

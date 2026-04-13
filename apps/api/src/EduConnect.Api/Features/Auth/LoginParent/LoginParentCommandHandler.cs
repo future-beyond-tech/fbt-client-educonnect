@@ -30,49 +30,49 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
     public async Task<LoginParentResponse> Handle(LoginParentCommand request, CancellationToken cancellationToken)
     {
-        // Look up the student by roll number
+        // Look up the active student by roll number.
+        // NOTE: this is an anonymous endpoint so EF Core global query filters
+        // do not scope by school_id. We deliberately accept any school's
+        // roll number here — the PIN then acts as the second factor that proves
+        // the caller is the linked parent. Roll numbers are school-unique by
+        // the DB unique index (school_id, class_id, roll_number), so collisions
+        // across schools are only possible if two schools share identical codes.
         var student = await _context.Students
-            .FirstOrDefaultAsync(s => s.RollNumber == request.RollNumber, cancellationToken);
+            .FirstOrDefaultAsync(s => s.RollNumber == request.RollNumber && s.IsActive, cancellationToken);
 
         if (student == null)
         {
-            _logger.LogWarning("Parent login attempt with invalid roll number {RollNumber}", request.RollNumber);
+            _logger.LogWarning("Parent login attempt with invalid or inactive roll number {RollNumber}", request.RollNumber);
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }
 
-        // Find the parent linked to this student
-        var parentLink = await _context.ParentStudentLinks
+        // Load ALL active parents linked to this student so we can test each PIN.
+        // A student can have multiple parents; we must find the one whose PIN matches
+        // rather than picking arbitrarily with FirstOrDefault.
+        var parentLinks = await _context.ParentStudentLinks
             .Include(l => l.Parent)
-            .FirstOrDefaultAsync(
+            .Where(
                 l => l.StudentId == student.Id &&
                      l.Parent != null &&
                      l.Parent!.Role == "Parent" &&
-                     l.Parent!.IsActive,
-                cancellationToken);
+                     l.Parent!.IsActive)
+            .ToListAsync(cancellationToken);
 
-        if (parentLink == null)
+        if (parentLinks.Count == 0)
         {
             _logger.LogWarning("No active parent found for student {StudentId} with roll number {RollNumber}", student.Id, request.RollNumber);
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }
 
-        var user = parentLink.Parent;
+        // Find the parent whose PIN matches the supplied value.
+        var user = parentLinks
+            .Select(l => l.Parent!)
+            .FirstOrDefault(p => !string.IsNullOrEmpty(p.PinHash) && _pinService.VerifyPin(request.Pin, p.PinHash));
+
         if (user == null)
         {
-            _logger.LogWarning("Parent link {ParentLinkId} has no parent user loaded", parentLink.Id);
-            throw new UnauthorizedException("Invalid roll number or PIN.");
-        }
-
-        var pinHash = user.PinHash;
-        if (string.IsNullOrEmpty(pinHash))
-        {
-            _logger.LogWarning("Parent login attempt for user {UserId} with no PIN set", user.Id);
-            throw new UnauthorizedException("PIN not set. Please contact school admin.");
-        }
-
-        if (!_pinService.VerifyPin(request.Pin, pinHash))
-        {
-            _logger.LogWarning("Invalid PIN attempt for parent user {UserId}", user.Id);
+            _logger.LogWarning("Invalid PIN attempt for roll number {RollNumber} (student {StudentId})", request.RollNumber, student.Id);
+            // Generic message — do not reveal whether roll number exists or PIN is unset.
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }
 

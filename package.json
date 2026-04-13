@@ -10,6 +10,7 @@
     "type-check": "pnpm --dir apps/web type-check",
     "test": "pnpm test:web && pnpm test:api",
     "test:web": "pnpm lint && pnpm type-check && NEXT_PUBLIC_APP_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:5000 pnpm --dir apps/web build",
+    "test:e2e:web": "pnpm --dir apps/web run test:e2e",
     "test:api": "dotnet test apps/api/tests/EduConnect.Api.Tests/EduConnect.Api.Tests.csproj -c Release",
     "db:use:local": "bash ./scripts/use-env-profile.sh local",
     "db:use:docker": "bash ./scripts/use-env-profile.sh docker",

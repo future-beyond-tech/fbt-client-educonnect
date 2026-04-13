@@ -32,11 +32,14 @@ export function ParentLinkList({
       {links.map((link) => (
         <li
           key={link.linkId}
-          className="flex items-center justify-between rounded-md border p-3"
+          className="flex items-center justify-between gap-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.42)] backdrop-blur-sm dark:bg-card/86"
         >
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground">{link.parentName}</p>
+            <p className="font-semibold text-foreground">{link.parentName}</p>
             <p className="text-sm text-muted-foreground">{link.parentPhone}</p>
+            {link.parentEmail && (
+              <p className="text-xs text-muted-foreground">{link.parentEmail}</p>
+            )}
           </div>
           <div className="ml-3 flex shrink-0 items-center gap-2">
             <Badge variant="outline" className="capitalize">

@@ -5,4 +5,5 @@ public record SearchParentsByPhoneQuery(string Phone) : IRequest<List<ParentSear
 public record ParentSearchResultDto(
     Guid Id,
     string Name,
-    string Phone);
+    string Phone,
+    string Email);

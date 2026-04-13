@@ -32,6 +32,7 @@ public class AppDbContext : DbContext
     public DbSet<SubjectEntity> Subjects { get; set; }
     public DbSet<NotificationEntity> Notifications { get; set; }
     public DbSet<AttachmentEntity> Attachments { get; set; }
+    public DbSet<LeaveApplicationEntity> LeaveApplications { get; set; }
     public DbSet<RefreshTokenEntity> RefreshTokens { get; set; }
     public DbSet<AuthResetTokenEntity> AuthResetTokens { get; set; }
 
@@ -65,6 +66,8 @@ public class AppDbContext : DbContext
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<AttachmentEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<LeaveApplicationEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<RefreshTokenEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       (entity.User != null && entity.User.SchoolId == _currentUserService.SchoolId));
@@ -85,7 +88,11 @@ public class AppDbContext : DbContext
 
         foreach (var entry in entries)
         {
-            entry.Property("UpdatedAt").CurrentValue = DateTimeOffset.UtcNow;
+            var updatedAtProperty = entry.Metadata.FindProperty("UpdatedAt");
+            if (updatedAtProperty != null)
+            {
+                entry.Property("UpdatedAt").CurrentValue = DateTimeOffset.UtcNow;
+            }
         }
 
         return await base.SaveChangesAsync(cancellationToken);
@@ -102,6 +109,14 @@ public class AppDbContext : DbContext
 
             foreach (var property in entityType.GetProperties())
             {
+                var currentColumnName = property.GetColumnName();
+                // If an explicit HasColumnName() was set in a configuration (i.e. the
+                // stored name differs from the default C# property name), respect it
+                // and do not overwrite with the snake_case convention.
+                if (currentColumnName != null && currentColumnName != property.Name)
+                {
+                    continue;
+                }
                 property.SetColumnName(ToSnakeCase(property.Name));
             }
 

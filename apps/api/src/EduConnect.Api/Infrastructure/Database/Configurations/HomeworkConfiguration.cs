@@ -16,12 +16,16 @@ public class HomeworkConfiguration : IEntityTypeConfiguration<HomeworkEntity>
         builder.Property(x => x.Subject).IsRequired().HasMaxLength(100);
         builder.Property(x => x.Title).IsRequired().HasMaxLength(256);
         builder.Property(x => x.Description).IsRequired().HasMaxLength(2000);
+        builder.Property(x => x.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Draft");
+        builder.Property(x => x.RejectedReason).HasMaxLength(500);
         builder.Property(x => x.IsEditable).IsRequired();
         builder.Property(x => x.IsDeleted).IsRequired();
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.ClassId);
         builder.HasIndex(x => x.AssignedById);
+        builder.HasIndex(x => x.ApprovedById);
+        builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.DueDate);
 
         builder.HasOne(x => x.School)
@@ -38,5 +42,15 @@ public class HomeworkConfiguration : IEntityTypeConfiguration<HomeworkEntity>
             .WithMany()
             .HasForeignKey(x => x.AssignedById)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.ApprovedBy)
+            .WithMany()
+            .HasForeignKey(x => x.ApprovedById)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.RejectedBy)
+            .WithMany()
+            .HasForeignKey(x => x.RejectedById)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

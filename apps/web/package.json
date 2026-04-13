@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "pretest:e2e": "playwright install chromium chromium-headless-shell",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@sentry/nextjs": "^8.40.0",
@@ -23,6 +26,8 @@
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "~1.56.0",
     "@types/node": "^20.10.0",
     "@types/react": "^19.0.0",
     "eslint": "^8.55.0",

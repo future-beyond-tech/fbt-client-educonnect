@@ -7,9 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { StatusBanner } from "@/components/shared/status-banner";
 import { Bell, Plus, Send } from "lucide-react";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
@@ -147,157 +151,146 @@ export default function AdminNoticesPage(): React.ReactElement {
   const published = notices.filter((n) => n.isPublished);
 
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Notices</h1>
-          <p className="text-muted-foreground">
-            Create and manage school notices.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setShowCreateForm(!showCreateForm);
-            setCreateError("");
-            setSuccessMessage("");
-          }}
-          size="sm"
-        >
-          <Plus className="mr-1 h-4 w-4" />
-          New Notice
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin operations"
+        title="Notices"
+        description="Draft, attach, and publish announcements with clear audience targeting."
+        icon={<Bell className="h-6 w-6" aria-hidden="true" />}
+        actions={(
+          <Button
+            onClick={() => {
+              setShowCreateForm(!showCreateForm);
+              setCreateError("");
+              setSuccessMessage("");
+            }}
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            New Notice
+          </Button>
+        )}
+        stats={[
+          { label: "Drafts", value: drafts.length.toString() },
+          { label: "Published", value: published.length.toString() },
+        ]}
+      />
 
       {successMessage && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-          {successMessage}
-        </div>
+        <StatusBanner variant="success">{successMessage}</StatusBanner>
       )}
 
       {newNoticeId && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <h3 className="font-semibold">Attach Files to Notice</h3>
-            <p className="text-sm text-muted-foreground">
+        <PageSection className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold">Attach Files to Notice</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
               Optionally attach images or PDFs to the draft notice before publishing.
             </p>
-            <AttachmentUploader
-              entityId={newNoticeId}
-              entityType="notice"
-              existingAttachments={newNoticeAttachments}
-              onAttachmentsChange={setNewNoticeAttachments}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setNewNoticeId(null);
-                setNewNoticeAttachments([]);
-                fetchNotices();
-              }}
-            >
-              Done
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <AttachmentUploader
+            entityId={newNoticeId}
+            entityType="notice"
+            existingAttachments={newNoticeAttachments}
+            onAttachmentsChange={setNewNoticeAttachments}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setNewNoticeId(null);
+              setNewNoticeAttachments([]);
+              fetchNotices();
+            }}
+          >
+            Done
+          </Button>
+        </PageSection>
       )}
 
       {showCreateForm && (
-        <Card>
-          <CardContent className="p-4">
-            <form onSubmit={handleCreate} className="space-y-3">
-              <h3 className="font-semibold">Create Notice</h3>
-              <div className="space-y-1">
-                <label htmlFor="createTitle" className="text-sm font-medium">
-                  Title
-                </label>
+        <PageSection>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <h3 className="text-lg font-semibold">Create Notice</h3>
+            <Input
+              id="createTitle"
+              label="Title"
+              placeholder="Notice title"
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              disabled={isCreating}
+            />
+            <Textarea
+              id="createBody"
+              label="Body"
+              placeholder="Notice content..."
+              value={createBody}
+              onChange={(e) => setCreateBody(e.target.value)}
+              disabled={isCreating}
+              rows={5}
+            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Select
+                id="createTargetAudience"
+                label="Target Audience"
+                value={createTargetAudience}
+                onChange={(e) => setCreateTargetAudience(e.target.value)}
+                disabled={isCreating}
+              >
+                <option value="All">All</option>
+                <option value="Class">Class</option>
+                <option value="Section">Section</option>
+              </Select>
+              {createTargetAudience !== "All" ? (
                 <Input
-                  id="createTitle"
-                  placeholder="Notice title"
-                  value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
+                  id="createTargetClassId"
+                  label="Class ID"
+                  placeholder="Enter class ID"
+                  value={createTargetClassId}
+                  onChange={(e) => setCreateTargetClassId(e.target.value)}
                   disabled={isCreating}
                 />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="createBody" className="text-sm font-medium">
-                  Body
-                </label>
-                <textarea
-                  id="createBody"
-                  placeholder="Notice content..."
-                  value={createBody}
-                  onChange={(e) => setCreateBody(e.target.value)}
-                  disabled={isCreating}
-                  rows={4}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label htmlFor="createTargetAudience" className="text-sm font-medium">
-                    Target Audience
-                  </label>
-                  <select
-                    id="createTargetAudience"
-                    value={createTargetAudience}
-                    onChange={(e) => setCreateTargetAudience(e.target.value)}
-                    disabled={isCreating}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="All">All</option>
-                    <option value="Class">Class</option>
-                    <option value="Section">Section</option>
-                  </select>
-                </div>
-                {createTargetAudience !== "All" && (
-                  <div className="space-y-1">
-                    <label htmlFor="createTargetClassId" className="text-sm font-medium">
-                      Class ID
-                    </label>
-                    <Input
-                      id="createTargetClassId"
-                      placeholder="Enter class ID"
-                      value={createTargetClassId}
-                      onChange={(e) => setCreateTargetClassId(e.target.value)}
-                      disabled={isCreating}
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="createExpiresAt" className="text-sm font-medium">
-                  Expires At (optional)
-                </label>
+              ) : (
                 <Input
                   id="createExpiresAt"
+                  label="Expires At (optional)"
                   type="datetime-local"
                   value={createExpiresAt}
                   onChange={(e) => setCreateExpiresAt(e.target.value)}
                   disabled={isCreating}
                 />
-              </div>
-              {createError && (
-                <p className="text-sm text-destructive">{createError}</p>
               )}
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={isCreating}>
-                  {isCreating ? <Spinner size="sm" /> : "Create Draft"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCreateForm(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </div>
+            {createTargetAudience !== "All" && (
+              <Input
+                id="createExpiresAt"
+                label="Expires At (optional)"
+                type="datetime-local"
+                value={createExpiresAt}
+                onChange={(e) => setCreateExpiresAt(e.target.value)}
+                disabled={isCreating}
+              />
+            )}
+            {createError && (
+              <StatusBanner variant="error">{createError}</StatusBanner>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={isCreating}>
+                {isCreating ? <Spinner size="sm" /> : "Create Draft"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateForm(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </PageSection>
       )}
 
       {isLoading ? (
@@ -317,7 +310,7 @@ export default function AdminNoticesPage(): React.ReactElement {
           }}
         />
       ) : (
-        <div className="space-y-6">
+        <PageSection className="space-y-6">
           {drafts.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Drafts</h2>
@@ -338,7 +331,7 @@ export default function AdminNoticesPage(): React.ReactElement {
                             <Spinner size="sm" />
                           ) : (
                             <>
-                              <Send className="mr-1 h-3 w-3" />
+                              <Send className="h-3 w-3" />
                               Publish
                             </>
                           )}
@@ -347,7 +340,7 @@ export default function AdminNoticesPage(): React.ReactElement {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{notice.body}</p>
+                    <p className="whitespace-pre-wrap text-sm">{notice.body}</p>
                     <div className="mt-3">
                       <AttachmentList entityId={notice.noticeId} entityType="notice" />
                     </div>
@@ -380,7 +373,7 @@ export default function AdminNoticesPage(): React.ReactElement {
                     )}
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{notice.body}</p>
+                    <p className="whitespace-pre-wrap text-sm">{notice.body}</p>
                     <div className="mt-3">
                       <AttachmentList entityId={notice.noticeId} entityType="notice" />
                     </div>
@@ -394,8 +387,8 @@ export default function AdminNoticesPage(): React.ReactElement {
               ))}
             </div>
           )}
-        </div>
+        </PageSection>
       )}
-    </div>
+    </PageShell>
   );
 }

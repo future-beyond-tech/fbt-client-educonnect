@@ -10,6 +10,13 @@ public class HomeworkEntity
     public string Description { get; set; } = string.Empty;
     public Guid AssignedById { get; set; }
     public DateOnly DueDate { get; set; }
+    public string Status { get; set; } = "Draft";
+    public DateTimeOffset? SubmittedAt { get; set; }
+    public DateTimeOffset? ApprovedAt { get; set; }
+    public Guid? ApprovedById { get; set; }
+    public DateTimeOffset? RejectedAt { get; set; }
+    public Guid? RejectedById { get; set; }
+    public string? RejectedReason { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public bool IsEditable { get; set; } = true;
     public bool IsDeleted { get; set; } = false;
@@ -20,4 +27,6 @@ public class HomeworkEntity
     public SchoolEntity? School { get; set; }
     public ClassEntity? Class { get; set; }
     public UserEntity? AssignedBy { get; set; }
+    public UserEntity? ApprovedBy { get; set; }
+    public UserEntity? RejectedBy { get; set; }
 }

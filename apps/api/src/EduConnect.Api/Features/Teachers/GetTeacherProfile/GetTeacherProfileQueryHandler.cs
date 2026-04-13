@@ -54,6 +54,7 @@ public class GetTeacherProfileQueryHandler : IRequestHandler<GetTeacherProfileQu
                 tca.Class != null ? tca.Class.Name : string.Empty,
                 tca.Class != null ? tca.Class.Section : string.Empty,
                 tca.Subject,
+                tca.IsClassTeacher,
                 tca.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -61,6 +62,7 @@ public class GetTeacherProfileQueryHandler : IRequestHandler<GetTeacherProfileQu
             teacher.Id,
             teacher.Name,
             teacher.Phone,
+            teacher.Email ?? string.Empty,
             teacher.IsActive,
             teacher.CreatedAt,
             assignments);

@@ -86,7 +86,6 @@ export function NotificationPanel({
   unreadCount,
 }: NotificationPanelProps): React.ReactElement {
   const router = useRouter();
-  const panelRef = React.useRef<HTMLDivElement>(null);
   const hasLoaded = React.useRef(false);
 
   // Load notifications on first open
@@ -96,21 +95,6 @@ export function NotificationPanel({
       onLoadNotifications();
     }
   }, [onLoadNotifications]);
-
-  // Close on click outside
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent): void {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node)
-      ) {
-        onClose();
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
 
   // Close on Escape
   React.useEffect(() => {
@@ -145,31 +129,33 @@ export function NotificationPanel({
 
   return (
     <div
-      ref={panelRef}
-      className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 rounded-lg border border-border bg-card shadow-lg"
+      className="absolute right-0 top-full z-50 mt-3 min-h-[200px] w-[min(calc(100vw-2rem),25rem)] origin-top-right rounded-[28px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,251,0.96))] shadow-[0_34px_90px_-38px_rgba(15,23,42,0.62)] backdrop-blur-2xl dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.98),rgba(8,18,31,0.96))] dark:shadow-[0_38px_96px_-42px_rgba(2,12,24,0.92)]"
       role="dialog"
       aria-label="Notifications"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
+      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            {unreadCount} unread
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => {
-                void onMarkAllRead();
-              }}
-            >
-              Mark all read
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={unreadCount === 0}
+            className="h-8 rounded-full px-3 text-[11px] font-semibold uppercase tracking-[0.14em]"
+            onClick={() => {
+              void onMarkAllRead();
+            }}
+          >
+            Mark all read
+          </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-8 w-8 rounded-full bg-card/80"
             onClick={onClose}
             aria-label="Close notifications"
           >
@@ -178,23 +164,27 @@ export function NotificationPanel({
         </div>
       </div>
 
-      {/* Body */}
-      <div className="max-h-96 overflow-y-auto">
+      <div className="min-h-[148px] max-h-96 overflow-y-auto px-2 py-2">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex min-h-[148px] items-center justify-center py-8">
             <Spinner size="md" />
           </div>
         ) : error ? (
-          <div className="px-4 py-8 text-center text-sm text-destructive">
+          <div className="flex min-h-[148px] items-center justify-center px-4 py-8 text-center text-sm text-destructive">
             {error}
           </div>
         ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Bell
-              className="mb-2 h-8 w-8 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <p className="text-sm text-muted-foreground">
+          <div className="flex min-h-[148px] flex-col items-center justify-center py-10 text-center">
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted/40">
+              <Bell
+                className="h-7 w-7 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              You&apos;re all caught up!
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
               No notifications yet.
             </p>
           </div>
@@ -202,7 +192,7 @@ export function NotificationPanel({
           <>
             {todayNotifications.length > 0 && (
               <div>
-                <p className="px-4 pt-3 pb-1 text-xs font-medium uppercase text-muted-foreground">
+                <p className="px-3 pt-3 pb-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   Today
                 </p>
                 {todayNotifications.map((n) => (
@@ -218,7 +208,7 @@ export function NotificationPanel({
             )}
             {earlierNotifications.length > 0 && (
               <div>
-                <p className="px-4 pt-3 pb-1 text-xs font-medium uppercase text-muted-foreground">
+                <p className="px-3 pt-3 pb-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   Earlier
                 </p>
                 {earlierNotifications.map((n) => (
@@ -250,8 +240,8 @@ function NotificationRow({
     <button
       type="button"
       className={cn(
-        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent",
-        !notification.isRead && "bg-primary/5"
+        "flex w-full items-start gap-3 rounded-[20px] px-3 py-3 text-left transition-all hover:bg-card/72",
+        !notification.isRead && "bg-primary/8"
       )}
       onClick={onClick}
     >
@@ -263,7 +253,7 @@ function NotificationRow({
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "text-sm leading-tight",
+            "text-sm leading-6",
             notification.isRead
               ? "text-muted-foreground"
               : "font-medium text-foreground"

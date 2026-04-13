@@ -37,7 +37,11 @@ public class SearchParentsByPhoneQueryHandler : IRequestHandler<SearchParentsByP
                 u.Phone.Contains(phoneTrimmed))
             .OrderBy(u => u.Name)
             .Take(10)
-            .Select(u => new ParentSearchResultDto(u.Id, u.Name, u.Phone))
+            .Select(u => new ParentSearchResultDto(
+                u.Id,
+                u.Name,
+                u.Phone,
+                u.Email ?? string.Empty))
             .ToListAsync(cancellationToken);
 
         return parents;

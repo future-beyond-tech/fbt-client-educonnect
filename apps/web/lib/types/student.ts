@@ -36,6 +36,7 @@ export interface ParentLink {
   parentId: string;
   parentName: string;
   parentPhone: string;
+  parentEmail: string;
   relationship: string;
   linkedAt: string;
 }
@@ -63,6 +64,7 @@ export interface ParentSearchResult {
   id: string;
   name: string;
   phone: string;
+  email: string;
 }
 
 export interface EnrollStudentRequest {
@@ -81,6 +83,35 @@ export interface UpdateStudentRequest {
 export interface LinkParentRequest {
   parentId: string;
   relationship: string;
+}
+
+export interface CreateParentRequest {
+  name: string;
+  phone: string;
+  email: string;
+  pin: string;
+}
+
+export interface ParentMutationResponse {
+  parentId?: string;
+  message: string;
+}
+
+export interface CreateClassRequest {
+  name: string;
+  section: string;
+  academicYear: string;
+}
+
+export interface UpdateClassRequest {
+  name: string;
+  section: string;
+  academicYear: string;
+}
+
+export interface ClassMutationResponse {
+  classId?: string;
+  message: string;
 }
 
 export interface MutationResponse {

@@ -7,9 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { StatusBanner } from "@/components/shared/status-banner";
 import { BookOpen, Pencil, Plus } from "lucide-react";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
@@ -22,6 +25,15 @@ interface HomeworkItem {
   description: string;
   dueDate: string;
   isEditable: boolean;
+  status: "Draft" | "PendingApproval" | "Published" | "Rejected";
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  approvedById?: string | null;
+  rejectedAt?: string | null;
+  rejectedById?: string | null;
+  rejectedReason?: string | null;
+  canSubmitForApproval: boolean;
+  canApproveOrReject: boolean;
   publishedAt: string;
 }
 
@@ -38,6 +50,9 @@ export default function TeacherHomeworkPage(): React.ReactElement {
   const [homework, setHomework] = React.useState<HomeworkItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [actionError, setActionError] = React.useState("");
+  const [actionSuccess, setActionSuccess] = React.useState("");
+  const [actionHomeworkId, setActionHomeworkId] = React.useState<string | null>(null);
 
   // Create form state
   const [showCreateForm, setShowCreateForm] = React.useState(false);
@@ -84,6 +99,8 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     e.preventDefault();
     setCreateError("");
     setSuccessMessage("");
+    setActionError("");
+    setActionSuccess("");
 
     if (!createClassId || !createSubject || !createTitle || !createDescription || !createDueDate) {
       setCreateError("All fields are required.");
@@ -130,6 +147,8 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     if (!editingId) return;
     setEditError("");
     setSuccessMessage("");
+    setActionError("");
+    setActionSuccess("");
 
     setIsUpdating(true);
     try {
@@ -161,152 +180,201 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     });
   };
 
+  const getStatusBadgeVariant = (
+    status: HomeworkItem["status"]
+  ): "secondary" | "destructive" | "outline" | undefined => {
+    if (status === "Draft") return "secondary";
+    if (status === "PendingApproval") return "outline";
+    if (status === "Rejected") return "destructive";
+    return undefined;
+  };
+
+  const getStatusLabel = (status: HomeworkItem["status"]): string => {
+    if (status === "PendingApproval") return "Pending approval";
+    return status;
+  };
+
+  const submitForApproval = async (id: string): Promise<void> => {
+    setActionError("");
+    setActionSuccess("");
+    setActionHomeworkId(id);
+    try {
+      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/submit`, {});
+      setActionSuccess(response.message);
+      fetchHomework();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to submit homework for approval.");
+    } finally {
+      setActionHomeworkId(null);
+    }
+  };
+
+  const approveHomework = async (id: string): Promise<void> => {
+    setActionError("");
+    setActionSuccess("");
+    setActionHomeworkId(id);
+    try {
+      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/approve`, {});
+      setActionSuccess(response.message);
+      fetchHomework();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to approve homework.");
+    } finally {
+      setActionHomeworkId(null);
+    }
+  };
+
+  const rejectHomework = async (id: string): Promise<void> => {
+    const reason = window.prompt("Rejection reason");
+    if (!reason) return;
+    setActionError("");
+    setActionSuccess("");
+    setActionHomeworkId(id);
+    try {
+      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/reject`, {
+        reason,
+      });
+      setActionSuccess(response.message);
+      fetchHomework();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to reject homework.");
+    } finally {
+      setActionHomeworkId(null);
+    }
+  };
+
   return (
-    <div className="space-y-4 p-4 md:p-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Homework</h1>
-          <p className="text-muted-foreground">
-            Manage homework assignments for your classes.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setShowCreateForm(!showCreateForm);
-            setCreateError("");
-            setSuccessMessage("");
-          }}
-          size="sm"
-        >
-          <Plus className="mr-1 h-4 w-4" />
-          New Homework
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Teacher tools"
+        title="Homework"
+        description="Create assignments, update active work, and attach supporting files for each class."
+        icon={<BookOpen className="h-6 w-6" aria-hidden="true" />}
+        actions={(
+          <Button
+            onClick={() => {
+              setShowCreateForm(!showCreateForm);
+              setCreateError("");
+              setSuccessMessage("");
+            }}
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            New Homework
+          </Button>
+        )}
+        stats={[
+          { label: "Assignments", value: homework.length.toString() },
+          { label: "Composer", value: showCreateForm ? "Open" : "Closed" },
+        ]}
+      />
+
+      {actionError && (
+        <StatusBanner variant="error">{actionError}</StatusBanner>
+      )}
+      {actionSuccess && (
+        <StatusBanner variant="success">{actionSuccess}</StatusBanner>
+      )}
 
       {successMessage && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-          {successMessage}
-        </div>
+        <StatusBanner variant="success">{successMessage}</StatusBanner>
       )}
 
       {newHomeworkId && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <h3 className="font-semibold">Attach Files to Homework</h3>
-            <p className="text-sm text-muted-foreground">
+        <PageSection className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold">Attach Files to Homework</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
               Optionally attach images or PDFs to the homework you just created.
             </p>
-            <AttachmentUploader
-              entityId={newHomeworkId}
-              entityType="homework"
-              existingAttachments={newHomeworkAttachments}
-              onAttachmentsChange={setNewHomeworkAttachments}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setNewHomeworkId(null);
-                setNewHomeworkAttachments([]);
-                fetchHomework();
-              }}
-            >
-              Done
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <AttachmentUploader
+            entityId={newHomeworkId}
+            entityType="homework"
+            existingAttachments={newHomeworkAttachments}
+            onAttachmentsChange={setNewHomeworkAttachments}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setNewHomeworkId(null);
+              setNewHomeworkAttachments([]);
+              fetchHomework();
+            }}
+          >
+            Done
+          </Button>
+        </PageSection>
       )}
 
       {showCreateForm && (
-        <Card>
-          <CardContent className="p-4">
-            <form onSubmit={handleCreate} className="space-y-3">
-              <h3 className="font-semibold">Create Homework</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label htmlFor="createClassId" className="text-sm font-medium">
-                    Class ID
-                  </label>
-                  <Input
-                    id="createClassId"
-                    placeholder="Enter class ID"
-                    value={createClassId}
-                    onChange={(e) => setCreateClassId(e.target.value)}
-                    disabled={isCreating}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="createSubject" className="text-sm font-medium">
-                    Subject
-                  </label>
-                  <Input
-                    id="createSubject"
-                    placeholder="e.g. Mathematics"
-                    value={createSubject}
-                    onChange={(e) => setCreateSubject(e.target.value)}
-                    disabled={isCreating}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="createTitle" className="text-sm font-medium">
-                  Title
-                </label>
-                <Input
-                  id="createTitle"
-                  placeholder="Homework title"
-                  value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="createDescription" className="text-sm font-medium">
-                  Description
-                </label>
-                <textarea
-                  id="createDescription"
-                  placeholder="Homework description and instructions"
-                  value={createDescription}
-                  onChange={(e) => setCreateDescription(e.target.value)}
-                  disabled={isCreating}
-                  rows={3}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="createDueDate" className="text-sm font-medium">
-                  Due Date
-                </label>
-                <Input
-                  id="createDueDate"
-                  type="date"
-                  value={createDueDate}
-                  onChange={(e) => setCreateDueDate(e.target.value)}
-                  disabled={isCreating}
-                />
-              </div>
-              {createError && (
-                <p className="text-sm text-destructive">{createError}</p>
-              )}
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={isCreating}>
-                  {isCreating ? <Spinner size="sm" /> : "Create"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCreateForm(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <PageSection>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <h3 className="text-lg font-semibold">Create Homework</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                id="createClassId"
+                label="Class ID"
+                placeholder="Enter class ID"
+                value={createClassId}
+                onChange={(e) => setCreateClassId(e.target.value)}
+                disabled={isCreating}
+              />
+              <Input
+                id="createSubject"
+                label="Subject"
+                placeholder="e.g. Mathematics"
+                value={createSubject}
+                onChange={(e) => setCreateSubject(e.target.value)}
+                disabled={isCreating}
+              />
+            </div>
+            <Input
+              id="createTitle"
+              label="Title"
+              placeholder="Homework title"
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              disabled={isCreating}
+            />
+            <Textarea
+              id="createDescription"
+              label="Description"
+              placeholder="Homework description and instructions"
+              value={createDescription}
+              onChange={(e) => setCreateDescription(e.target.value)}
+              disabled={isCreating}
+              rows={4}
+            />
+            <Input
+              id="createDueDate"
+              label="Due Date"
+              type="date"
+              value={createDueDate}
+              onChange={(e) => setCreateDueDate(e.target.value)}
+              disabled={isCreating}
+            />
+            {createError && (
+              <StatusBanner variant="error">{createError}</StatusBanner>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={isCreating}>
+                {isCreating ? <Spinner size="sm" /> : "Create"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateForm(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </PageSection>
       )}
 
       {isLoading ? (
@@ -326,51 +394,82 @@ export default function TeacherHomeworkPage(): React.ReactElement {
           }}
         />
       ) : (
-        <div className="space-y-3">
+        <PageSection className="space-y-4">
+          {homework.some((h) => h.status === "PendingApproval" && h.canApproveOrReject) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Approvals</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {homework
+                  .filter((h) => h.status === "PendingApproval" && h.canApproveOrReject)
+                  .map((h) => (
+                    <div
+                      key={h.homeworkId}
+                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">{h.title}</span>
+                          <Badge variant="secondary">{h.subject}</Badge>
+                          <Badge variant={getStatusBadgeVariant(h.status)}>{getStatusLabel(h.status)}</Badge>
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">Due {formatDate(h.dueDate)}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approveHomework(h.homeworkId)}
+                          disabled={actionHomeworkId === h.homeworkId}
+                        >
+                          {actionHomeworkId === h.homeworkId ? <Spinner size="sm" /> : "Approve & publish"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectHomework(h.homeworkId)}
+                          disabled={actionHomeworkId === h.homeworkId}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </CardContent>
+            </Card>
+          )}
+
           {homework.map((item) =>
             editingId === item.homeworkId ? (
               <Card key={item.homeworkId}>
                 <CardContent className="p-4">
-                  <form onSubmit={handleUpdate} className="space-y-3">
-                    <h3 className="font-semibold">Edit Homework</h3>
-                    <div className="space-y-1">
-                      <label htmlFor="editTitle" className="text-sm font-medium">
-                        Title
-                      </label>
-                      <Input
-                        id="editTitle"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        disabled={isUpdating}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="editDescription" className="text-sm font-medium">
-                        Description
-                      </label>
-                      <textarea
-                        id="editDescription"
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        disabled={isUpdating}
-                        rows={3}
-                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="editDueDate" className="text-sm font-medium">
-                        Due Date
-                      </label>
-                      <Input
-                        id="editDueDate"
-                        type="date"
-                        value={editDueDate}
-                        onChange={(e) => setEditDueDate(e.target.value)}
-                        disabled={isUpdating}
-                      />
-                    </div>
+                  <form onSubmit={handleUpdate} className="space-y-4">
+                    <h3 className="text-lg font-semibold">Edit Homework</h3>
+                    <Input
+                      id="editTitle"
+                      label="Title"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      disabled={isUpdating}
+                    />
+                    <Textarea
+                      id="editDescription"
+                      label="Description"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      disabled={isUpdating}
+                      rows={4}
+                    />
+                    <Input
+                      id="editDueDate"
+                      label="Due Date"
+                      type="date"
+                      value={editDueDate}
+                      onChange={(e) => setEditDueDate(e.target.value)}
+                      disabled={isUpdating}
+                    />
                     {editError && (
-                      <p className="text-sm text-destructive">{editError}</p>
+                      <StatusBanner variant="error">{editError}</StatusBanner>
                     )}
                     <div className="flex gap-2">
                       <Button type="submit" size="sm" disabled={isUpdating}>
@@ -396,6 +495,7 @@ export default function TeacherHomeworkPage(): React.ReactElement {
                     <CardTitle className="text-lg">{item.title}</CardTitle>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{item.subject}</Badge>
+                      <Badge variant={getStatusBadgeVariant(item.status)}>{getStatusLabel(item.status)}</Badge>
                       {item.isEditable && (
                         <Button
                           variant="ghost"
@@ -410,20 +510,45 @@ export default function TeacherHomeworkPage(): React.ReactElement {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
+                  <p className="mb-3 text-sm text-muted-foreground">
                     {item.description}
                   </p>
-                  <div className="flex items-center gap-2 text-sm mb-3">
+                  {item.status === "Rejected" && item.rejectedReason && (
+                    <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                      <div className="font-medium text-destructive">Rejected</div>
+                      <div className="mt-1 text-muted-foreground">{item.rejectedReason}</div>
+                    </div>
+                  )}
+                  <div className="mb-3 flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Due:</span>
                     <span className="font-medium">{formatDate(item.dueDate)}</span>
                   </div>
+                  {item.canSubmitForApproval && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => submitForApproval(item.homeworkId)}
+                        disabled={actionHomeworkId === item.homeworkId}
+                      >
+                        {actionHomeworkId === item.homeworkId ? <Spinner size="sm" /> : "Submit for approval"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(item)}
+                        disabled={actionHomeworkId === item.homeworkId}
+                      >
+                        Edit draft
+                      </Button>
+                    </div>
+                  )}
                   <AttachmentList entityId={item.homeworkId} entityType="homework" />
                 </CardContent>
               </Card>
             )
           )}
-        </div>
+        </PageSection>
       )}
-    </div>
+    </PageShell>
   );
 }

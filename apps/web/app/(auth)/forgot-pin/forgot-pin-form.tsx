@@ -7,6 +7,7 @@ import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { StatusBanner } from "@/components/shared/status-banner";
 
 interface ForgotPinResponse {
   message: string;
@@ -62,36 +63,27 @@ export function ForgotPinForm(): React.ReactElement {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-foreground"
-          >
-            Email
-          </label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e): void => {
-              setEmail(e.target.value);
-              setError("");
-            }}
-            disabled={isLoading}
-            aria-invalid={!!error}
-            aria-describedby={error ? "form-error" : undefined}
-          />
-        </div>
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e): void => {
+            setEmail(e.target.value);
+            setError("");
+          }}
+          disabled={isLoading}
+          aria-invalid={!!error}
+          aria-describedby={error ? "form-error" : undefined}
+        />
 
         {error && (
-          <p id="form-error" className="text-sm font-medium text-destructive">
-            {error}
-          </p>
+          <StatusBanner id="form-error" variant="error">{error}</StatusBanner>
         )}
         {success && (
-          <p className="text-sm font-medium text-green-700">{success}</p>
+          <StatusBanner variant="success">{success}</StatusBanner>
         )}
 
         <Button

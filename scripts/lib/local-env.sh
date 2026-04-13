@@ -76,6 +76,11 @@ set_backend_defaults() {
   : "${PIN_MAX_LENGTH:=6}"
   : "${CORS_ALLOWED_ORIGINS:=http://localhost:3000}"
   : "${RATE_LIMIT_API_PER_USER_PER_MINUTE:=60}"
+  : "${NEXT_PUBLIC_APP_URL:=http://localhost:3000}"
+  # Dev-safe placeholders keep the API bootable locally; replace them with real
+  # Resend credentials before testing forgot/reset email delivery.
+  : "${RESEND_API_KEY:=dev-resend-api-key}"
+  : "${RESEND_FROM_EMAIL:=EduConnect <no-reply@example.com>}"
   : "${ASPNETCORE_URLS:=http://localhost:${API_PORT}}"
 
   export ASPNETCORE_ENVIRONMENT
@@ -89,6 +94,9 @@ set_backend_defaults() {
   export PIN_MAX_LENGTH
   export CORS_ALLOWED_ORIGINS
   export RATE_LIMIT_API_PER_USER_PER_MINUTE
+  export NEXT_PUBLIC_APP_URL
+  export RESEND_API_KEY
+  export RESEND_FROM_EMAIL
   export ASPNETCORE_URLS
 }
 
@@ -106,6 +114,7 @@ print_backend_summary() {
   cat <<EOF
 Repo root: ${REPO_ROOT}
 API URL:   ${ASPNETCORE_URLS}
+App URL:   ${NEXT_PUBLIC_APP_URL}
 DB mode:   ${EDUCONNECT_DB_MODE}
 DB:        ${DATABASE_URL}
 DB Port:   ${POSTGRES_HOST_PORT}

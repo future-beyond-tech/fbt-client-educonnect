@@ -86,6 +86,7 @@ public class GetStudentByIdQueryHandler : IRequestHandler<GetStudentByIdQuery, S
                 pl.ParentId,
                 pl.Parent?.Name ?? string.Empty,
                 pl.Parent?.Phone ?? string.Empty,
+                pl.Parent?.Email ?? string.Empty,
                 pl.Relationship,
                 pl.CreatedAt))
             .OrderBy(pl => pl.ParentName)

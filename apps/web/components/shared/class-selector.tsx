@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
 import type { ClassItem } from "@/lib/types/student";
 
 export interface ClassSelectorProps {
@@ -27,30 +27,16 @@ export function ClassSelector({
 }: ClassSelectorProps): React.ReactElement {
   const generatedId = React.useId();
   const selectId = id || `class-selector-${generatedId}`;
-  const errorId = error ? `${selectId}-error` : undefined;
 
   return (
-    <div className="space-y-2">
-      {label && (
-        <label
-          htmlFor={selectId}
-          className="block text-sm font-medium text-foreground"
-        >
-          {label}
-        </label>
-      )}
-      <select
-        id={selectId}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        aria-invalid={!!error}
-        aria-describedby={errorId}
-        className={cn(
-          "flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          error && "border-destructive focus-visible:ring-destructive"
-        )}
-      >
+    <Select
+      id={selectId}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      error={error}
+      label={label}
+    >
         {includeAll && <option value="">All Classes</option>}
         {!includeAll && !value && (
           <option value="" disabled>
@@ -64,12 +50,6 @@ export function ClassSelector({
             {cls.academicYear ? ` (${cls.academicYear})` : ""}
           </option>
         ))}
-      </select>
-      {error && (
-        <p id={errorId} className="text-sm font-medium text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
+    </Select>
   );
 }

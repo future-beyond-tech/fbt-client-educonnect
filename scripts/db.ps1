@@ -41,6 +41,20 @@ Set-BackendDefaults
 $repoRoot = Get-RepoRoot
 
 function Test-Db {
+    if (Get-Command pg_isready -ErrorAction SilentlyContinue) {
+        & pg_isready -d $env:DATABASE_URL -t 1 *> $null
+        return $LASTEXITCODE -eq 0
+    }
+
+    if (Get-Command psql -ErrorAction SilentlyContinue) {
+        & psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -qAt -c 'SELECT 1;' *> $null
+        return $LASTEXITCODE -eq 0
+    }
+
+    if ($env:EDUCONNECT_DB_MODE -eq 'remote') {
+        return $false
+    }
+
     try {
         $tcp = New-Object System.Net.Sockets.TcpClient
         $tcp.Connect('localhost', [int]$env:POSTGRES_HOST_PORT)
