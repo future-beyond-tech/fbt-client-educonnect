@@ -17,6 +17,9 @@ public interface IStorageService
     Task<string> GeneratePresignedDownloadUrlAsync(
         string key,
         TimeSpan expiresIn,
+        string? fileName = null,
+        string? contentType = null,
+        bool forceDownload = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

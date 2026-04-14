@@ -48,6 +48,7 @@ using EduConnect.Api.Features.Notifications.GetUnreadCount;
 using EduConnect.Api.Features.Notifications.MarkNotificationRead;
 using EduConnect.Api.Features.Notifications.MarkAllNotificationsRead;
 using EduConnect.Api.Features.Attachments.RequestUploadUrl;
+using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
@@ -185,6 +186,7 @@ public static class EndpointRouteBuilderExtensions
         var group = app.MapGroup("/api/attachments").WithTags("Attachments").RequireAuthorization();
 
         group.MapPost("/request-upload-url", RequestUploadUrlEndpoint.Handle).WithName("RequestUploadUrl");
+        group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle).WithName("RequestUploadUrlV2");
         group.MapPost("/attach", AttachFileToEntityEndpoint.Handle).WithName("AttachFileToEntity");
         group.MapGet("/", GetAttachmentsForEntityEndpoint.Handle).WithName("GetAttachmentsForEntity");
         group.MapDelete("/{id}", DeleteAttachmentEndpoint.Handle).WithName("DeleteAttachment");

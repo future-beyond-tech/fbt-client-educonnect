@@ -10,6 +10,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -79,6 +80,19 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDateTimeProvider, DateTimeProvider>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+var storageOptions = builder.Configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>() ?? new StorageOptions();
+storageOptions.BucketName =
+    builder.Configuration["S3_BUCKET_NAME"] ??
+    storageOptions.BucketName;
+storageOptions.Region =
+    builder.Configuration["AWS_REGION"] ??
+    storageOptions.Region;
+storageOptions.ServiceUrl =
+    builder.Configuration["S3_SERVICE_URL"] ??
+    storageOptions.ServiceUrl;
+
+builder.Services.AddSingleton<IOptions<StorageOptions>>(Options.Create(storageOptions));
+
 // Resend transactional email (used by forgot/reset password & PIN flows).
 builder.Services.AddHttpClient<IEmailService, ResendEmailService>(client =>
 {
@@ -86,14 +100,13 @@ builder.Services.AddHttpClient<IEmailService, ResendEmailService>(client =>
 });
 
 // S3 storage for attachments (compatible with AWS S3, Cloudflare R2, MinIO)
-var s3ServiceUrl = builder.Configuration["S3_SERVICE_URL"];
-if (!string.IsNullOrWhiteSpace(s3ServiceUrl))
+if (!string.IsNullOrWhiteSpace(storageOptions.ServiceUrl))
 {
     builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(sp =>
     {
         var config = new Amazon.S3.AmazonS3Config
         {
-            ServiceURL = s3ServiceUrl,
+            ServiceURL = storageOptions.ServiceUrl,
             ForcePathStyle = true
         };
         return new Amazon.S3.AmazonS3Client(
@@ -108,8 +121,7 @@ else
     {
         var config = new Amazon.S3.AmazonS3Config
         {
-            RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(
-                builder.Configuration["AWS_REGION"] ?? "ap-south-1")
+            RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(storageOptions.Region)
         };
         return new Amazon.S3.AmazonS3Client(config);
     });

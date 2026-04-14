@@ -1,4 +1,5 @@
 using EduConnect.Api.Common.Auth;
+using EduConnect.Api.Features.Attachments;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
 using MediatR;
@@ -10,8 +11,6 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly ILogger<AttachFileToEntityCommandHandler> _logger;
-
-    private const int MaxAttachmentsPerEntity = 5;
 
     public AttachFileToEntityCommandHandler(
         AppDbContext context,
@@ -48,6 +47,12 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
             throw new InvalidOperationException("This attachment is already associated with an entity.");
         }
 
+        if (!string.IsNullOrWhiteSpace(attachment.EntityType) &&
+            !string.Equals(attachment.EntityType, request.EntityType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("This attachment was prepared for a different entity type.");
+        }
+
         // Verify the target entity exists in the correct table
         if (request.EntityType == "homework")
         {
@@ -57,6 +62,19 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
             if (homework == null)
             {
                 throw new NotFoundException("Homework", request.EntityId.ToString());
+            }
+
+            if (_currentUserService.Role == "Teacher")
+            {
+                if (homework.AssignedById != _currentUserService.UserId)
+                {
+                    throw new ForbiddenException("You can only attach files to homework you created.");
+                }
+
+                if (homework.Status != "Draft" && homework.Status != "Rejected")
+                {
+                    throw new ForbiddenException("Attachments can only be changed while homework is editable.");
+                }
             }
         }
         else if (request.EntityType == "notice")
@@ -68,6 +86,11 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
             {
                 throw new NotFoundException("Notice", request.EntityId.ToString());
             }
+
+            if (notice.IsPublished)
+            {
+                throw new ForbiddenException("Attachments can only be changed before the notice is published.");
+            }
         }
 
         // Check max 5 attachments per entity
@@ -78,9 +101,9 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
                 a.SchoolId == _currentUserService.SchoolId,
                 cancellationToken);
 
-        if (existingCount >= MaxAttachmentsPerEntity)
+        if (existingCount >= AttachmentFeatureRules.MaxAttachmentsPerEntity)
         {
-            throw new InvalidOperationException($"Maximum of {MaxAttachmentsPerEntity} attachments per entity reached.");
+            throw new InvalidOperationException($"Maximum of {AttachmentFeatureRules.MaxAttachmentsPerEntity} attachments per entity reached.");
         }
 
         // Associate the attachment

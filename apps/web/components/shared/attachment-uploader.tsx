@@ -1,23 +1,30 @@
 "use client";
 
 import * as React from "react";
-import { ApiError, apiPost, apiDelete } from "@/lib/api-client";
+import { useDropzone, type FileRejection } from "react-dropzone";
+import { AlertCircle, CheckCircle2, FileText, ImageIcon, UploadCloud, X } from "lucide-react";
+import { ApiError, apiDelete, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { FileUp, X, FileText, ImageIcon, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
-  RequestUploadUrlRequest,
-  RequestUploadUrlResponse,
   AttachFileRequest,
   AttachFileResponse,
+  AttachmentEntityType,
   DeleteAttachmentResponse,
+  RequestUploadUrlRequest,
+  RequestUploadUrlResponse,
 } from "@/lib/types/attachment";
 import {
-  isAllowedContentType,
-  formatFileSize,
-  MAX_FILE_SIZE_BYTES,
   MAX_ATTACHMENTS_PER_ENTITY,
+  MAX_FILE_SIZE_BYTES,
+  formatFileSize,
+  getAcceptedFiles,
+  getAttachmentEmptyLabel,
+  getAttachmentHelperText,
+  isAllowedContentType,
+  isPdfAttachment,
+  isWordAttachment,
 } from "@/lib/types/attachment";
 
 export interface UploadedFile {
@@ -33,15 +40,44 @@ interface FileInProgress {
   progress: number;
   status: "uploading" | "attaching" | "done" | "error";
   error?: string;
-  attachmentId?: string;
 }
 
 interface AttachmentUploaderProps {
   entityId: string;
-  entityType: "homework" | "notice";
+  entityType: AttachmentEntityType;
   existingAttachments?: UploadedFile[];
   onAttachmentsChange: (attachments: UploadedFile[]) => void;
   disabled?: boolean;
+}
+
+function uploadToPresignedUrl(
+  uploadUrl: string,
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      onProgress(Math.min(95, Math.round((event.loaded / event.total) * 100)));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve();
+        return;
+      }
+
+      reject(new Error("Failed to upload file to storage."));
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.send(file);
+  });
 }
 
 export function AttachmentUploader({
@@ -51,343 +87,418 @@ export function AttachmentUploader({
   onAttachmentsChange,
   disabled = false,
 }: AttachmentUploaderProps): React.ReactElement {
-  const [filesInProgress, setFilesInProgress] = React.useState<
-    FileInProgress[]
-  >([]);
-  const [isDragOver, setIsDragOver] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const attachmentsRef = React.useRef(existingAttachments);
+  const [filesInProgress, setFilesInProgress] = React.useState<FileInProgress[]>(
+    []
+  );
+  const [confirmingDeleteId, setConfirmingDeleteId] = React.useState<string | null>(
+    null
+  );
+  const [deleteError, setDeleteError] = React.useState<string>("");
+
+  React.useEffect(() => {
+    attachmentsRef.current = existingAttachments;
+  }, [existingAttachments]);
 
   const totalAttached = existingAttachments.length;
   const canAddMore = totalAttached < MAX_ATTACHMENTS_PER_ENTITY;
+  const remainingSlots = Math.max(0, MAX_ATTACHMENTS_PER_ENTITY - totalAttached);
 
-  const handleFiles = React.useCallback(
-    async (files: FileList | File[]) => {
-      const fileArray = Array.from(files);
-      const remaining = MAX_ATTACHMENTS_PER_ENTITY - totalAttached;
+  const updateProgressItem = React.useCallback(
+    (trackingId: string, next: Partial<FileInProgress>): void => {
+      setFilesInProgress((prev) =>
+        prev.map((file) => (file.id === trackingId ? { ...file, ...next } : file))
+      );
+    },
+    []
+  );
 
-      if (fileArray.length > remaining) {
-        fileArray.splice(remaining);
+  const addFileError = React.useCallback((file: File, error: string): void => {
+    setFilesInProgress((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        file,
+        progress: 0,
+        status: "error",
+        error,
+      },
+    ]);
+  }, []);
+
+  const uploadFile = React.useCallback(
+    async (file: File): Promise<void> => {
+      const trackingId = crypto.randomUUID();
+
+      setFilesInProgress((prev) => [
+        ...prev,
+        {
+          id: trackingId,
+          file,
+          progress: 0,
+          status: "uploading",
+        },
+      ]);
+
+      try {
+        const body: RequestUploadUrlRequest = {
+          fileName: file.name,
+          contentType: file.type,
+          sizeBytes: file.size,
+          entityType,
+        };
+
+        const uploadUrlResponse = await apiPost<RequestUploadUrlResponse>(
+          API_ENDPOINTS.attachmentsRequestUploadV2,
+          body
+        );
+
+        updateProgressItem(trackingId, { progress: 10 });
+
+        await uploadToPresignedUrl(uploadUrlResponse.uploadUrl, file, (progress) => {
+          updateProgressItem(trackingId, { progress });
+        });
+
+        updateProgressItem(trackingId, { progress: 100, status: "attaching" });
+
+        const attachBody: AttachFileRequest = {
+          attachmentId: uploadUrlResponse.attachmentId,
+          entityId,
+          entityType,
+        };
+
+        await apiPost<AttachFileResponse>(API_ENDPOINTS.attachmentsAttach, attachBody);
+
+        updateProgressItem(trackingId, { progress: 100, status: "done" });
+
+        const nextAttachments = [
+          ...attachmentsRef.current,
+          {
+            attachmentId: uploadUrlResponse.attachmentId,
+            fileName: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+          },
+        ];
+
+        attachmentsRef.current = nextAttachments;
+        onAttachmentsChange(nextAttachments);
+
+        window.setTimeout(() => {
+          setFilesInProgress((prev) => prev.filter((item) => item.id !== trackingId));
+        }, 1200);
+      } catch (error) {
+        const message =
+          error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Upload failed.";
+
+        updateProgressItem(trackingId, {
+          status: "error",
+          error: message,
+        });
+      }
+    },
+    [entityId, entityType, onAttachmentsChange, updateProgressItem]
+  );
+
+  const handleAcceptedFiles = React.useCallback(
+    async (acceptedFiles: File[]) => {
+      setDeleteError("");
+
+      const remaining = MAX_ATTACHMENTS_PER_ENTITY - existingAttachments.length;
+      const filesToUpload = acceptedFiles.slice(0, remaining);
+
+      if (acceptedFiles.length > remaining) {
+        acceptedFiles.slice(remaining).forEach((file) => {
+          addFileError(
+            file,
+            `Maximum ${MAX_ATTACHMENTS_PER_ENTITY} attachments allowed per ${entityType}.`
+          );
+        });
       }
 
-      for (const file of fileArray) {
-        if (!isAllowedContentType(file.type)) {
-          setFilesInProgress((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              file,
-              progress: 0,
-              status: "error",
-              error: "Unsupported file type. Use JPEG, PNG, WebP, or PDF.",
-            },
-          ]);
+      for (const file of filesToUpload) {
+        if (!isAllowedContentType(entityType, file.type)) {
+          addFileError(
+            file,
+            entityType === "homework"
+              ? "Only PDF and Word documents are allowed."
+              : "Only JPEG, PNG, WebP, and PDF files are allowed."
+          );
           continue;
         }
 
         if (file.size > MAX_FILE_SIZE_BYTES) {
-          setFilesInProgress((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              file,
-              progress: 0,
-              status: "error",
-              error: `File too large (${formatFileSize(file.size)}). Max 10MB.`,
-            },
-          ]);
+          addFileError(
+            file,
+            `File too large (${formatFileSize(file.size)}). Max 10MB.`
+          );
           continue;
         }
 
-        const trackingId = crypto.randomUUID();
-
-        setFilesInProgress((prev) => [
-          ...prev,
-          { id: trackingId, file, progress: 0, status: "uploading" },
-        ]);
-
-        try {
-          // Step 1: Request presigned upload URL
-          const body: RequestUploadUrlRequest = {
-            fileName: file.name,
-            contentType: file.type,
-            sizeBytes: file.size,
-          };
-
-          const uploadUrlResponse = await apiPost<RequestUploadUrlResponse>(
-            API_ENDPOINTS.attachmentsRequestUpload,
-            body
-          );
-
-          setFilesInProgress((prev) =>
-            prev.map((f) =>
-              f.id === trackingId
-                ? {
-                    ...f,
-                    progress: 30,
-                    attachmentId: uploadUrlResponse.attachmentId,
-                  }
-                : f
-            )
-          );
-
-          // Step 2: Upload file directly to S3 via presigned URL
-          const uploadResponse = await fetch(uploadUrlResponse.uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": file.type },
-            body: file,
-          });
-
-          if (!uploadResponse.ok) {
-            throw new Error("Failed to upload file to storage.");
-          }
-
-          setFilesInProgress((prev) =>
-            prev.map((f) =>
-              f.id === trackingId
-                ? { ...f, progress: 70, status: "attaching" }
-                : f
-            )
-          );
-
-          // Step 3: Attach to entity
-          const attachBody: AttachFileRequest = {
-            attachmentId: uploadUrlResponse.attachmentId,
-            entityId,
-            entityType,
-          };
-
-          await apiPost<AttachFileResponse>(
-            API_ENDPOINTS.attachmentsAttach,
-            attachBody
-          );
-
-          setFilesInProgress((prev) =>
-            prev.map((f) =>
-              f.id === trackingId ? { ...f, progress: 100, status: "done" } : f
-            )
-          );
-
-          // Add to parent's attached list
-          const newAttachment: UploadedFile = {
-            attachmentId: uploadUrlResponse.attachmentId,
-            fileName: file.name,
-            contentType: file.type,
-            sizeBytes: file.size,
-          };
-
-          onAttachmentsChange([...existingAttachments, newAttachment]);
-
-          // Remove from progress list after a short delay
-          setTimeout(() => {
-            setFilesInProgress((prev) =>
-              prev.filter((f) => f.id !== trackingId)
-            );
-          }, 1500);
-        } catch (err) {
-          const errorMessage =
-            err instanceof ApiError
-              ? err.message
-              : err instanceof Error
-                ? err.message
-                : "Upload failed.";
-
-          setFilesInProgress((prev) =>
-            prev.map((f) =>
-              f.id === trackingId
-                ? { ...f, status: "error", error: errorMessage }
-                : f
-            )
-          );
-        }
+        await uploadFile(file);
       }
     },
-    [entityId, entityType, existingAttachments, onAttachmentsChange, totalAttached]
+    [addFileError, entityType, existingAttachments.length, uploadFile]
   );
 
-  const handleDrop = React.useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragOver(false);
-      if (disabled || !canAddMore) return;
-      void handleFiles(e.dataTransfer.files);
+  const onDropRejected = React.useCallback(
+    (rejections: FileRejection[]) => {
+      rejections.forEach(({ file, errors }) => {
+        const firstError = errors[0];
+
+        if (firstError?.code === "too-many-files") {
+          addFileError(
+            file,
+            `Maximum ${MAX_ATTACHMENTS_PER_ENTITY} attachments allowed per ${entityType}.`
+          );
+          return;
+        }
+
+        if (firstError?.code === "file-too-large") {
+          addFileError(
+            file,
+            `File too large (${formatFileSize(file.size)}). Max 10MB.`
+          );
+          return;
+        }
+
+        addFileError(
+          file,
+          entityType === "homework"
+            ? "Only PDF and Word documents are allowed."
+            : "Only JPEG, PNG, WebP, and PDF files are allowed."
+        );
+      });
     },
-    [disabled, canAddMore, handleFiles]
+    [addFileError, entityType]
   );
 
-  const handleDragOver = (e: React.DragEvent): void => {
-    e.preventDefault();
-    if (!disabled && canAddMore) {
-      setIsDragOver(true);
-    }
-  };
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    accept: getAcceptedFiles(entityType),
+    disabled: disabled || !canAddMore,
+    maxFiles: remainingSlots,
+    maxSize: MAX_FILE_SIZE_BYTES,
+    multiple: true,
+    noClick: true,
+    noKeyboard: true,
+    onDropAccepted: (acceptedFiles) => {
+      void handleAcceptedFiles(acceptedFiles);
+    },
+    onDropRejected,
+  });
 
-  const handleDragLeave = (e: React.DragEvent): void => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
+  const handleRemoveAttachment = async (attachmentId: string): Promise<void> => {
+    setDeleteError("");
 
-  const handleBrowse = (): void => {
-    fileInputRef.current?.click();
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    if (e.target.files && e.target.files.length > 0) {
-      void handleFiles(e.target.files);
-      e.target.value = "";
-    }
-  };
-
-  const handleRemoveAttachment = async (
-    attachmentId: string
-  ): Promise<void> => {
     try {
       await apiDelete<DeleteAttachmentResponse>(
         `${API_ENDPOINTS.attachments}/${attachmentId}`
       );
-      onAttachmentsChange(
-        existingAttachments.filter((a) => a.attachmentId !== attachmentId)
+
+      const nextAttachments = attachmentsRef.current.filter(
+        (attachment) => attachment.attachmentId !== attachmentId
       );
-    } catch {
-      // Silently fail — UI stays consistent
+
+      attachmentsRef.current = nextAttachments;
+      onAttachmentsChange(nextAttachments);
+      setConfirmingDeleteId(null);
+    } catch (error) {
+      setDeleteError(
+        error instanceof ApiError ? error.message : "Failed to delete attachment."
+      );
     }
   };
 
-  const handleDismissError = (trackingId: string): void => {
-    setFilesInProgress((prev) => prev.filter((f) => f.id !== trackingId));
+  const dismissProgressItem = (trackingId: string): void => {
+    setFilesInProgress((prev) => prev.filter((file) => file.id !== trackingId));
   };
 
   const getFileIcon = (contentType: string): React.ReactNode => {
-    if (contentType === "application/pdf") {
-      return <FileText className="h-4 w-4 text-red-500" aria-hidden="true" />;
+    if (isWordAttachment(contentType)) {
+      return <FileText className="h-5 w-5 text-sky-600" aria-hidden="true" />;
     }
-    return <ImageIcon className="h-4 w-4 text-blue-500" aria-hidden="true" />;
+
+    if (isPdfAttachment(contentType)) {
+      return <FileText className="h-5 w-5 text-rose-600" aria-hidden="true" />;
+    }
+
+    return <ImageIcon className="h-5 w-5 text-emerald-600" aria-hidden="true" />;
   };
 
   return (
-    <div className="space-y-3">
-      {/* Drop zone */}
+    <div className="space-y-4">
       <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={cn(
-          "flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
-          isDragOver
-            ? "border-primary bg-primary/5"
-            : "border-border bg-muted/30",
-          (disabled || !canAddMore) && "cursor-not-allowed opacity-50"
-        )}
+        {...getRootProps({
+          className: cn(
+            "rounded-[24px] border-2 border-dashed p-5 text-center transition-colors",
+            isDragActive
+              ? "border-primary bg-primary/5"
+              : "border-border bg-muted/30",
+            (disabled || !canAddMore) && "cursor-not-allowed opacity-60"
+          ),
+          role: "button",
+          tabIndex: disabled || !canAddMore ? -1 : 0,
+          "aria-label": `Upload ${entityType} attachments`,
+          onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              if (!disabled && canAddMore) {
+                open();
+              }
+            }
+          },
+        })}
       >
-        <FileUp
-          className="mb-2 h-6 w-6 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <p className="text-sm text-muted-foreground">
+        <input {...getInputProps()} />
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-card/80 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.35)]">
+          <UploadCloud className="h-6 w-6 text-primary" aria-hidden="true" />
+        </div>
+        <p className="text-sm font-medium text-foreground">
           {canAddMore
-            ? "Drag & drop files here, or"
-            : `Maximum ${MAX_ATTACHMENTS_PER_ENTITY} files reached`}
+            ? getAttachmentEmptyLabel(entityType)
+            : `Maximum ${MAX_ATTACHMENTS_PER_ENTITY} attachments reached`}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {getAttachmentHelperText(entityType)}
         </p>
         {canAddMore && (
           <Button
             type="button"
-            variant="link"
+            variant="outline"
             size="sm"
-            onClick={handleBrowse}
+            onClick={open}
             disabled={disabled}
-            className="mt-1"
+            className="mt-4"
           >
             Browse files
           </Button>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">
-          JPEG, PNG, WebP, or PDF — max 10MB each
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
-          multiple
-          onChange={handleInputChange}
-          className="hidden"
-          disabled={disabled || !canAddMore}
-        />
       </div>
 
-      {/* Upload progress */}
-      {filesInProgress.map((f) => (
-        <div
-          key={f.id}
-          className={cn(
-            "flex items-center gap-3 rounded-md border p-3",
-            f.status === "error" && "border-destructive/50 bg-destructive/5"
-          )}
-        >
-          {f.status === "error" ? (
-            <AlertCircle
-              className="h-4 w-4 shrink-0 text-destructive"
-              aria-hidden="true"
-            />
-          ) : (
-            getFileIcon(f.file.type)
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{f.file.name}</p>
-            {f.status === "error" ? (
-              <p className="text-xs text-destructive">{f.error}</p>
-            ) : (
-              <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${f.progress}%` }}
-                />
-              </div>
-            )}
-          </div>
-          {f.status === "error" && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={() => handleDismissError(f.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      ))}
+      {(filesInProgress.length > 0 || deleteError) && (
+        <div className="space-y-3">
+          {deleteError ? (
+            <div className="rounded-[20px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {deleteError}
+            </div>
+          ) : null}
 
-      {/* Attached files */}
-      {existingAttachments.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {existingAttachments.length} / {MAX_ATTACHMENTS_PER_ENTITY} files
-            attached
-          </p>
-          {existingAttachments.map((a) => (
+          {filesInProgress.map((file) => (
             <div
-              key={a.attachmentId}
-              className="flex items-center gap-3 rounded-md border p-3"
+              key={file.id}
+              className={cn(
+                "flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)]",
+                file.status === "error" && "border-destructive/40 bg-destructive/10"
+              )}
             >
-              {getFileIcon(a.contentType)}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{a.fileName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(a.sizeBytes)}
-                </p>
+              <div className="shrink-0">
+                {file.status === "done" ? (
+                  <CheckCircle2
+                    className="h-5 w-5 text-emerald-600"
+                    aria-hidden="true"
+                  />
+                ) : file.status === "error" ? (
+                  <AlertCircle
+                    className="h-5 w-5 text-destructive"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  getFileIcon(file.file.type)
+                )}
               </div>
-              {!disabled && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {file.file.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatFileSize(file.file.size)}
+                </p>
+                {file.status === "error" ? (
+                  <p className="mt-1 text-xs text-destructive">{file.error}</p>
+                ) : (
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{ width: `${file.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+              {file.status === "error" && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => {
-                    void handleRemoveAttachment(a.attachmentId);
-                  }}
-                  aria-label={`Remove ${a.fileName}`}
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => dismissProgressItem(file.id)}
+                  aria-label={`Dismiss error for ${file.file.name}`}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {existingAttachments.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {existingAttachments.length} / {MAX_ATTACHMENTS_PER_ENTITY} attached
+          </p>
+          {existingAttachments.map((attachment) => (
+            <div
+              key={attachment.attachmentId}
+              className="flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)]"
+            >
+              <div className="shrink-0">{getFileIcon(attachment.contentType)}</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {attachment.fileName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatFileSize(attachment.sizeBytes)}
+                </p>
+              </div>
+
+              {disabled ? null : confirmingDeleteId === attachment.attachmentId ? (
+                <div className="flex items-center gap-2 rounded-full bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive">
+                  <span>Delete?</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 rounded-full px-2 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      void handleRemoveAttachment(attachment.attachmentId);
+                    }}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 rounded-full px-2"
+                    onClick={() => setConfirmingDeleteId(null)}
+                  >
+                    No
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => setConfirmingDeleteId(attachment.attachmentId)}
+                  aria-label={`Delete ${attachment.fileName}`}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               )}
             </div>

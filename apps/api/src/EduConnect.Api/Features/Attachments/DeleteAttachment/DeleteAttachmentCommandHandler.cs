@@ -43,17 +43,51 @@ public class DeleteAttachmentCommandHandler : IRequestHandler<DeleteAttachmentCo
             throw new NotFoundException("Attachment", request.AttachmentId.ToString());
         }
 
-        // Teachers can only delete their own attachments; admins can delete any
-        if (_currentUserService.Role == "Teacher" && attachment.UploadedById != _currentUserService.UserId)
+        if (attachment.EntityType == "homework" && attachment.EntityId.HasValue)
         {
-            throw new ForbiddenException("You can only delete your own attachments.");
+            var homework = await _context.Homeworks
+                .FirstOrDefaultAsync(
+                    h => h.Id == attachment.EntityId &&
+                         h.SchoolId == _currentUserService.SchoolId &&
+                         !h.IsDeleted,
+                    cancellationToken);
+
+            if (homework == null)
+            {
+                throw new NotFoundException("Homework", attachment.EntityId.Value.ToString());
+            }
+
+            if (_currentUserService.Role == "Teacher")
+            {
+                if (homework.AssignedById != _currentUserService.UserId)
+                {
+                    throw new ForbiddenException("You can only delete attachments from homework you created.");
+                }
+
+                if (homework.Status != "Draft" && homework.Status != "Rejected")
+                {
+                    throw new ForbiddenException("Attachments can only be deleted while homework is editable.");
+                }
+            }
+        }
+        else
+        {
+            // Teachers can only delete their own attachments; admins can delete any.
+            if (_currentUserService.Role == "Teacher" && attachment.UploadedById != _currentUserService.UserId)
+            {
+                throw new ForbiddenException("You can only delete your own attachments.");
+            }
         }
 
-        // If attached to a published notice, block deletion
         if (attachment.EntityType == "notice" && attachment.EntityId.HasValue)
         {
             var notice = await _context.Notices
-                .FirstOrDefaultAsync(n => n.Id == attachment.EntityId && n.IsPublished, cancellationToken);
+                .FirstOrDefaultAsync(
+                    n => n.Id == attachment.EntityId &&
+                         n.SchoolId == _currentUserService.SchoolId &&
+                         !n.IsDeleted &&
+                         n.IsPublished,
+                    cancellationToken);
 
             if (notice != null)
             {
