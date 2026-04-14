@@ -6,11 +6,12 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { AuthUser } from "@/lib/auth/jwt";
 import { decodeJwtPayload, getUserFromToken } from "@/lib/auth/jwt";
-import { clearAccessToken, setAccessToken } from "@/lib/auth/session";
+import { clearAccessToken, getAccessToken, setAccessToken } from "@/lib/auth/session";
 
 interface AuthContextType {
   token: string | null;
@@ -31,6 +32,9 @@ export function AuthProvider({
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // True only while the initial session-restore refresh is in-flight.
+  // Used to prevent a failing restore from wiping a concurrent manual login.
+  const isInitialRefreshRef = useRef<boolean>(true);
 
   const clearAuthState = useCallback((): void => {
     clearAccessToken();
@@ -82,19 +86,26 @@ export function AuthProvider({
       );
 
       if (!response.ok) {
-        clearAuthState();
+        // Guard: if this is the initial session restore and the user manually
+        // logged in while the request was in-flight, do not wipe their session.
+        if (!isInitialRefreshRef.current || !getAccessToken()) {
+          clearAuthState();
+        }
         return;
       }
 
       const data = (await response.json()) as { accessToken: string };
       login(data.accessToken);
     } catch {
-      clearAuthState();
+      if (!isInitialRefreshRef.current || !getAccessToken()) {
+        clearAuthState();
+      }
     }
   }, [clearAuthState, login]);
 
   useEffect(() => {
     refreshToken().finally(() => {
+      isInitialRefreshRef.current = false;
       setIsLoading(false);
     });
   }, [refreshToken]);
