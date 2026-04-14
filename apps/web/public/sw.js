@@ -61,9 +61,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   // For static assets: cache-first
+  // /_next/static/ is intentionally excluded — Next.js serves those with
+  // content-hashed filenames and immutable Cache-Control headers, so the
+  // browser HTTP cache handles them correctly. Caching them in the SW
+  // caused stale JS chunks to be served after a new deploy, producing
+  // "Failed to find Server Action" errors in production.
   if (
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff2?)$/) ||
-    url.pathname.startsWith("/_next/static/")
+    url.pathname.match(/\.(png|jpg|jpeg|svg|ico|woff2?)$/) &&
+    !url.pathname.startsWith("/_next/")
   ) {
     event.respondWith(
       caches.match(request).then(
