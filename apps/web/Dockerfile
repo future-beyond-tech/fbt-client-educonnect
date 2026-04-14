@@ -1,21 +1,14 @@
-# NOTE: This Dockerfile is intended to be built with the *repo root* as the
-# Docker build context (so pnpm workspaces + local packages resolve).
-#
-# Railway: set Root Directory = repo root and Dockerfile Path = apps/web/Dockerfile
-
 # ── Stage 1: Dependencies ───────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Copy only the workspace manifests first for better layer caching.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json ./apps/web/package.json
-COPY packages/*/package.json ./packages/*/package.json
-COPY packages/config/package.json ./packages/config/package.json
-
-RUN pnpm install --frozen-lockfile
+# This Dockerfile is designed to work when the Docker build context is `apps/web`
+# (Railway Root Directory = `apps/web`). It intentionally does NOT rely on
+# pnpm-workspace packages living outside this folder.
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --no-frozen-lockfile
 
 # ── Stage 2: Build ──────────────────────────
 FROM node:20-alpine AS build
@@ -36,7 +29,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --dir apps/web build
+RUN pnpm build
 
 # ── Stage 3: Runtime ───────────────────────
 FROM node:20-alpine AS runtime
@@ -49,9 +42,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
 # Copy standalone output (Next.js output: "standalone")
-COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./.next/static
-COPY --from=build /app/apps/web/public ./public
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 
 USER appuser
 
