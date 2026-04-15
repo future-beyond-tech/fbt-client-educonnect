@@ -14,6 +14,9 @@ const config: Config = {
         input: "rgb(var(--input) / <alpha-value>)",
         ring: "rgb(var(--ring) / <alpha-value>)",
         fbt: "rgb(var(--fbt) / <alpha-value>)",
+        success: "rgb(var(--success) / <alpha-value>)",
+        warning: "rgb(var(--warning) / <alpha-value>)",
+        info: "rgb(var(--info) / <alpha-value>)",
         cyber: {
           cyan: "rgb(var(--cyan) / <alpha-value>)",
           amber: "rgb(var(--amber) / <alpha-value>)",

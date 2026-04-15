@@ -64,7 +64,7 @@ export function Sidebar(): React.ReactElement {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group flex min-h-[56px] items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
+                  "focus-ring group flex min-h-[56px] items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all focus-visible:ring-offset-transparent",
                   isActive
                     ? "bg-white text-slate-900 shadow-[0_18px_42px_-26px_rgba(255,255,255,0.9)]"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
