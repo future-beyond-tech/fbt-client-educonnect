@@ -221,12 +221,11 @@ if (!string.IsNullOrWhiteSpace(sentryDsn))
 app.UseCorrelationId();
 app.UseRequestLogging();
 app.UseGlobalException();
+app.UseCors("AllowConfigured");
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.UseTenantIsolation();
-
-app.UseCors("AllowConfigured");
 
 app.MapAllEndpoints();
 
