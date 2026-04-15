@@ -104,6 +104,28 @@ export function AuthProvider({
   }, [clearAuthState, login]);
 
   useEffect(() => {
+    // Attempt to restore session from a persisted access token (localStorage).
+    // This prevents the user from being logged out on every page refresh while
+    // the background token-refresh request is still in-flight.
+    const storedToken = getAccessToken();
+    if (storedToken) {
+      const payload = decodeJwtPayload(storedToken);
+      const now = Math.floor(Date.now() / 1000);
+      if (payload && payload.exp > now) {
+        // Token is still valid — hydrate React state immediately.
+        const restoredUser = getUserFromToken(storedToken);
+        if (restoredUser) {
+          setToken(storedToken);
+          setUser(restoredUser);
+        }
+      } else {
+        // Token has expired — remove it so the refresh call starts clean.
+        clearAccessToken();
+      }
+    }
+
+    // Always attempt a background refresh so we get a fresh token (and honour
+    // the HTTP-only refresh-token cookie when available).
     refreshToken().finally(() => {
       isInitialRefreshRef.current = false;
       setIsLoading(false);
