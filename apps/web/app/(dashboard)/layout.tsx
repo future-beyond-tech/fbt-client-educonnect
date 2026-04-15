@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { RetentionSlot } from "@/components/shared/retention-slot";
+import { AnimatedContent } from "@/components/effects/animated-content";
 
 function DashboardSkeleton(): React.ReactElement {
   return (
@@ -33,7 +34,7 @@ export default function DashboardLayout({
         <main className="flex-1 pb-24 md:ml-[19rem] md:pb-8">
           <RetentionSlot />
           <Suspense fallback={<DashboardSkeleton />}>
-            {children}
+            <AnimatedContent>{children}</AnimatedContent>
           </Suspense>
         </main>
         <BottomNav />

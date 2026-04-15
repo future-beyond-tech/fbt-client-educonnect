@@ -243,3 +243,62 @@
     transform: translateY(0);
   }
 }
+
+@keyframes btn-ring {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes btn-shine {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Premium button: solid gradient fill inside a rotating conic-gradient ring.
+   Uses background-clip with padding-box/border-box so text is never masked. */
+@property --btn-premium-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes btn-premium-spin {
+  to {
+    --btn-premium-angle: 360deg;
+  }
+}
+
+.btn-premium {
+  position: relative;
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent))),
+    conic-gradient(
+      from var(--btn-premium-angle),
+      rgb(var(--primary)),
+      rgb(var(--accent)),
+      rgb(var(--glow-3)),
+      rgb(var(--primary))
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: btn-premium-spin 6s linear infinite;
+}
+
+@supports not (background: paint(something)) {
+  /* Fallback for browsers without @property support: static gradient border */
+  .btn-premium {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-premium {
+    animation: none;
+  }
+}

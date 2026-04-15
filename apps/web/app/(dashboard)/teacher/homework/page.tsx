@@ -320,6 +320,7 @@ export default function TeacherHomeworkPage(): React.ReactElement {
               setSuccessMessage("");
             }}
             size="sm"
+            variant="premium"
           >
             <Plus className="h-4 w-4" />
             New Homework

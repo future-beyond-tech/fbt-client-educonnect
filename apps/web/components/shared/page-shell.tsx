@@ -1,5 +1,9 @@
+"use client";
+
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { SpotlightCard } from "@/components/effects/spotlight-card";
+import { CountUp } from "@/components/effects/count-up";
 
 export interface PageShellProps extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -86,19 +90,29 @@ export function PageHeader({
           </div>
           {stats && stats.length > 0 ? (
             <div className="flex flex-wrap gap-3">
-              {stats.map((stat) => (
-                <div
-                  key={`${stat.label}-${stat.value}`}
-                  className="rounded-[22px] border border-border/70 bg-card/74 px-4 py-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:bg-card/86"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-foreground">
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
+              {stats.map((stat) => {
+                const numeric = /^-?\d+$/.test(stat.value)
+                  ? parseInt(stat.value, 10)
+                  : null;
+                return (
+                  <SpotlightCard
+                    key={`${stat.label}-${stat.value}`}
+                    radius={240}
+                    className="rounded-[22px] border border-border/70 bg-card/74 px-4 py-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-0.5 dark:bg-card/86"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                      {stat.label}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {numeric !== null ? (
+                        <CountUp to={numeric} />
+                      ) : (
+                        stat.value
+                      )}
+                    </p>
+                  </SpotlightCard>
+                );
+              })}
             </div>
           ) : null}
         </div>
