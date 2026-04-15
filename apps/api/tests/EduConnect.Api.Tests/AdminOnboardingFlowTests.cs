@@ -8,6 +8,7 @@ using EduConnect.Api.Features.Parents.CreateParent;
 using EduConnect.Api.Features.Teachers.AssignClassToTeacher;
 using EduConnect.Api.Features.Teachers.CreateTeacher;
 using EduConnect.Api.Features.Teachers.PromoteClassTeacher;
+using EduConnect.Api.Features.Students.EnrollStudent;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
@@ -75,6 +76,348 @@ public class AdminOnboardingFlowTests
         parent.Email.Should().Be("meera@home.com");
         parent.PinHash.Should().NotBe("1234");
         pinService.VerifyPin("1234", parent.PinHash!).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EnrollStudent_WithoutParentData_CreatesStudentOnly()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "5",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var response = await handler.Handle(
+            new EnrollStudentCommand("Arjun Nair", "2026-5A-001", classId, new DateOnly(2015, 5, 11), null),
+            CancellationToken.None);
+
+        var student = await context.Students.FirstAsync(s => s.Id == response.StudentId);
+        response.Message.Should().Be("Student enrolled successfully.");
+        student.Name.Should().Be("Arjun Nair");
+        student.RollNumber.Should().Be("2026-5A-001");
+        student.ClassId.Should().Be(classId);
+        student.DateOfBirth.Should().Be(new DateOnly(2015, 5, 11));
+        (await context.Users.CountAsync(u => u.Role == "Parent")).Should().Be(0);
+        (await context.ParentStudentLinks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EnrollStudent_WithParentData_CreatesStudentParentAndLink()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+        var pinService = new PinService();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "6",
+                    Section = "B",
+                    AcademicYear = "2026-27"
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            pinService,
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var response = await handler.Handle(
+            new EnrollStudentCommand(
+                "Diya Rao",
+                "2026-6B-002",
+                classId,
+                new DateOnly(2014, 10, 3),
+                new EnrollStudentParentRequest(
+                    "Lakshmi Rao",
+                    "9123456789",
+                    "Lakshmi@Home.com",
+                    "1234",
+                    "guardian")),
+            CancellationToken.None);
+
+        var student = await context.Students.FirstAsync(s => s.Id == response.StudentId);
+        var parent = await context.Users.FirstAsync(u => u.Role == "Parent");
+        var link = await context.ParentStudentLinks.FirstAsync(l => l.StudentId == student.Id);
+
+        student.Name.Should().Be("Diya Rao");
+        parent.Name.Should().Be("Lakshmi Rao");
+        parent.Email.Should().Be("lakshmi@home.com");
+        parent.PinHash.Should().NotBe("1234");
+        pinService.VerifyPin("1234", parent.PinHash!).Should().BeTrue();
+        link.ParentId.Should().Be(parent.Id);
+        link.StudentId.Should().Be(student.Id);
+        link.Relationship.Should().Be("guardian");
+    }
+
+    [Fact]
+    public async Task EnrollStudent_DuplicateRollNumber_DoesNotCreateParentAccount()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "7",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            students:
+            [
+                new StudentEntity
+                {
+                    Id = Guid.NewGuid(),
+                    SchoolId = schoolId,
+                    ClassId = classId,
+                    Name = "Existing Student",
+                    RollNumber = "2026-7A-001",
+                    IsActive = true,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var act = () => handler.Handle(
+            new EnrollStudentCommand(
+                "New Student",
+                "2026-7A-001",
+                classId,
+                null,
+                new EnrollStudentParentRequest(
+                    "Parent One",
+                    "9234567890",
+                    "parent.one@test.com",
+                    "1234",
+                    "parent")),
+            CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ValidationException>();
+        exception.Which.Errors.Should().ContainKey("RollNumber");
+
+        await using var verificationContext = new AppDbContext(options, currentUser);
+        (await verificationContext.Students.CountAsync()).Should().Be(1);
+        (await verificationContext.Users.CountAsync(u => u.Role == "Parent")).Should().Be(0);
+        (await verificationContext.ParentStudentLinks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EnrollStudent_DuplicateParentPhone_DoesNotCreateStudent()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "8",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateParentUser(Guid.NewGuid(), schoolId, "9345678901", "Existing Parent", "existing.parent@test.com")
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var act = () => handler.Handle(
+            new EnrollStudentCommand(
+                "Student Phone Clash",
+                "2026-8A-004",
+                classId,
+                null,
+                new EnrollStudentParentRequest(
+                    "Parent Two",
+                    "9345678901",
+                    "new.parent@test.com",
+                    "4567",
+                    "parent")),
+            CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ValidationException>();
+        exception.Which.Errors.Should().ContainKey("Phone");
+
+        await using var verificationContext = new AppDbContext(options, currentUser);
+        (await verificationContext.Students.CountAsync()).Should().Be(0);
+        (await verificationContext.Users.CountAsync(u => u.Role == "Parent")).Should().Be(1);
+        (await verificationContext.ParentStudentLinks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EnrollStudent_DuplicateParentEmail_DoesNotCreateStudent()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "9",
+                    Section = "C",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateParentUser(Guid.NewGuid(), schoolId, "9456789012", "Existing Parent", "existing.parent@test.com")
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var act = () => handler.Handle(
+            new EnrollStudentCommand(
+                "Student Email Clash",
+                "2026-9C-008",
+                classId,
+                null,
+                new EnrollStudentParentRequest(
+                    "Parent Three",
+                    "9567890123",
+                    "Existing.Parent@Test.com",
+                    "4567",
+                    "guardian")),
+            CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ValidationException>();
+        exception.Which.Errors.Should().ContainKey("Email");
+
+        await using var verificationContext = new AppDbContext(options, currentUser);
+        (await verificationContext.Students.CountAsync()).Should().Be(0);
+        (await verificationContext.Users.CountAsync(u => u.Role == "Parent")).Should().Be(1);
+        (await verificationContext.ParentStudentLinks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EnrollStudent_NonAdminUser_IsForbidden()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Teacher", teacherId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "10",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000024", "Teacher User", "teacher@school.com")
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var act = () => handler.Handle(
+            new EnrollStudentCommand(
+                "Forbidden Student",
+                "2026-10A-001",
+                classId,
+                null,
+                new EnrollStudentParentRequest(
+                    "Parent Four",
+                    "9678901234",
+                    "parent.four@test.com",
+                    "1234",
+                    "parent")),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ForbiddenException>()
+            .WithMessage("Only admins can enroll students.");
+
+        await using var verificationContext = new AppDbContext(options, currentUser);
+        (await verificationContext.Students.CountAsync()).Should().Be(0);
+        (await verificationContext.Users.CountAsync(u => u.Role == "Parent")).Should().Be(0);
+        (await verificationContext.ParentStudentLinks.CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -578,10 +921,28 @@ public class AdminOnboardingFlowTests
         };
     }
 
+    private static UserEntity CreateParentUser(Guid id, Guid schoolId, string phone, string name, string email)
+    {
+        return new UserEntity
+        {
+            Id = id,
+            SchoolId = schoolId,
+            Phone = phone,
+            Email = email,
+            Name = name,
+            Role = "Parent",
+            PinHash = "hashed-pin",
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
     private static async Task SeedAsync(
         DbContextOptions<AppDbContext> options,
         Guid schoolId,
         IEnumerable<ClassEntity>? classes = null,
+        IEnumerable<StudentEntity>? students = null,
         IEnumerable<UserEntity>? users = null,
         IEnumerable<SubjectEntity>? subjects = null,
         IEnumerable<TeacherClassAssignmentEntity>? assignments = null,
@@ -605,6 +966,11 @@ public class AdminOnboardingFlowTests
         if (classes != null)
         {
             context.Classes.AddRange(classes);
+        }
+
+        if (students != null)
+        {
+            context.Students.AddRange(students);
         }
 
         if (users != null)

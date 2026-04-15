@@ -13,11 +13,13 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshTokenEn
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id).ValueGeneratedNever();
-        builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(256);
-        builder.Property(x => x.IsRevoked).IsRequired();
+        builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(500);
+        builder.Property(x => x.IsRevoked).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.UserId);
-        builder.HasIndex(x => new { x.UserId, x.IsRevoked });
+        builder.HasIndex(x => new { x.UserId, x.IsRevoked })
+            .HasFilter("is_revoked = false");
 
         builder.HasOne(x => x.User)
             .WithMany(x => x.RefreshTokens)

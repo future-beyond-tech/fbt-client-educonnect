@@ -14,6 +14,7 @@ public class SubjectConfiguration : IEntityTypeConfiguration<SubjectEntity>
 
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Name).IsRequired().HasMaxLength(80);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => new { x.SchoolId, x.Name }).IsUnique();

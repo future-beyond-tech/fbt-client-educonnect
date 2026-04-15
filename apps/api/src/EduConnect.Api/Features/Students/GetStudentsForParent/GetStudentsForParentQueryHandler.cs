@@ -30,6 +30,7 @@ public class GetStudentsForParentQueryHandler : IRequestHandler<GetStudentsForPa
             .Include(psl => psl.Student)
                 .ThenInclude(s => s!.Class)
             .Where(psl => psl.Student != null && psl.Student.IsActive)
+            .OrderBy(psl => psl.Student!.Name)
             .Select(psl => new ParentChildDto(
                 psl.Student!.Id,
                 psl.Student.Name,
@@ -39,7 +40,6 @@ public class GetStudentsForParentQueryHandler : IRequestHandler<GetStudentsForPa
                 psl.Student.Class != null ? psl.Student.Class.Section : string.Empty,
                 psl.Relationship,
                 psl.Student.IsActive))
-            .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
 
         return children;

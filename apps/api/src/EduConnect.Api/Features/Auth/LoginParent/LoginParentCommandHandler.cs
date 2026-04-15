@@ -1,5 +1,6 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
+using EduConnect.Api.Common.Logging;
 using EduConnect.Api.Infrastructure.Database;
 using MediatR;
 using BCrypt.Net;
@@ -42,7 +43,9 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
         if (student == null)
         {
-            _logger.LogWarning("Parent login attempt with invalid or inactive roll number {RollNumber}", request.RollNumber);
+            _logger.LogWarning(
+                "Parent login attempt with invalid or inactive roll number (rollNumberHash={RollNumberHash})",
+                LogRedaction.Sha256(request.RollNumber));
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }
 
@@ -60,7 +63,10 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
         if (parentLinks.Count == 0)
         {
-            _logger.LogWarning("No active parent found for student {StudentId} with roll number {RollNumber}", student.Id, request.RollNumber);
+            _logger.LogWarning(
+                "No active parent found for student {StudentId} (rollNumberHash={RollNumberHash})",
+                student.Id,
+                LogRedaction.Sha256(request.RollNumber));
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }
 
@@ -71,7 +77,10 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
         if (user == null)
         {
-            _logger.LogWarning("Invalid PIN attempt for roll number {RollNumber} (student {StudentId})", request.RollNumber, student.Id);
+            _logger.LogWarning(
+                "Invalid parent PIN attempt (studentId={StudentId}, rollNumberHash={RollNumberHash})",
+                student.Id,
+                LogRedaction.Sha256(request.RollNumber));
             // Generic message — do not reveal whether roll number exists or PIN is unset.
             throw new UnauthorizedException("Invalid roll number or PIN.");
         }

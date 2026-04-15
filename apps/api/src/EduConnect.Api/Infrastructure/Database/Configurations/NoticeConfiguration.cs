@@ -8,7 +8,12 @@ public class NoticeConfiguration : IEntityTypeConfiguration<NoticeEntity>
 {
     public void Configure(EntityTypeBuilder<NoticeEntity> builder)
     {
-        builder.ToTable("notices");
+        builder.ToTable("notices", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "chk_notices_target_audience",
+                "target_audience IN ('All', 'Class', 'Section')");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -16,13 +21,16 @@ public class NoticeConfiguration : IEntityTypeConfiguration<NoticeEntity>
         builder.Property(x => x.Title).IsRequired().HasMaxLength(256);
         builder.Property(x => x.Body).IsRequired().HasMaxLength(5000);
         builder.Property(x => x.TargetAudience).IsRequired().HasMaxLength(50);
-        builder.Property(x => x.IsPublished).IsRequired();
-        builder.Property(x => x.IsDeleted).IsRequired();
+        builder.Property(x => x.IsPublished).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.IsDeleted).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.PublishedById);
         builder.HasIndex(x => x.TargetClassId);
-        builder.HasIndex(x => new { x.SchoolId, x.IsPublished, x.IsDeleted });
+        builder.HasIndex(x => new { x.SchoolId, x.IsPublished, x.IsDeleted })
+            .HasFilter("is_published = true AND is_deleted = false");
 
         builder.HasOne(x => x.School)
             .WithMany(x => x.Notices)

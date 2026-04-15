@@ -1,12 +1,13 @@
 import { getAccessToken } from "@/lib/auth/session";
 
-interface ProblemDetails {
+export interface ProblemDetails {
   type: string;
   title: string;
   status: number;
   detail: string;
   instance: string;
   traceId: string;
+  errors?: Record<string, string[]>;
 }
 
 export class ApiError extends Error {

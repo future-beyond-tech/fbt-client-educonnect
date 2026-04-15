@@ -78,25 +78,6 @@ public class AppDbContext : DbContext
         ApplySnakeCaseNamingConventions(modelBuilder);
     }
 
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        var entries = ChangeTracker
-            .Entries()
-            .Where(e => e.Entity is not RefreshTokenEntity &&
-                        e.Entity is not AuthResetTokenEntity &&
-                        e.State == EntityState.Modified);
-
-        foreach (var entry in entries)
-        {
-            var updatedAtProperty = entry.Metadata.FindProperty("UpdatedAt");
-            if (updatedAtProperty != null)
-            {
-                entry.Property("UpdatedAt").CurrentValue = DateTimeOffset.UtcNow;
-            }
-        }
-
-        return await base.SaveChangesAsync(cancellationToken);
-    }
 
     private static void ApplySnakeCaseNamingConventions(ModelBuilder modelBuilder)
     {
