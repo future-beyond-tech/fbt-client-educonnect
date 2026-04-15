@@ -48,10 +48,10 @@ export function BottomNav(): React.ReactElement | null {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 text-[11px] font-medium uppercase tracking-[0.14em] transition-all",
+                "focus-ring flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 text-[11px] font-medium uppercase tracking-[0.14em] transition-all",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-[0_16px_32px_-18px_rgba(12,57,95,0.8)]"
-                  : "text-muted-foreground"
+                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-primary-foreground shadow-[0_16px_38px_-20px_rgba(18,66,145,0.65)]"
+                  : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
               )}
               aria-current={isActive ? "page" : undefined}
             >
