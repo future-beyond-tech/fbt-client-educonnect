@@ -45,7 +45,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
 
   // Mark absence form state
   const [showForm, setShowForm] = React.useState(false);
-  const [studentId, setStudentId] = React.useState("");
+  const [rollNumber, setRollNumber] = React.useState("");
   const [absenceDate, setAbsenceDate] = React.useState(
     new Date().toISOString().split("T")[0]
   );
@@ -78,20 +78,20 @@ export default function TeacherAttendancePage(): React.ReactElement {
     setFormError("");
     setSuccessMessage("");
 
-    if (!studentId.trim()) {
-      setFormError("Student ID is required.");
+    if (!rollNumber.trim()) {
+      setFormError("Roll number is required.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       const response = await apiPost<MarkAbsenceResponse>(API_ENDPOINTS.attendance, {
-        studentId,
+        rollNumber,
         date: absenceDate,
         reason: reason || null,
       });
       setSuccessMessage(response.message);
-      setStudentId("");
+      setRollNumber("");
       setReason("");
       setShowForm(false);
       fetchAttendance();
@@ -151,11 +151,11 @@ export default function TeacherAttendancePage(): React.ReactElement {
             <h3 className="text-lg font-semibold">Mark Student Absent</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <Input
-                id="studentId"
-                label="Student ID"
-                placeholder="Enter student ID"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                id="rollNumber"
+                label="Roll Number"
+                placeholder="e.g. 5A-001"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
                 disabled={isSubmitting}
               />
               <Input

@@ -28,26 +28,69 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
 
     public async Task<MarkAbsenceResponse> Handle(MarkAbsenceCommand request, CancellationToken cancellationToken)
     {
-        var parentStudentLink = await _context.ParentStudentLinks
-            .Include(psl => psl.Student)
-            .FirstOrDefaultAsync(psl =>
-                psl.SchoolId == _currentUserService.SchoolId &&
-                psl.ParentId == _currentUserService.UserId &&
-                psl.StudentId == request.StudentId,
+        // Step 1: Resolve student by roll number within this school
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s =>
+                s.SchoolId == _currentUserService.SchoolId &&
+                s.RollNumber == request.RollNumber &&
+                s.IsActive,
                 cancellationToken);
 
-        if (parentStudentLink == null)
+        if (student == null)
         {
             _logger.LogWarning(
-                "Parent {ParentId} attempted to mark attendance for student {StudentId} they don't own",
-                _currentUserService.UserId, request.StudentId);
-            throw new ForbiddenException("You do not have permission to mark attendance for this student.");
+                "Student with roll number {RollNumber} not found in school {SchoolId}",
+                request.RollNumber, _currentUserService.SchoolId);
+            throw new NotFoundException($"Student with roll number '{request.RollNumber}' not found.");
         }
 
+        // Step 2: Authorize based on the caller's role
+        var role = _currentUserService.Role;
+
+        if (role == "Teacher")
+        {
+            var isAssignedToClass = await _context.TeacherClassAssignments
+                .AnyAsync(tca =>
+                    tca.SchoolId == _currentUserService.SchoolId &&
+                    tca.TeacherId == _currentUserService.UserId &&
+                    tca.ClassId == student.ClassId,
+                    cancellationToken);
+
+            if (!isAssignedToClass)
+            {
+                _logger.LogWarning(
+                    "Teacher {TeacherId} attempted to mark absence for student {StudentId} in unassigned class {ClassId}",
+                    _currentUserService.UserId, student.Id, student.ClassId);
+                throw new ForbiddenException("You are not assigned to this student's class.");
+            }
+        }
+        else if (role == "Parent")
+        {
+            var isLinked = await _context.ParentStudentLinks
+                .AnyAsync(psl =>
+                    psl.SchoolId == _currentUserService.SchoolId &&
+                    psl.ParentId == _currentUserService.UserId &&
+                    psl.StudentId == student.Id,
+                    cancellationToken);
+
+            if (!isLinked)
+            {
+                _logger.LogWarning(
+                    "Parent {ParentId} attempted to mark absence for student {StudentId} they are not linked to",
+                    _currentUserService.UserId, student.Id);
+                throw new ForbiddenException("You do not have permission to mark attendance for this student.");
+            }
+        }
+        else
+        {
+            throw new ForbiddenException("Only teachers and parents can mark student absences.");
+        }
+
+        // Step 3: Guard against duplicate records on the same date
         var existingRecord = await _context.AttendanceRecords
             .FirstOrDefaultAsync(ar =>
                 ar.SchoolId == _currentUserService.SchoolId &&
-                ar.StudentId == request.StudentId &&
+                ar.StudentId == student.Id &&
                 ar.Date == request.Date &&
                 !ar.IsDeleted,
                 cancellationToken);
@@ -56,15 +99,16 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
         {
             _logger.LogWarning(
                 "Duplicate attendance record attempt for student {StudentId} on date {Date}",
-                request.StudentId, request.Date);
+                student.Id, request.Date);
             throw new InvalidOperationException("Attendance record already exists for this student on this date.");
         }
 
+        // Step 4: Persist the absence record
         var attendanceRecord = new AttendanceRecordEntity
         {
             Id = Guid.NewGuid(),
             SchoolId = _currentUserService.SchoolId,
-            StudentId = request.StudentId,
+            StudentId = student.Id,
             Date = request.Date,
             Status = "Absent",
             Reason = request.Reason,
@@ -77,11 +121,11 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
         _context.AttendanceRecords.Add(attendanceRecord);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Notify all parents linked to this student about the absence
-        var studentName = parentStudentLink.Student?.Name ?? "your child";
+        // Step 5: Notify all parents linked to this student
         var allParentIds = await _context.ParentStudentLinks
-            .Where(psl => psl.SchoolId == _currentUserService.SchoolId
-                && psl.StudentId == request.StudentId)
+            .Where(psl =>
+                psl.SchoolId == _currentUserService.SchoolId &&
+                psl.StudentId == student.Id)
             .Select(psl => psl.ParentId)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -92,8 +136,8 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
                 _currentUserService.SchoolId,
                 allParentIds,
                 "absence_marked",
-                $"Absence: {studentName}",
-                $"{studentName} was marked absent on {request.Date:yyyy-MM-dd}." +
+                $"Absence: {student.Name}",
+                $"{student.Name} was marked absent on {request.Date:yyyy-MM-dd}." +
                     (string.IsNullOrWhiteSpace(request.Reason) ? "" : $" Reason: {request.Reason}"),
                 attendanceRecord.Id,
                 "attendance",
@@ -101,8 +145,8 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
         }
 
         _logger.LogInformation(
-            "Attendance record created: {RecordId} for student {StudentId} by {UserId}",
-            attendanceRecord.Id, request.StudentId, _currentUserService.UserId);
+            "Attendance record {RecordId} created for student {StudentId} (roll: {RollNumber}) by {UserId} ({Role})",
+            attendanceRecord.Id, student.Id, request.RollNumber, _currentUserService.UserId, role);
 
         return new MarkAbsenceResponse(attendanceRecord.Id, "Absent", "Absence marked successfully.");
     }
