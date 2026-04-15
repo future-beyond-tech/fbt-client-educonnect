@@ -220,6 +220,9 @@ var app = builder.Build();
         await dbContext.Database.MigrateAsync();
         logger.LogInformation("EF Core Migrations applied successfully.");
         
+        // Always run production seeding to ensure base setup
+        await EduConnect.Api.Infrastructure.Database.DatabaseSeeder.SeedProductionDataAsync(dbContext, logger);
+
         if (app.Environment.IsDevelopment())
         {
             await EduConnect.Api.Infrastructure.Database.DatabaseSeeder.SeedDevelopmentDataAsync(dbContext, logger);
