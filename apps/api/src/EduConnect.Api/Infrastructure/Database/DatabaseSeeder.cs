@@ -25,22 +25,34 @@ public static class DatabaseSeeder
             await context.SaveChangesAsync();
         }
 
-        // 2. Ensure at least one Admin user exists
+        // 2. Ensure at least one Admin user exists with correct password hash
         var schoolId = await context.Schools.Select(s => s.Id).FirstOrDefaultAsync();
-        if (schoolId != Guid.Empty && !await context.Users.AnyAsync(u => u.Role == "Admin"))
+        if (schoolId != Guid.Empty)
         {
-            logger.LogInformation("Seeding default production admin user...");
-            var defaultAdmin = new Entities.UserEntity
+            var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
+            var correctHash = "$2a$12$RVblikCT9RnEoUu6bo8aA.E8pO7BSdWSEE07EKGG2EtX2NFyos6i.";
+            
+            if (adminUser == null)
             {
-                Id = Guid.Parse("b1b2c3d4-0001-4000-8000-000000000001"),
-                SchoolId = schoolId,
-                Phone = "9000000001",
-                Name = "System Administrator",
-                Role = "Admin",
-                PasswordHash = "$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa" // Password: EduConnect@2026
-            };
-            context.Users.Add(defaultAdmin);
-            await context.SaveChangesAsync();
+                logger.LogInformation("Seeding default production admin user...");
+                var defaultAdmin = new Entities.UserEntity
+                {
+                    Id = Guid.Parse("b1b2c3d4-0001-4000-8000-000000000001"),
+                    SchoolId = schoolId,
+                    Phone = "9000000001",
+                    Name = "System Administrator",
+                    Role = "Admin",
+                    PasswordHash = correctHash // Password: EduConnect@2026
+                };
+                context.Users.Add(defaultAdmin);
+                await context.SaveChangesAsync();
+            }
+            else if (adminUser.Id == Guid.Parse("b1b2c3d4-0001-4000-8000-000000000001") && adminUser.PasswordHash != correctHash)
+            {
+                logger.LogInformation("Patching default production admin user with correct working password hash...");
+                adminUser.PasswordHash = correctHash;
+                await context.SaveChangesAsync();
+            }
         }
     }
     public static async Task SeedDevelopmentDataAsync(AppDbContext context, ILogger logger)
