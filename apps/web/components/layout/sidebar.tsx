@@ -36,11 +36,11 @@ export function Sidebar(): React.ReactElement {
 
   return (
     <aside className="hidden md:fixed md:inset-y-4 md:left-4 md:z-40 md:flex md:w-72 md:flex-col">
-      <div className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(13,41,64,0.97),rgba(12,57,95,0.95))] text-white shadow-[0_35px_90px_-40px_rgba(2,12,24,0.9)]">
+      <div className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgb(var(--sidebar-from)),rgb(var(--sidebar-to)))] text-white shadow-[0_35px_90px_-40px_rgba(2,12,24,0.9)]">
         <div className="border-b border-white/10 px-6 py-6">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 shadow-inner shadow-white/10">
-              <div className="h-6 w-6 rounded-full bg-[linear-gradient(135deg,rgba(58,199,179,1),rgba(255,176,32,0.9))]" />
+              <div className="h-6 w-6 rounded-full bg-[linear-gradient(135deg,rgb(var(--accent)),rgb(var(--glow-2)))]" />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
