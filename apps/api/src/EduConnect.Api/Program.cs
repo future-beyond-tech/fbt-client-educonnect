@@ -60,8 +60,13 @@ var jwtIssuer = builder.Configuration["JWT_ISSUER"];
 var jwtAudience = builder.Configuration["JWT_AUDIENCE"];
 var databaseConnectionString = DatabaseConnectionStringResolver.Resolve(databaseUrl);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(databaseConnectionString));
+builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Database.Interceptors.AuditableEntityInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    options.UseNpgsql(databaseConnectionString);
+    options.AddInterceptors(sp.GetRequiredService<EduConnect.Api.Infrastructure.Database.Interceptors.AuditableEntityInterceptor>());
+});
 
 builder.Services.AddMediatR(cfg =>
 {
@@ -129,6 +134,8 @@ else
 builder.Services.AddScoped<IStorageService, S3StorageService>();
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -203,15 +210,37 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Apply pending SQL migrations on startup. Safe across replicas via pg advisory lock.
-// Halts startup on failure so a misconfigured / broken schema cannot serve traffic.
-// Seeds only run when ASPNETCORE_ENVIRONMENT=Development.
+// Apply pending EF Migrations on startup
 {
-    var migrationLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SqlMigrationRunner");
-    await SqlMigrationRunner.ApplyAsync(app.Services, app.Environment, app.Configuration, migrationLogger);
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        await dbContext.Database.MigrateAsync();
+        logger.LogInformation("EF Core Migrations applied successfully.");
+        
+        if (app.Environment.IsDevelopment())
+        {
+            await EduConnect.Api.Infrastructure.Database.DatabaseSeeder.SeedDevelopmentDataAsync(dbContext, logger);
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Failed to apply EF Core Migrations.");
+        throw;
+    }
 }
 
 app.UseRouting();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger(options =>
+    {
+        options.RouteTemplate = "openapi/{documentName}.json";
+    });
+}
 
 if (!string.IsNullOrWhiteSpace(sentryDsn))
 {
@@ -219,13 +248,13 @@ if (!string.IsNullOrWhiteSpace(sentryDsn))
 }
 
 app.UseCorrelationId();
-app.UseRequestLogging();
 app.UseGlobalException();
 app.UseCors("AllowConfigured");
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.UseTenantIsolation();
+app.UseRequestLogging();
 
 app.MapAllEndpoints();
 

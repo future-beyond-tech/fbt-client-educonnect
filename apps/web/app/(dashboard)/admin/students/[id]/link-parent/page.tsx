@@ -4,6 +4,7 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { PARENT_RELATIONSHIP_OPTIONS } from "@/lib/student-relationships";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CardContent } from "@/components/ui/card";
@@ -19,14 +20,6 @@ import type {
   LinkParentRequest,
   MutationResponse,
 } from "@/lib/types/student";
-
-const RELATIONSHIP_OPTIONS = [
-  { value: "parent", label: "Parent" },
-  { value: "guardian", label: "Guardian" },
-  { value: "grandparent", label: "Grandparent" },
-  { value: "sibling", label: "Sibling" },
-  { value: "other", label: "Other" },
-];
 
 export default function LinkParentPage(): React.ReactElement {
   const params = useParams();
@@ -334,7 +327,7 @@ export default function LinkParentPage(): React.ReactElement {
                   onChange={(e) => setRelationship(e.target.value)}
                   disabled={isLinking}
                 >
-                  {RELATIONSHIP_OPTIONS.map((opt) => (
+                  {PARENT_RELATIONSHIP_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -388,7 +381,7 @@ export default function LinkParentPage(): React.ReactElement {
                   onChange={(e) => setNewRelationship(e.target.value)}
                   disabled={isCreatingParent}
                 >
-                  {RELATIONSHIP_OPTIONS.map((opt) => (
+                  {PARENT_RELATIONSHIP_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

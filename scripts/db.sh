@@ -156,7 +156,7 @@ cmd_reset() {
       echo "Wiping Docker Postgres volume..."
       (cd "${REPO_ROOT}" && docker compose down db -v)
       cmd_up
-      echo "Done. The .NET API will re-run all schema + seed migrations on next startup."
+      echo "Done. On next Development startup, the API will re-apply EF Core migrations and re-run the dev seed scripts."
       ;;
     local)
       require_psql
@@ -169,7 +169,7 @@ cmd_reset() {
         -h localhost -p "${POSTGRES_HOST_PORT}" \
         -U "${LOCAL_DB_USER:-educonnect}" -d postgres \
         -c "CREATE DATABASE ${LOCAL_DB_NAME:-educonnect};"
-      echo "Done. The .NET API will re-run all schema + seed migrations on next startup."
+      echo "Done. On next Development startup, the API will re-apply EF Core migrations and re-run the dev seed scripts."
       ;;
     remote)
       echo "Refusing to reset remote database. Do it manually if you really mean it." >&2

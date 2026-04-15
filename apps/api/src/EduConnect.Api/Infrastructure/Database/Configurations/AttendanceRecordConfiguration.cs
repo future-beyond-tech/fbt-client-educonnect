@@ -8,13 +8,21 @@ public class AttendanceRecordConfiguration : IEntityTypeConfiguration<Attendance
 {
     public void Configure(EntityTypeBuilder<AttendanceRecordEntity> builder)
     {
-        builder.ToTable("attendance_records");
+        builder.ToTable("attendance_records", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint("chk_attendance_status", "status IN ('Absent', 'Late')");
+            tableBuilder.HasCheckConstraint(
+                "chk_attendance_entered_by_role",
+                "entered_by_role IN ('Parent', 'Teacher', 'Admin')");
+        });
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Status).IsRequired().HasMaxLength(50);
         builder.Property(x => x.EnteredByRole).IsRequired().HasMaxLength(50);
+        builder.Property(x => x.IsDeleted).HasDefaultValue(false);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.StudentId);

@@ -16,6 +16,8 @@ public class ClassConfiguration : IEntityTypeConfiguration<ClassEntity>
         builder.Property(x => x.Name).IsRequired().HasMaxLength(100);
         builder.Property(x => x.Section).IsRequired().HasMaxLength(50);
         builder.Property(x => x.AcademicYear).IsRequired().HasMaxLength(50);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => new { x.SchoolId, x.Name, x.Section, x.AcademicYear }).IsUnique();

@@ -8,17 +8,23 @@ public class ParentStudentLinkConfiguration : IEntityTypeConfiguration<ParentStu
 {
     public void Configure(EntityTypeBuilder<ParentStudentLinkEntity> builder)
     {
-        builder.ToTable("parent_student_links");
+        builder.ToTable("parent_student_links", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "chk_parent_student_links_relationship",
+                "relationship IN ('parent', 'guardian', 'grandparent', 'sibling', 'other')");
+        });
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Relationship).IsRequired().HasMaxLength(30).HasDefaultValue("parent");
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.ParentId);
         builder.HasIndex(x => x.StudentId);
-        builder.HasIndex(x => new { x.SchoolId, x.ParentId, x.StudentId }).IsUnique();
+        builder.HasIndex(x => new { x.ParentId, x.StudentId }).IsUnique();
 
         builder.HasOne(x => x.School)
             .WithMany(x => x.ParentStudentLinks)

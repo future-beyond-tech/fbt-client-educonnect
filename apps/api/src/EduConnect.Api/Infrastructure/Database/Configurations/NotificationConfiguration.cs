@@ -8,7 +8,15 @@ public class NotificationConfiguration : IEntityTypeConfiguration<NotificationEn
 {
     public void Configure(EntityTypeBuilder<NotificationEntity> builder)
     {
-        builder.ToTable("notifications");
+        builder.ToTable("notifications", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "chk_notification_type",
+                "type IN ('notice_published', 'homework_assigned', 'absence_marked')");
+            tableBuilder.HasCheckConstraint(
+                "chk_notification_entity_type",
+                "entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance')");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -17,7 +25,8 @@ public class NotificationConfiguration : IEntityTypeConfiguration<NotificationEn
         builder.Property(x => x.Title).IsRequired().HasMaxLength(120);
         builder.Property(x => x.Body).HasMaxLength(500);
         builder.Property(x => x.EntityType).HasMaxLength(50);
-        builder.Property(x => x.IsRead).IsRequired();
+        builder.Property(x => x.IsRead).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAt })
             .HasDatabaseName("ix_notifications_user_read_created")

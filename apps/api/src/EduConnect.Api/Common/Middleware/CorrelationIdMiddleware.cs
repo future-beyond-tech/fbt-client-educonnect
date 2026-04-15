@@ -23,7 +23,11 @@ public class CorrelationIdMiddleware
         context.Items["CorrelationId"] = correlationId;
         context.Response.Headers.Append(HeaderName, correlationId);
 
+        var traceId = context.TraceIdentifier;
+        context.Items["TraceId"] = traceId;
+
         using (LogContext.PushProperty("CorrelationId", correlationId))
+        using (LogContext.PushProperty("TraceId", traceId))
         {
             await _next(context);
         }

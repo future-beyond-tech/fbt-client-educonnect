@@ -15,11 +15,12 @@ public class TeacherClassAssignmentConfiguration : IEntityTypeConfiguration<Teac
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Subject).IsRequired().HasMaxLength(100);
         builder.Property(x => x.IsClassTeacher).HasDefaultValue(false);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.TeacherId);
         builder.HasIndex(x => x.ClassId);
-        builder.HasIndex(x => new { x.SchoolId, x.TeacherId, x.ClassId, x.Subject }).IsUnique();
+        builder.HasIndex(x => new { x.TeacherId, x.ClassId, x.Subject }).IsUnique();
         builder.HasIndex(x => new { x.SchoolId, x.ClassId })
             .IsUnique()
             .HasFilter("is_class_teacher = true");

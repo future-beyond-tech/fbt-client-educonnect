@@ -15,6 +15,7 @@ AUTO_START_DB=true
 DB_MODE_CLI=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --)                 shift ;;
     --db)               DB_MODE_CLI="$2"; shift 2 ;;
     --db=*)             DB_MODE_CLI="${1#*=}"; shift ;;
     --no-db-autostart)  AUTO_START_DB=false; shift ;;
@@ -52,7 +53,7 @@ fi
 
 # In docker mode, transparently bring up the Postgres container so the user
 # never has to remember `docker compose up db -d`. The .NET API will then
-# auto-apply migrations on startup via SqlMigrationRunner.
+# auto-apply EF Core migrations and the development seed scripts on startup.
 if [[ "${EDUCONNECT_DB_MODE}" == "docker" && "${AUTO_START_DB}" == "true" ]]; then
   if command -v docker >/dev/null 2>&1; then
     echo "Ensuring docker Postgres is up..."

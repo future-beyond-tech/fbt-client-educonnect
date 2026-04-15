@@ -18,6 +18,8 @@ public class StudentConfiguration : IEntityTypeConfiguration<StudentEntity>
         builder.Property(x => x.DateOfBirth).HasColumnName("date_of_birth");
         builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.CreatedById).HasColumnName("created_by");
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.ClassId);

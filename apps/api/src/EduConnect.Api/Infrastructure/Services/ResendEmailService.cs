@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using EduConnect.Api.Common.Logging;
 
 namespace EduConnect.Api.Infrastructure.Services;
 
@@ -40,7 +41,9 @@ public class ResendEmailService : IEmailService
 
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(fromEmail))
         {
-            _logger.LogError("Resend is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL missing). Skipping email to {ToEmail}", toEmail);
+            _logger.LogError(
+                "Resend is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL missing). Skipping email (toMasked={ToMasked})",
+                LogRedaction.MaskEmail(toEmail));
             return false;
         }
 
@@ -67,17 +70,22 @@ public class ResendEmailService : IEmailService
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 _logger.LogError(
-                    "Resend API returned {StatusCode} when sending email to {ToEmail}: {Body}",
-                    (int)response.StatusCode, toEmail, body);
+                    "Resend API returned {StatusCode} when sending email (toMasked={ToMasked}): {Body}",
+                    (int)response.StatusCode,
+                    LogRedaction.MaskEmail(toEmail),
+                    body);
                 return false;
             }
 
-            _logger.LogInformation("Sent transactional email to {ToEmail} via Resend (subject={Subject})", toEmail, subject);
+            _logger.LogInformation(
+                "Sent transactional email via Resend (toMasked={ToMasked}, subject={Subject})",
+                LogRedaction.MaskEmail(toEmail),
+                subject);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send Resend email to {ToEmail}", toEmail);
+            _logger.LogError(ex, "Failed to send Resend email (toMasked={ToMasked})", LogRedaction.MaskEmail(toEmail));
             return false;
         }
     }

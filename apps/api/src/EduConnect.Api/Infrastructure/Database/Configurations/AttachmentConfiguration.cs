@@ -8,7 +8,18 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
 {
     public void Configure(EntityTypeBuilder<AttachmentEntity> builder)
     {
-        builder.ToTable("attachments");
+        builder.ToTable("attachments", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "chk_attachment_entity_type",
+                "entity_type IS NULL OR entity_type IN ('homework', 'notice')");
+            tableBuilder.HasCheckConstraint(
+                "chk_attachment_content_type",
+                "content_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')");
+            tableBuilder.HasCheckConstraint(
+                "chk_attachment_size",
+                "size_bytes > 0 AND size_bytes <= 10485760");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -18,12 +29,15 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
         builder.Property(x => x.FileName).IsRequired().HasMaxLength(255);
         builder.Property(x => x.ContentType).IsRequired().HasMaxLength(100);
         builder.Property(x => x.SizeBytes).IsRequired();
+        builder.Property(x => x.UploadedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => new { x.EntityId, x.EntityType })
             .HasDatabaseName("ix_attachments_entity");
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.UploadedById);
+        builder.HasIndex(x => x.UploadedAt)
+            .HasFilter("entity_id IS NULL");
 
         builder.HasOne(x => x.School)
             .WithMany()

@@ -1,5 +1,6 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
+using EduConnect.Api.Common.Logging;
 using EduConnect.Api.Infrastructure.Database;
 using MediatR;
 using BCrypt.Net;
@@ -35,19 +36,26 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
 
         if (user == null)
         {
-            _logger.LogWarning("Login attempt for non-existent or inactive user with phone {PhoneNumber}", request.Phone);
+            _logger.LogWarning(
+                "Login attempt for non-existent or inactive staff user (phoneMasked={PhoneMasked})",
+                LogRedaction.MaskPhone(request.Phone));
             throw new UnauthorizedException("Invalid phone or password.");
         }
 
         if (user.Role == "Parent")
         {
-            _logger.LogWarning("Parent user attempted to use Teacher/Admin login with phone {PhoneNumber}", request.Phone);
+            _logger.LogWarning(
+                "Parent user attempted staff login (phoneMasked={PhoneMasked})",
+                LogRedaction.MaskPhone(request.Phone));
             throw new UnauthorizedException("Parents must use PIN login.");
         }
 
         if (string.IsNullOrEmpty(user.PasswordHash) || !_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
         {
-            _logger.LogWarning("Invalid password attempt for user {UserId} with phone {PhoneNumber}", user.Id, request.Phone);
+            _logger.LogWarning(
+                "Invalid password attempt for staff user {UserId} (phoneMasked={PhoneMasked})",
+                user.Id,
+                LogRedaction.MaskPhone(request.Phone));
             throw new UnauthorizedException("Invalid phone or password.");
         }
 

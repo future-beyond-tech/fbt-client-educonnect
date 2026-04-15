@@ -12,10 +12,9 @@ services:
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # NOTE: schema + seed migrations are auto-applied by the .NET API on
-      # startup via SqlMigrationRunner. Do NOT mount Migrations into
-      # /docker-entrypoint-initdb.d — it would race with the runner and
-      # Postgres's init system does not recurse into schema/ + seed/ subfolders.
+      # NOTE: EF Core migrations plus development seed scripts are applied by
+      # the .NET API on startup. Do NOT mount Migrations into
+      # /docker-entrypoint-initdb.d — it would race with the API startup flow.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U educonnect"]
       interval: 10s

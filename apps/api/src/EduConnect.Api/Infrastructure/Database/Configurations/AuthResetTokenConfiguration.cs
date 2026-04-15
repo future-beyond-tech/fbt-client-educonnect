@@ -8,7 +8,12 @@ public class AuthResetTokenConfiguration : IEntityTypeConfiguration<AuthResetTok
 {
     public void Configure(EntityTypeBuilder<AuthResetTokenEntity> builder)
     {
-        builder.ToTable("auth_reset_tokens");
+        builder.ToTable("auth_reset_tokens", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "chk_auth_reset_purpose",
+                "purpose IN ('Password', 'Pin')");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -16,11 +21,12 @@ public class AuthResetTokenConfiguration : IEntityTypeConfiguration<AuthResetTok
         builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
         builder.Property(x => x.Purpose).IsRequired().HasMaxLength(20);
         builder.Property(x => x.ExpiresAt).IsRequired();
-        builder.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => x.TokenHash).IsUnique();
         builder.HasIndex(x => x.UserId);
-        builder.HasIndex(x => new { x.UserId, x.Purpose });
+        builder.HasIndex(x => new { x.UserId, x.Purpose })
+            .HasFilter("used_at IS NULL");
         builder.HasIndex(x => x.ExpiresAt);
 
         builder.HasOne(x => x.User)

@@ -67,11 +67,23 @@ export interface ParentSearchResult {
   email: string;
 }
 
+export interface CreateParentRequest {
+  name: string;
+  phone: string;
+  email: string;
+  pin: string;
+}
+
+export interface EnrollStudentParentRequest extends CreateParentRequest {
+  relationship: string;
+}
+
 export interface EnrollStudentRequest {
   name: string;
   rollNumber: string;
   classId: string;
   dateOfBirth: string | null;
+  parent?: EnrollStudentParentRequest;
 }
 
 export interface UpdateStudentRequest {
@@ -83,13 +95,6 @@ export interface UpdateStudentRequest {
 export interface LinkParentRequest {
   parentId: string;
   relationship: string;
-}
-
-export interface CreateParentRequest {
-  name: string;
-  phone: string;
-  email: string;
-  pin: string;
 }
 
 export interface ParentMutationResponse {

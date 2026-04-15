@@ -130,7 +130,7 @@ function Cmd-Reset {
             Push-Location $repoRoot
             try { & docker compose down db -v } finally { Pop-Location }
             Cmd-Up
-            Write-Host 'Done. The .NET API will re-run all schema + seed migrations on next startup.'
+            Write-Host 'Done. On next Development startup, the API will re-apply EF Core migrations and re-run the dev seed scripts.'
         }
         'local' {
             Require-Psql
@@ -140,7 +140,7 @@ function Cmd-Reset {
             Write-Host "Dropping and recreating database '$dbName'..."
             & psql -h localhost -p $env:POSTGRES_HOST_PORT -U $dbUser -d postgres -c "DROP DATABASE IF EXISTS $dbName;"
             & psql -h localhost -p $env:POSTGRES_HOST_PORT -U $dbUser -d postgres -c "CREATE DATABASE $dbName;"
-            Write-Host 'Done. The .NET API will re-run all schema + seed migrations on next startup.'
+            Write-Host 'Done. On next Development startup, the API will re-apply EF Core migrations and re-run the dev seed scripts.'
         }
         'remote' {
             throw 'Refusing to reset remote database.'

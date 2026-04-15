@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using EduConnect.Api.Common.Auth;
+using Serilog.Context;
 
 namespace EduConnect.Api.Common.Middleware;
 
@@ -45,7 +46,13 @@ public class TenantIsolationMiddleware
             }
         }
 
-        await _next(context);
+        var isAuthenticated = currentUserService.IsAuthenticated;
+        using (LogContext.PushProperty("UserId", isAuthenticated ? currentUserService.UserId : "anonymous"))
+        using (LogContext.PushProperty("SchoolId", isAuthenticated ? currentUserService.SchoolId : "unknown"))
+        using (LogContext.PushProperty("Role", isAuthenticated ? currentUserService.Role : "anonymous"))
+        {
+            await _next(context);
+        }
     }
 }
 

@@ -8,7 +8,10 @@ public class UserConfiguration : IEntityTypeConfiguration<UserEntity>
 {
     public void Configure(EntityTypeBuilder<UserEntity> builder)
     {
-        builder.ToTable("users");
+        builder.ToTable("users", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint("chk_users_role", "role IN ('Parent', 'Teacher', 'Admin')");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -19,11 +22,18 @@ public class UserConfiguration : IEntityTypeConfiguration<UserEntity>
         builder.Property(x => x.Role).IsRequired().HasMaxLength(50);
         builder.Property(x => x.PasswordHash).HasMaxLength(500);
         builder.Property(x => x.PinHash).HasMaxLength(500);
-        builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
 
         builder.HasIndex(x => new { x.SchoolId, x.Phone }).IsUnique();
         builder.HasIndex(x => x.SchoolId);
-        builder.HasIndex(x => x.Email);
+        builder.HasIndex(x => x.Phone);
+        builder.HasIndex(x => new { x.SchoolId, x.Email })
+            .IsUnique()
+            .HasFilter("email IS NOT NULL");
+        builder.HasIndex(x => x.Email)
+            .HasFilter("email IS NOT NULL");
 
         builder.HasOne(x => x.School)
             .WithMany(x => x.Users)
