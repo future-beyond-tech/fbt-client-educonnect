@@ -1,17 +1,13 @@
+using EduConnect.Api.Features.Attachments;
+using EduConnect.Api.Infrastructure.Services;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Features.Attachments.RequestUploadUrl;
 
 public class RequestUploadUrlCommandValidator : AbstractValidator<RequestUploadUrlCommand>
 {
-    private static readonly string[] AllowedContentTypes =
-    {
-        "image/jpeg", "image/png", "image/webp", "application/pdf"
-    };
-
-    private const int MaxSizeBytes = 10 * 1024 * 1024; // 10MB
-
-    public RequestUploadUrlCommandValidator()
+    public RequestUploadUrlCommandValidator(IOptions<StorageOptions> storageOptions)
     {
         RuleFor(x => x.FileName)
             .NotEmpty().WithMessage("File name is required.")
@@ -19,11 +15,12 @@ public class RequestUploadUrlCommandValidator : AbstractValidator<RequestUploadU
 
         RuleFor(x => x.ContentType)
             .NotEmpty().WithMessage("Content type is required.")
-            .Must(ct => AllowedContentTypes.Contains(ct))
+            .Must(ct => AttachmentFeatureRules.NoticeAllowedContentTypes.Contains(ct))
             .WithMessage("Content type must be one of: image/jpeg, image/png, image/webp, application/pdf.");
 
         RuleFor(x => x.SizeBytes)
             .GreaterThan(0).WithMessage("File size must be greater than zero.")
-            .LessThanOrEqualTo(MaxSizeBytes).WithMessage("File size must not exceed 10MB.");
+            .LessThanOrEqualTo((int)storageOptions.Value.MaxFileSizeBytes)
+            .WithMessage($"File size must not exceed {storageOptions.Value.MaxFileSizeBytes / (1024 * 1024)}MB.");
     }
 }

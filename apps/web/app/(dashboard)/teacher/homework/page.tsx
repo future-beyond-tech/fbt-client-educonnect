@@ -16,6 +16,7 @@ import { StatusBanner } from "@/components/shared/status-banner";
 import { BookOpen, Pencil, Plus } from "lucide-react";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
+import type { AttachmentItem } from "@/lib/types/attachment";
 
 interface HomeworkItem {
   homeworkId: string;
@@ -77,6 +78,12 @@ export default function TeacherHomeworkPage(): React.ReactElement {
   // Post-create attachment flow
   const [newHomeworkId, setNewHomeworkId] = React.useState<string | null>(null);
   const [newHomeworkAttachments, setNewHomeworkAttachments] = React.useState<UploadedFile[]>([]);
+  const [managingAttachmentsForId, setManagingAttachmentsForId] = React.useState<string | null>(null);
+  const [loadingAttachmentsForId, setLoadingAttachmentsForId] = React.useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = React.useState("");
+  const [attachmentsByHomeworkId, setAttachmentsByHomeworkId] = React.useState<
+    Record<string, UploadedFile[]>
+  >({});
 
   const fetchHomework = React.useCallback(async () => {
     setIsLoading(true);
@@ -94,6 +101,61 @@ export default function TeacherHomeworkPage(): React.ReactElement {
   React.useEffect(() => {
     fetchHomework();
   }, [fetchHomework]);
+
+  const mapAttachments = React.useCallback(
+    (attachments: AttachmentItem[]): UploadedFile[] =>
+      attachments.map((attachment) => ({
+        attachmentId: attachment.id,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+      })),
+    []
+  );
+
+  const loadHomeworkAttachments = React.useCallback(
+    async (homeworkId: string): Promise<void> => {
+      setLoadingAttachmentsForId(homeworkId);
+      setAttachmentError("");
+
+      try {
+        const attachments = await apiGet<AttachmentItem[]>(
+          `${API_ENDPOINTS.attachments}?entityId=${homeworkId}&entityType=homework`
+        );
+
+        setAttachmentsByHomeworkId((prev) => ({
+          ...prev,
+          [homeworkId]: mapAttachments(attachments),
+        }));
+      } catch (err) {
+        setAttachmentError(
+          err instanceof ApiError ? err.message : "Failed to load attachments."
+        );
+      } finally {
+        setLoadingAttachmentsForId((current) =>
+          current === homeworkId ? null : current
+        );
+      }
+    },
+    [mapAttachments]
+  );
+
+  const toggleAttachmentManager = React.useCallback(
+    async (homeworkId: string): Promise<void> => {
+      if (managingAttachmentsForId === homeworkId) {
+        setManagingAttachmentsForId(null);
+        setAttachmentError("");
+        return;
+      }
+
+      setManagingAttachmentsForId(homeworkId);
+
+      if (!attachmentsByHomeworkId[homeworkId]) {
+        await loadHomeworkAttachments(homeworkId);
+      }
+    },
+    [attachmentsByHomeworkId, loadHomeworkAttachments, managingAttachmentsForId]
+  );
 
   const handleCreate = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -285,7 +347,7 @@ export default function TeacherHomeworkPage(): React.ReactElement {
           <div>
             <h3 className="text-lg font-semibold">Attach Files to Homework</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Optionally attach images or PDFs to the homework you just created.
+              Optionally attach PDF or Word documents to the homework you just created.
             </p>
           </div>
           <AttachmentUploader
@@ -523,26 +585,73 @@ export default function TeacherHomeworkPage(): React.ReactElement {
                     <span className="text-muted-foreground">Due:</span>
                     <span className="font-medium">{formatDate(item.dueDate)}</span>
                   </div>
-                  {item.canSubmitForApproval && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => submitForApproval(item.homeworkId)}
-                        disabled={actionHomeworkId === item.homeworkId}
-                      >
-                        {actionHomeworkId === item.homeworkId ? <Spinner size="sm" /> : "Submit for approval"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => startEdit(item)}
-                        disabled={actionHomeworkId === item.homeworkId}
-                      >
-                        Edit draft
-                      </Button>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {item.canSubmitForApproval && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => submitForApproval(item.homeworkId)}
+                            disabled={actionHomeworkId === item.homeworkId}
+                          >
+                            {actionHomeworkId === item.homeworkId ? (
+                              <Spinner size="sm" />
+                            ) : (
+                              "Submit for approval"
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => startEdit(item)}
+                            disabled={actionHomeworkId === item.homeworkId}
+                          >
+                            Edit draft
+                          </Button>
+                        </>
+                      )}
+
+                      {item.isEditable && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            void toggleAttachmentManager(item.homeworkId);
+                          }}
+                          disabled={loadingAttachmentsForId === item.homeworkId}
+                        >
+                          {loadingAttachmentsForId === item.homeworkId ? (
+                            <Spinner size="sm" />
+                          ) : managingAttachmentsForId === item.homeworkId ? (
+                            "Hide attachments"
+                          ) : (
+                            "Manage attachments"
+                          )}
+                        </Button>
+                      )}
                     </div>
-                  )}
-                  <AttachmentList entityId={item.homeworkId} entityType="homework" />
+
+                    {item.isEditable && managingAttachmentsForId === item.homeworkId ? (
+                      <div className="space-y-3">
+                        {attachmentError ? (
+                          <StatusBanner variant="error">{attachmentError}</StatusBanner>
+                        ) : null}
+                        <AttachmentUploader
+                          entityId={item.homeworkId}
+                          entityType="homework"
+                          existingAttachments={attachmentsByHomeworkId[item.homeworkId] ?? []}
+                          onAttachmentsChange={(attachments) => {
+                            setAttachmentsByHomeworkId((prev) => ({
+                              ...prev,
+                              [item.homeworkId]: attachments,
+                            }));
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <AttachmentList entityId={item.homeworkId} entityType="homework" />
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )
