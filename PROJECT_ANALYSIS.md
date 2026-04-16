@@ -290,7 +290,7 @@ Full PWA support with a custom service worker, Web App Manifest (`public/manifes
 ## 9. Infrastructure & DevOps
 
 ### Local Development
-Docker Compose spins up three containers: PostgreSQL 16, the .NET API, and the Next.js frontend. The API applies SQL migrations automatically on startup via `SqlMigrationRunner` (uses a PostgreSQL advisory lock — safe across multiple replicas). Seed data runs only in `Development` environment.
+Docker Compose spins up three containers: PostgreSQL 16, the .NET API, and the Next.js frontend. The API applies EF Core migrations automatically on startup via `Database.MigrateAsync()`. Development seed SQL runs only in `Development` environment.
 
 Convenience scripts are provided for both **bash** (Linux/macOS) and **PowerShell** (Windows) to manage the DB, run services, and execute tests.
 
@@ -300,7 +300,7 @@ Convenience scripts are provided for both **bash** (Linux/macOS) and **PowerShel
 - **Web job:** install → lint (ESLint) → type-check (tsc) → build (Next.js)
 - **API job:** restore → build (.NET Release) → test (dotnet test, skipped gracefully if no tests)
 - **Docker job:** (PRs only) build both Docker images to verify Dockerfile integrity
-- **Migrations job:** spins up a test Postgres container and runs all `.sql` migration files sequentially to catch syntax errors
+- **Migrations job:** spins up a test Postgres container, boots the API, and verifies startup succeeds after EF Core migrations apply
 
 **`deploy.yml`** runs on push to `main`:
 1. Calls `ci.yml` as a gate (must pass)

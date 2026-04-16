@@ -178,33 +178,41 @@ scripts/run-frontend-local.sh --dry-run
 
 ## 5. Database Migrations and Seed Data
 
-The API does **not** use EF Core migration commands in normal development. Instead, startup runs the SQL migration runner in:
+This repo now standardizes on **EF Core migrations** for schema changes.
+
+Source of truth:
 
 ```text
-apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/
-├── schema/
-└── seed/
+apps/api/src/EduConnect.Api/Migrations/
 ```
 
-Behavior:
+Runtime behavior:
 
-- `schema/*` runs in every environment
-- `seed/*` runs only when `ASPNETCORE_ENVIRONMENT=Development`
-- migrations are additive and idempotent
-- startup fails if an already-applied migration file is edited on disk
+- On API startup, `dbContext.Database.MigrateAsync()` applies any pending EF Core migrations automatically.
+- In `Development`, the API then executes the SQL files in `apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/seed/`.
+- Those seed SQL files are the only SQL scripts the running app executes directly.
 
-Adding a new migration:
+Common workflows:
 
-1. Create a new numbered SQL file in `schema/` or `seed/`.
-2. Keep it idempotent.
-3. Restart the API.
+- Start the API normally with `pnpm local:backend:run` and let startup apply migrations for you.
+- Apply pending EF migrations manually with `pnpm db:update`.
 
-Do not use these older EF-style commands for the main workflow:
+Adding a new schema migration:
 
-- `dotnet ef migrations add ...`
-- `dotnet ef database update`
+1. Create an EF Core migration:
 
-They are not the migration source of truth for this repo.
+   ```bash
+   dotnet ef migrations add <MigrationName> \
+     --project apps/api/src/EduConnect.Api/EduConnect.Api.csproj \
+     --startup-project apps/api/src/EduConnect.Api/EduConnect.Api.csproj
+   ```
+
+2. Review the generated files under `apps/api/src/EduConnect.Api/Migrations/`.
+3. Apply them with `pnpm db:update` or by restarting the API.
+
+Notes:
+
+- Keep `seed/*.sql` idempotent, because they are replayed on Development startup.
 
 ## 6. Development Seed Data
 

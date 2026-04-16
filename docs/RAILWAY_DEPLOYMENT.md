@@ -12,11 +12,11 @@ PostgreSQL should be provisioned as a separate Railway database service and shar
 Current implementation details that affect deployment:
 
 - the API reads **flat env vars** such as `DATABASE_URL` and `JWT_SECRET`
-- the API automatically applies SQL migrations on startup via `SqlMigrationRunner`
+- the API automatically applies EF Core migrations on startup
 - the frontend bakes `NEXT_PUBLIC_*` values in at build time
 - each app ships its own Dockerfile and `railway.toml`
 
-Older docs or generic Railway guides that mention `ConnectionStrings__DefaultConnection`, `Jwt__Key`, `Cors__AllowedOrigins__0`, or `dotnet ef database update` do **not** match this repo's current code.
+Older docs or generic Railway guides that mention `ConnectionStrings__DefaultConnection`, `Jwt__Key`, or `Cors__AllowedOrigins__0` do **not** match this repo's current code.
 
 ## 2. Provision PostgreSQL First
 
@@ -67,13 +67,12 @@ The checked-in `apps/api/railway.toml` expects:
 
 ### Migration behavior
 
-No manual EF Core migration step is required. On every boot, the API:
+No manual migration step is required for Railway deploys. On every boot, the API:
 
-- runs pending SQL files in `Infrastructure/Database/Migrations/schema`
-- runs `seed/*` only in `Development`
-- fails startup if an already-applied file has been modified
+- runs `dbContext.Database.MigrateAsync()` to apply pending EF Core migrations
+- runs `Infrastructure/Database/Migrations/seed/*.sql` only in `Development`
 
-That means production deploys should rely on the built-in startup runner, not `dotnet ef database update`.
+That means production deploys should rely on the built-in startup runner. `dotnet ef database update` remains a valid manual maintenance command for local or one-off admin workflows, but it is not required in Railway deploy automation.
 
 ## 4. Deploy the Web Service
 
