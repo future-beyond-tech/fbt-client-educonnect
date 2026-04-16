@@ -44,6 +44,16 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
   const [isRemoving, setIsRemoving] = React.useState<string | null>(null);
   const [isPromoting, setIsPromoting] = React.useState<string | null>(null);
 
+  const getBestErrorMessage = React.useCallback((err: unknown, fallback: string): string => {
+    if (!(err instanceof ApiError)) return fallback;
+
+    const firstValidationMessage = err.details?.errors
+      ? Object.values(err.details.errors).flat()[0]
+      : undefined;
+
+    return firstValidationMessage || err.message || fallback;
+  }, []);
+
   const fetchTeacher = React.useCallback(async () => {
     setIsLoading(true);
     setError("");
@@ -57,13 +67,11 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
       setClasses(classData);
       setSubjects(subjectData);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to load teacher."
-      );
+      setError(getBestErrorMessage(err, "Failed to load teacher."));
     } finally {
       setIsLoading(false);
     }
-  }, [teacherId]);
+  }, [getBestErrorMessage, teacherId]);
 
   React.useEffect(() => {
     fetchTeacher();
@@ -97,9 +105,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
       setAssignIsClassTeacher(false);
       fetchTeacher();
     } catch (err) {
-      setAssignError(
-        err instanceof ApiError ? err.message : "Failed to assign."
-      );
+      setAssignError(getBestErrorMessage(err, "Failed to assign."));
     } finally {
       setIsAssigning(false);
     }
@@ -120,9 +126,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
       setSuccessMessage("Assignment removed.");
       fetchTeacher();
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to remove assignment."
-      );
+      setError(getBestErrorMessage(err, "Failed to remove assignment."));
     } finally {
       setIsRemoving(null);
     }
@@ -139,9 +143,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
       setSuccessMessage(result.message);
       fetchTeacher();
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to update class teacher."
-      );
+      setError(getBestErrorMessage(err, "Failed to update class teacher."));
     } finally {
       setIsPromoting(null);
     }

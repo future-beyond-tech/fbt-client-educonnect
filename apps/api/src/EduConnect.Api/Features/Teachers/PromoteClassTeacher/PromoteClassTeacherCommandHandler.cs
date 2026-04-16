@@ -50,6 +50,10 @@ public class PromoteClassTeacherCommandHandler : IRequestHandler<PromoteClassTea
         if (existingClassTeacher != null)
         {
             existingClassTeacher.IsClassTeacher = false;
+            
+            // Save immediately to avoid Postgres partial unique constraint formulation
+            // issues when swapping true -> false and false -> true in the same batch
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         assignment.IsClassTeacher = true;

@@ -38,6 +38,7 @@ using EduConnect.Api.Features.Students.LinkParentToStudent;
 using EduConnect.Api.Features.Students.UnlinkParentFromStudent;
 using EduConnect.Api.Features.Parents.CreateParent;
 using EduConnect.Api.Features.Classes.GetClassesBySchool;
+using EduConnect.Api.Features.Classes.GetClassAssignments;
 using EduConnect.Api.Features.Classes.CreateClass;
 using EduConnect.Api.Features.Classes.UpdateClass;
 using EduConnect.Api.Features.Teachers.GetTeachersBySchool;
@@ -158,6 +159,7 @@ public static class EndpointRouteBuilderExtensions
         var group = app.MapGroup("/api/classes").WithTags("Classes").RequireAuthorization();
 
         group.MapGet("/", GetClassesBySchoolEndpoint.Handle).WithName("GetClassesBySchool");
+        group.MapGet("/{id}/assignments", GetClassAssignmentsEndpoint.Handle).WithName("GetClassAssignments");
         group.MapPost("/", CreateClassEndpoint.Handle).WithName("CreateClass");
         group.MapPut("/{id}", UpdateClassEndpoint.Handle).WithName("UpdateClass");
     }
