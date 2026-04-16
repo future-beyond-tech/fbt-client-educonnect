@@ -61,12 +61,12 @@ export function EmptyState({
     <SpotlightCard
       radius={520}
       spotlightColor="rgb(var(--accent) / 0.25)"
-      className="w-full rounded-[30px] border border-dashed border-border/80 bg-card/55 shadow-[0_24px_64px_-42px_rgba(15,23,42,0.35)] backdrop-blur-sm"
+      className="w-full rounded-[30px] border border-dashed border-border/80 bg-card/55 shadow-[0_24px_64px_-42px_rgba(15,40,69,0.35)] backdrop-blur-sm"
     >
       <div className="flex min-h-96 w-full flex-col items-center justify-center space-y-5 px-5 py-10 text-center">
       <div className="relative flex flex-col items-center gap-3">
         <DefaultEmptyIllustration />
-        <div className="rounded-full border border-border/70 bg-card/82 p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-sm dark:bg-card/92">
+        <div className="rounded-full border border-border/70 bg-card/82 p-4 shadow-[0_18px_40px_-28px_rgba(15,40,69,0.4)] backdrop-blur-sm dark:bg-card/92">
           {icon ?? (
             <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
           )}

@@ -48,7 +48,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             aria-invalid={!!error}
             aria-describedby={describedBy || undefined}
             className={cn(
-              "focus-ring flex min-h-12 w-full appearance-none rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 pr-11 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,23,42,0.38)] ring-offset-background backdrop-blur-sm focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
+              "focus-ring flex min-h-12 w-full appearance-none rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 pr-11 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
               error && "border-destructive focus-visible:ring-destructive",
               className
             )}

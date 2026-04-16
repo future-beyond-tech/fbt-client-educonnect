@@ -8,15 +8,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-primary-foreground shadow-[0_18px_44px_-22px_rgba(76,29,149,0.7)] hover:-translate-y-0.5 hover:shadow-[0_26px_56px_-24px_rgba(76,29,149,0.72)] active:translate-y-0 active:shadow-[0_16px_34px_-20px_rgba(76,29,149,0.6)]",
+          "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_18px_44px_-22px_rgba(15,40,69,0.55)] hover:-translate-y-0.5 hover:shadow-[0_26px_56px_-24px_rgba(15,40,69,0.6)] active:translate-y-0 active:shadow-[0_16px_34px_-20px_rgba(15,40,69,0.5)]",
         premium:
-          "btn-premium text-primary-foreground shadow-[0_22px_50px_-24px_rgba(76,29,149,0.7)] hover:-translate-y-0.5 active:translate-y-0",
+          "btn-premium text-primary-foreground shadow-[0_22px_50px_-24px_rgba(15,40,69,0.55)] hover:-translate-y-0.5 active:translate-y-0",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-[0_18px_36px_-22px_rgba(214,69,69,0.7)] hover:-translate-y-0.5 hover:bg-destructive/90 active:translate-y-0",
+          "bg-destructive text-destructive-foreground shadow-[0_18px_36px_-22px_rgba(220,38,38,0.55)] hover:-translate-y-0.5 hover:bg-destructive/90 active:translate-y-0",
         outline:
-          "border border-border/80 bg-card/80 text-foreground shadow-[0_14px_32px_-28px_rgba(15,23,42,0.38)] backdrop-blur-sm hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card/95 active:translate-y-0",
+          "border border-border/80 bg-card/80 text-foreground shadow-[0_14px_32px_-28px_rgba(120,90,60,0.32)] backdrop-blur-sm hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card/95 active:translate-y-0",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-[0_14px_34px_-26px_rgba(15,23,42,0.24)] hover:-translate-y-0.5 hover:bg-secondary/90 active:translate-y-0",
+          "bg-secondary text-secondary-foreground shadow-[0_14px_34px_-26px_rgba(15,40,69,0.22)] hover:-translate-y-0.5 hover:bg-secondary/90 active:translate-y-0",
         ghost:
           "bg-transparent text-muted-foreground hover:bg-card/70 hover:text-foreground active:bg-card/90",
         link: "rounded-none px-0 text-primary shadow-none underline-offset-4 hover:underline active:text-primary/80",

@@ -44,7 +44,7 @@ export const StarBorder = React.forwardRef<HTMLButtonElement, StarBorderProps>(
             animation: `star-border-spin ${speed}s linear infinite`,
           }}
         />
-        <span className="relative inline-flex h-full w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] px-5 py-2.5 shadow-[0_18px_44px_-22px_rgba(76,29,149,0.7)]">
+        <span className="relative inline-flex h-full w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] px-5 py-2.5 shadow-[0_18px_44px_-22px_rgba(15,40,69,0.55)]">
           {children}
         </span>
         <style>{`

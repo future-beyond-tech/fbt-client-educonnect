@@ -54,7 +54,7 @@ export function PageHeader({
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[32px] border border-border/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.97),rgba(244,248,252,0.86))] p-5 shadow-[0_30px_84px_-42px_rgba(15,23,42,0.46)] backdrop-blur-xl [animation:enter-up_420ms_ease-out_both] dark:bg-[linear-gradient(145deg,rgba(11,28,46,0.96),rgba(7,16,28,0.92))] dark:shadow-[0_34px_90px_-44px_rgba(2,12,24,0.84)] md:p-7",
+        "relative overflow-hidden rounded-[32px] border border-border/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.97),rgba(245,240,230,0.92))] p-5 shadow-[0_30px_84px_-42px_rgba(15,40,69,0.28)] backdrop-blur-xl [animation:enter-up_420ms_ease-out_both] dark:bg-[linear-gradient(145deg,rgba(22,28,50,0.96),rgba(10,14,24,0.92))] dark:shadow-[0_34px_90px_-44px_rgba(10,14,24,0.84)] md:p-7",
         className
       )}
     >
@@ -67,7 +67,7 @@ export function PageHeader({
             <div className="flex flex-wrap items-center gap-3">
               {backAction}
               {eyebrow ? (
-                <span className="inline-flex rounded-full border border-primary/10 bg-primary/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[rgb(var(--primary)/0.75)]">
                   {eyebrow}
                 </span>
               ) : null}
@@ -98,12 +98,12 @@ export function PageHeader({
                   <SpotlightCard
                     key={`${stat.label}-${stat.value}`}
                     radius={240}
-                    className="rounded-[22px] border border-border/70 bg-card/74 px-4 py-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-0.5 dark:bg-card/86"
+                    className="rounded-[22px] border border-[rgb(var(--warning)/0.35)] bg-[rgb(var(--warning)/0.15)] px-4 py-3 text-[rgb(var(--primary-strong))] shadow-[0_16px_36px_-28px_rgba(15,40,69,0.35)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-0.5 dark:border-[rgb(var(--warning)/0.4)] dark:bg-[rgb(var(--warning)/0.12)]"
                   >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[rgb(var(--primary-strong)/0.75)] dark:text-[rgb(var(--warning))]">
                       {stat.label}
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
+                    <p className="mt-1 text-lg font-semibold text-[rgb(var(--primary-strong))] dark:text-[rgb(var(--warning))]">
                       {numeric !== null ? (
                         <CountUp to={numeric} />
                       ) : (
@@ -137,7 +137,7 @@ export function PageSection({
   return (
     <section
       className={cn(
-        "rounded-[28px] border border-border/70 bg-card/88 p-4 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:bg-card/92 dark:shadow-[0_32px_80px_-42px_rgba(2,12,24,0.84)] md:p-6",
+        "rounded-[28px] border border-border/70 bg-card/88 p-4 shadow-[0_28px_70px_-40px_rgba(15,40,69,0.22)] backdrop-blur-xl dark:bg-card/92 dark:shadow-[0_32px_80px_-42px_rgba(10,14,24,0.84)] md:p-6",
         className
       )}
       {...props}

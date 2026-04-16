@@ -337,7 +337,7 @@ export default function AdminClassDetailPage(): React.ReactElement {
                       </option>
                     ))}
                   </Select>
-                  <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,23,42,0.4)] dark:bg-card/90">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,40,69,0.4)] dark:bg-card/90">
                     <input
                       type="checkbox"
                       checked={markAsClassTeacher}
@@ -434,7 +434,7 @@ export default function AdminClassDetailPage(): React.ReactElement {
                       {group.items.map((a) => (
                         <div
                           key={a.assignmentId}
-                          className="flex flex-col gap-2 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.38)] sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-2 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_32px_-26px_rgba(15,40,69,0.38)] sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{a.teacherName}</p>
@@ -502,7 +502,7 @@ export default function AdminClassDetailPage(): React.ReactElement {
                     <Link
                       key={s.id}
                       href={`/admin/students/${s.id}`}
-                      className="focus-ring flex items-center justify-between gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 text-sm shadow-[0_14px_32px_-26px_rgba(15,23,42,0.38)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92"
+                      className="focus-ring flex items-center justify-between gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 text-sm shadow-[0_14px_32px_-26px_rgba(15,40,69,0.38)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92"
                     >
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-foreground">{s.name}</div>

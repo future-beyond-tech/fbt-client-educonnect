@@ -33,9 +33,9 @@ export function Header(): React.ReactElement {
 
   return (
     <header className="sticky top-0 z-30 px-4 pt-4 md:pl-[19rem] md:pr-6">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 rounded-[28px] border border-border/70 bg-card/72 px-4 shadow-[0_20px_70px_-38px_rgba(15,23,42,0.55)] backdrop-blur-xl dark:bg-card/84 dark:shadow-[0_26px_90px_-46px_rgba(2,12,24,0.82)] md:px-5">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 rounded-[28px] border border-[rgb(var(--border))] bg-[rgb(var(--page-wash)/0.85)] px-4 shadow-[0_20px_70px_-38px_rgba(15,40,69,0.35)] backdrop-blur-md dark:bg-card/84 dark:shadow-[0_26px_90px_-46px_rgba(10,14,24,0.82)] md:px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-sm font-semibold text-primary-foreground shadow-[0_16px_32px_-22px_rgba(12,57,95,0.82)] md:hidden">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-sm font-semibold text-primary-foreground shadow-[0_16px_32px_-22px_rgba(15,40,69,0.55)] md:hidden">
             {APP_NAME.slice(0, 2)}
           </div>
           <div className="min-w-0">
@@ -52,7 +52,7 @@ export function Header(): React.ReactElement {
           <ThemeToggle />
           {user && <NotificationBell />}
           {user && (
-            <div className="hidden items-center gap-3 rounded-full border border-border/70 bg-card/72 px-2.5 py-2 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)] backdrop-blur-xl dark:bg-card/90 sm:flex">
+            <div className="hidden items-center gap-3 rounded-full border border-border/70 bg-[rgb(var(--muted))] px-2.5 py-2 shadow-[0_12px_30px_-24px_rgba(15,40,69,0.3)] backdrop-blur-xl dark:bg-card/90 sm:flex">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
                 {initials || user.role.slice(0, 1)}
               </div>

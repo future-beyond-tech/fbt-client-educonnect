@@ -28,7 +28,7 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <div className="relative flex min-h-screen flex-col">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgb(var(--glow-1)/0.14),transparent_26rem),radial-gradient(circle_at_top_right,rgb(var(--glow-2)/0.14),transparent_24rem),radial-gradient(circle_at_70%_28%,rgb(var(--glow-3)/0.11),transparent_30rem),linear-gradient(180deg,rgb(var(--page-wash)/0.84),transparent_22rem)] dark:bg-[radial-gradient(circle_at_top_left,rgb(var(--glow-1)/0.14),transparent_28rem),radial-gradient(circle_at_top_right,rgb(var(--glow-3)/0.18),transparent_26rem),linear-gradient(180deg,rgb(var(--page-wash)/0.96),rgb(var(--page-wash)/0.62)_26rem,transparent_34rem)]" />
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,rgb(var(--glow-2)/0.14),transparent_30rem),radial-gradient(circle_at_top_left,rgb(var(--glow-1)/0.10),transparent_26rem),linear-gradient(160deg,rgb(245_240_230),rgb(250_247_242))] dark:bg-[radial-gradient(ellipse_at_top_right,rgb(var(--glow-1)/0.18),transparent_30rem),radial-gradient(circle_at_top_left,rgb(var(--glow-2)/0.12),transparent_28rem),linear-gradient(160deg,rgb(var(--page-wash)/0.96),rgb(var(--page-wash)/0.62)_26rem,transparent_34rem)]" />
         <Sidebar />
         <Header />
         <main className="flex-1 pb-24 md:ml-[19rem] md:pb-8">

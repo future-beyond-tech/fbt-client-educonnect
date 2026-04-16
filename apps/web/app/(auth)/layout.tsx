@@ -17,14 +17,14 @@ export default function AuthLayout({
         <Card className="relative w-full overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgb(var(--glow-1)/0.18),transparent_70%)]" />
           <CardHeader className="relative space-y-3 border-b border-border/50 bg-card/35 text-center dark:bg-card/55">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-base font-semibold text-primary-foreground shadow-[0_18px_42px_-26px_rgba(18,66,145,0.7)]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-base font-semibold text-primary-foreground shadow-[0_18px_42px_-26px_rgba(15,40,69,0.55)]">
               {APP_NAME.slice(0, 2)}
             </div>
             <div className="space-y-1.5">
               <SplitText
                 as="h1"
                 text={APP_NAME}
-                className="bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] bg-clip-text text-2xl font-semibold tracking-tight text-transparent md:text-3xl"
+                className="bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] bg-clip-text text-2xl font-semibold tracking-tight text-transparent md:text-3xl"
               />
               <CardDescription className="mx-auto max-w-sm">
                 Sign in to continue.

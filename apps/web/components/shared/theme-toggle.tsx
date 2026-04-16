@@ -28,7 +28,7 @@ export function ThemeToggle({
       aria-label={label}
       title={label}
       className={cn(
-        "h-11 w-11 rounded-full border-border/70 bg-card/82 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.38)] backdrop-blur-xl dark:bg-card/92",
+        "h-11 w-11 rounded-full border-border/70 bg-card/82 shadow-[0_18px_38px_-28px_rgba(15,40,69,0.38)] backdrop-blur-xl dark:bg-card/92",
         className
       )}
     >

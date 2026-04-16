@@ -36,7 +36,7 @@ export function Sidebar(): React.ReactElement {
 
   return (
     <aside className="hidden md:fixed md:inset-y-4 md:left-4 md:z-40 md:flex md:w-72 md:flex-col">
-      <div className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgb(var(--sidebar-from)),rgb(var(--sidebar-to)))] text-white shadow-[0_35px_90px_-40px_rgba(2,12,24,0.9)]">
+      <div className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgb(var(--sidebar-from)),rgb(var(--sidebar-to)))] text-white shadow-[0_35px_90px_-40px_rgba(10,14,24,0.9)]">
         <div className="border-b border-white/10 px-6 py-6">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 shadow-inner shadow-white/10">
@@ -64,10 +64,10 @@ export function Sidebar(): React.ReactElement {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "focus-ring group flex min-h-[56px] items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all focus-visible:ring-offset-transparent",
+                  "focus-ring group relative flex min-h-[56px] items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all focus-visible:ring-offset-transparent",
                   isActive
-                    ? "bg-white text-slate-900 shadow-[0_18px_42px_-26px_rgba(255,255,255,0.9)]"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                    ? "border-l-2 border-l-[rgb(var(--primary))] bg-white text-slate-900 shadow-[0_18px_42px_-26px_rgba(31,60,95,0.55)]"
+                    : "border-l-2 border-l-transparent text-white/70 hover:bg-white/10 hover:text-white"
                 )}
                 aria-current={isActive ? "page" : undefined}
               >

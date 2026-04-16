@@ -103,7 +103,7 @@ export function AttachmentList({
               href={attachment.downloadUrl}
               target={opensInNewTab ? "_blank" : undefined}
               rel={opensInNewTab ? "noopener noreferrer" : undefined}
-              className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92 dark:bg-card/86"
+              className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.4)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92 dark:bg-card/86"
               aria-label={`Download ${attachment.fileName}`}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary/70">

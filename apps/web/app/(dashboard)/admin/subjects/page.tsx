@@ -190,7 +190,7 @@ export default function AdminSubjectsPage(): React.ReactElement {
             {subjects.map((subject) => (
               <div
                 key={subject.id}
-                className="flex items-center rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,23,42,0.42)] dark:bg-card/90"
+                className="flex items-center rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,40,69,0.42)] dark:bg-card/90"
               >
                 <BookOpen
                   className="mr-3 h-5 w-5 shrink-0 text-muted-foreground"

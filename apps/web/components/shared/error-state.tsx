@@ -16,7 +16,7 @@ export function ErrorState({
   icon,
 }: ErrorStateProps): React.ReactElement {
   return (
-    <div className="flex min-h-96 w-full flex-col items-center justify-center space-y-5 rounded-[30px] border border-destructive/15 bg-card/62 px-5 py-10 text-center shadow-[0_24px_64px_-42px_rgba(15,23,42,0.35)] backdrop-blur-sm">
+    <div className="flex min-h-96 w-full flex-col items-center justify-center space-y-5 rounded-[30px] border border-destructive/15 bg-card/62 px-5 py-10 text-center shadow-[0_24px_64px_-42px_rgba(15,40,69,0.35)] backdrop-blur-sm">
       <div className="rounded-full border border-destructive/20 bg-destructive/10 p-4">
         {icon || (
           <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
