@@ -77,7 +77,7 @@ export function RetentionProgressCard({
       className="px-4 pt-4 md:pl-[19rem] md:pr-6"
       aria-labelledby="retention-heading"
     >
-      <div className="mx-auto max-w-7xl rounded-[28px] border border-border/70 bg-card/75 px-4 py-4 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.46)] backdrop-blur-xl dark:bg-card/88 dark:shadow-[0_28px_78px_-46px_rgba(2,12,24,0.84)] md:px-5">
+      <div className="mx-auto max-w-7xl rounded-[28px] border border-border/70 bg-card/75 px-4 py-4 shadow-[0_24px_70px_-42px_rgba(15,40,69,0.46)] backdrop-blur-xl dark:bg-card/88 dark:shadow-[0_28px_78px_-46px_rgba(10,14,24,0.84)] md:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2
             id="retention-heading"

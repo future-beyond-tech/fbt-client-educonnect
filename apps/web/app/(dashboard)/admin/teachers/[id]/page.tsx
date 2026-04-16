@@ -266,7 +266,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
             {isTeacherAccount && showAssignForm && (
               <form
                 onSubmit={handleAssign}
-                className="mb-4 space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.42)] dark:bg-card/88"
+                className="mb-4 space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,40,69,0.42)] dark:bg-card/88"
               >
                 <ClassSelector
                   classes={classes}
@@ -291,7 +291,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
                     </option>
                   ))}
                 </Select>
-                <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,23,42,0.4)] dark:bg-card/90">
+                <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,40,69,0.4)] dark:bg-card/90">
                   <input
                     type="checkbox"
                     checked={assignIsClassTeacher}
@@ -343,7 +343,7 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
                 {teacher.assignments.map((a) => (
                   <li
                     key={a.assignmentId}
-                    className="flex items-center justify-between gap-4 rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,23,42,0.42)] dark:bg-card/90"
+                    className="flex items-center justify-between gap-4 rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,40,69,0.42)] dark:bg-card/90"
                   >
                     <div>
                       <p className="font-medium">

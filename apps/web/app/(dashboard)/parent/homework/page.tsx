@@ -98,7 +98,7 @@ export default function ParentHomeworkPage(): React.ReactElement {
             onClick={() => setSubjectFilter("")}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
               !subjectFilter
-                ? "bg-primary text-primary-foreground shadow-[0_16px_32px_-22px_rgba(12,57,95,0.82)]"
+                ? "bg-primary text-primary-foreground shadow-[0_16px_32px_-22px_rgba(15,40,69,0.55)]"
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
@@ -111,7 +111,7 @@ export default function ParentHomeworkPage(): React.ReactElement {
               onClick={() => setSubjectFilter(subject)}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 subjectFilter === subject
-                  ? "bg-primary text-primary-foreground shadow-[0_16px_32px_-22px_rgba(12,57,95,0.82)]"
+                  ? "bg-primary text-primary-foreground shadow-[0_16px_32px_-22px_rgba(15,40,69,0.55)]"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >

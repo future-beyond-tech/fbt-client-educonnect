@@ -230,7 +230,7 @@ export default function AdminClassesPage(): React.ReactElement {
             {classes.map((classItem) => (
               <div
                 key={classItem.id}
-                className="rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,23,42,0.42)] dark:bg-card/90"
+                className="rounded-[24px] border border-border/70 bg-card/80 p-4 shadow-[0_18px_46px_-34px_rgba(15,40,69,0.42)] dark:bg-card/90"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

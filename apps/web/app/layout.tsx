@@ -53,8 +53,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#7C3AED" },
-    { media: "(prefers-color-scheme: dark)", color: "#100A24" },
+    { media: "(prefers-color-scheme: light)", color: "#1F3C5F" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1320" },
   ],
   viewportFit: "cover",
 };
@@ -77,7 +77,7 @@ const themeScript = `
       if (themeColorMeta) {
         themeColorMeta.setAttribute(
           "content",
-          theme === "dark" ? "#100A24" : "#7C3AED"
+          theme === "dark" ? "#0F1320" : "#1F3C5F"
         );
       }
     } catch (error) {

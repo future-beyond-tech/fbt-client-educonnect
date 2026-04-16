@@ -328,7 +328,7 @@ export default function LinkParentPage(): React.ReactElement {
             )}
 
             {selectedParent && (
-              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.42)] dark:bg-card/88">
+              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
                 <p className="text-sm font-medium">
                   Linking: {selectedParent.name} ({selectedParent.phone})
                 </p>
@@ -352,7 +352,7 @@ export default function LinkParentPage(): React.ReactElement {
             )}
 
             {showCreateForm && (
-              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.42)] dark:bg-card/88">
+              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
                 <p className="text-sm font-medium">Create and link a new parent account</p>
                 <Input
                   label="Parent Name"

@@ -397,7 +397,7 @@ export default function EnrollStudentPage(): React.ReactElement {
               disabled={isSubmitting}
             />
 
-            <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.42)] dark:bg-card/88">
+            <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">
                   Parent Details

@@ -12,8 +12,8 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = "educonnect-theme";
-const LIGHT_THEME_COLOR = "#7C3AED";
-const DARK_THEME_COLOR = "#100A24";
+const LIGHT_THEME_COLOR = "#1F3C5F";
+const DARK_THEME_COLOR = "#0F1320";
 
 const ThemeContext = React.createContext<ThemeContextValue | undefined>(
   undefined

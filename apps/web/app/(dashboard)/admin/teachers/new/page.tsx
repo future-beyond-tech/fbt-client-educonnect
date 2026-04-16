@@ -224,7 +224,7 @@ export default function CreateTeacherPage(): React.ReactElement {
             />
 
             {role === "Teacher" ? (
-              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.42)] dark:bg-card/88">
+              <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,40,69,0.42)] dark:bg-card/88">
                 <p className="text-sm font-medium text-foreground">
                   Initial assignment (optional)
                 </p>
@@ -263,7 +263,7 @@ export default function CreateTeacherPage(): React.ReactElement {
                         </option>
                       ))}
                     </Select>
-                    <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,23,42,0.4)] dark:bg-card/90">
+                    <label className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/74 px-4 py-3 text-sm text-foreground shadow-[0_14px_32px_-26px_rgba(15,40,69,0.4)] dark:bg-card/90">
                       <input
                         type="checkbox"
                         checked={assignIsClassTeacher}

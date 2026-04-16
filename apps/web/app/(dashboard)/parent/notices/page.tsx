@@ -76,7 +76,7 @@ export default function ParentNoticesPage(): React.ReactElement {
           {notices.map((notice) => (
             <Card
               key={notice.noticeId}
-              className="cursor-pointer transition-shadow hover:shadow-md"
+              className="cursor-pointer border-l-4 border-l-[rgb(var(--primary))] transition-[box-shadow,border-color] hover:border-l-[rgb(var(--primary-strong))] hover:shadow-[0_8px_30px_-8px_rgb(var(--primary)/0.25)]"
               onClick={() =>
                 setExpandedId(expandedId === notice.noticeId ? null : notice.noticeId)
               }
@@ -84,7 +84,10 @@ export default function ParentNoticesPage(): React.ReactElement {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-lg">{notice.title}</CardTitle>
-                  <Badge variant={notice.targetAudience === "All" ? "default" : "secondary"}>
+                  <Badge
+                    variant="outline"
+                    className="border-[rgb(var(--success)/0.3)] bg-[rgb(var(--success)/0.15)] text-[rgb(var(--success))]"
+                  >
                     {formatNoticeAudienceLabel(notice)}
                   </Badge>
                 </div>

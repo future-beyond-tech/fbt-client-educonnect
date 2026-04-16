@@ -487,7 +487,7 @@ export default function AdminNoticesPage(): React.ReactElement {
             </div>
 
             {createTargetAudience !== "All" && (
-              <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.42)] dark:bg-card/88">
+              <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">
                     Class Targeting
@@ -534,7 +534,7 @@ export default function AdminNoticesPage(): React.ReactElement {
                 </Select>
 
                 {selectedClassGroup && (
-                  <div className="rounded-[22px] border border-border/70 bg-card/60 px-4 py-3 shadow-[0_12px_30px_-28px_rgba(15,23,42,0.38)]">
+                  <div className="rounded-[22px] border border-border/70 bg-card/60 px-4 py-3 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)]">
                     <p className="text-sm font-medium text-foreground">
                       {formatClassGroupLabel(selectedClassGroup)}
                     </p>
@@ -695,13 +695,24 @@ export default function AdminNoticesPage(): React.ReactElement {
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Drafts</h2>
               {drafts.map((notice) => (
-                <Card key={notice.noticeId}>
+                <Card
+                  key={notice.noticeId}
+                  className="border-l-4 border-l-[rgb(var(--primary)/0.5)] transition-[box-shadow,border-color] hover:border-l-[rgb(var(--primary-strong))] hover:shadow-[0_8px_30px_-8px_rgb(var(--primary)/0.25)]"
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-lg">{notice.title}</CardTitle>
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Badge variant="outline">Draft</Badge>
-                        <Badge variant="secondary">
+                        <Badge
+                          variant="outline"
+                          className="bg-[rgb(var(--muted))] text-[rgb(var(--muted-foreground))]"
+                        >
+                          Draft
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-[rgb(var(--success)/0.3)] bg-[rgb(var(--success)/0.15)] text-[rgb(var(--success))]"
+                        >
                           {formatNoticeAudienceLabel(notice)}
                         </Badge>
                         <Button
@@ -744,13 +755,21 @@ export default function AdminNoticesPage(): React.ReactElement {
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Published</h2>
               {published.map((notice) => (
-                <Card key={notice.noticeId}>
+                <Card
+                  key={notice.noticeId}
+                  className="border-l-4 border-l-[rgb(var(--primary))] transition-[box-shadow,border-color] hover:border-l-[rgb(var(--primary-strong))] hover:shadow-[0_8px_30px_-8px_rgb(var(--primary)/0.25)]"
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-lg">{notice.title}</CardTitle>
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Badge>Published</Badge>
-                        <Badge variant="secondary">
+                        <Badge className="border-transparent bg-[linear-gradient(135deg,rgb(var(--warning)),rgb(var(--primary)))] text-primary-foreground shadow-[0_12px_24px_-18px_rgba(15,40,69,0.5)]">
+                          Published
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-[rgb(var(--success)/0.3)] bg-[rgb(var(--success)/0.15)] text-[rgb(var(--success))]"
+                        >
                           {formatNoticeAudienceLabel(notice)}
                         </Badge>
                       </div>

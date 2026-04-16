@@ -354,7 +354,7 @@ export function AttachmentUploader({
         })}
       >
         <input {...getInputProps()} />
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-card/80 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.35)]">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-card/80 shadow-[0_14px_32px_-26px_rgba(15,40,69,0.35)]">
           <UploadCloud className="h-6 w-6 text-primary" aria-hidden="true" />
         </div>
         <p className="text-sm font-medium text-foreground">
@@ -391,7 +391,7 @@ export function AttachmentUploader({
             <div
               key={file.id}
               className={cn(
-                "flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)]",
+                "flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.35)]",
                 file.status === "error" && "border-destructive/40 bg-destructive/10"
               )}
             >
@@ -453,7 +453,7 @@ export function AttachmentUploader({
           {existingAttachments.map((attachment) => (
             <div
               key={attachment.attachmentId}
-              className="flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)]"
+              className="flex items-center gap-3 rounded-[22px] border border-border/70 bg-card/82 p-3 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.35)]"
             >
               <div className="shrink-0">{getFileIcon(attachment.contentType)}</div>
               <div className="min-w-0 flex-1">

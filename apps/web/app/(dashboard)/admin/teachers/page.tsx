@@ -155,7 +155,7 @@ export default function AdminTeachersPage(): React.ReactElement {
                   onClick={() =>
                     router.push(`/admin/teachers/${teacher.id}`)
                   }
-                  className="flex w-full flex-col items-start gap-3 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                  className="flex w-full flex-col items-start gap-3 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,40,69,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                   aria-label={`Staff account ${teacher.name}`}
                 >
                   <div className="min-w-0 w-full flex-1">

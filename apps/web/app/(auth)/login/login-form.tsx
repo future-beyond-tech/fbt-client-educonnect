@@ -39,7 +39,7 @@ export function LoginForm(): React.ReactElement {
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
   const staffPhoneRef = React.useRef<HTMLInputElement | null>(null);
   const secureFieldClassName =
-    "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,23,42,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60";
+    "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60";
 
   React.useEffect(() => {
     if (!isAuthLoading && user) {
@@ -138,7 +138,7 @@ export function LoginForm(): React.ReactElement {
         <div
           role="tablist"
           aria-label="Login type"
-          className="rounded-[22px] border border-border/70 bg-card/70 p-1.5 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.4)] backdrop-blur-sm dark:bg-card/86"
+          className="rounded-[22px] border border-border/70 bg-card/70 p-1.5 shadow-[0_14px_34px_-30px_rgba(15,40,69,0.4)] backdrop-blur-sm dark:bg-card/86"
         >
           <div className="grid grid-cols-2 gap-1.5">
             <button
@@ -150,7 +150,7 @@ export function LoginForm(): React.ReactElement {
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "parent"
-                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(18,66,145,0.65)]"
+                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
               ].join(" ")}
             >
@@ -166,7 +166,7 @@ export function LoginForm(): React.ReactElement {
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "staff"
-                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(18,66,145,0.65)]"
+                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
               ].join(" ")}
             >
@@ -203,7 +203,7 @@ export function LoginForm(): React.ReactElement {
               Phone number
             </label>
             <div
-              className="focus-within:ring-ring focus-within:ring-offset-background flex min-h-12 items-center gap-3 rounded-[20px] border border-input/90 bg-card/85 px-4 shadow-[0_12px_30px_-28px_rgba(15,23,42,0.38)] ring-offset-background backdrop-blur-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-offset-2"
+              className="focus-within:ring-ring focus-within:ring-offset-background flex min-h-12 items-center gap-3 rounded-[20px] border border-input/90 bg-card/85 px-4 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-offset-2"
               onClick={() => staffPhoneRef.current?.focus()}
               role="group"
               aria-labelledby="phone"

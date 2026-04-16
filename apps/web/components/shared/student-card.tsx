@@ -33,7 +33,7 @@ export function StudentCard({
   return (
     <Wrapper
       onClick={onClick}
-      className={`flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_22px_60px_-42px_rgba(15,23,42,0.45)] transition-all backdrop-blur-sm dark:bg-card/92 dark:shadow-[0_24px_68px_-44px_rgba(2,12,24,0.84)] ${
+      className={`flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_22px_60px_-42px_rgba(15,40,69,0.45)] transition-all backdrop-blur-sm dark:bg-card/92 dark:shadow-[0_24px_68px_-44px_rgba(10,14,24,0.84)] ${
         onClick
           ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           : ""
@@ -41,7 +41,7 @@ export function StudentCard({
       aria-label={`Student ${name}, roll number ${rollNumber}`}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgba(22,88,136,0.14),rgba(58,199,179,0.14))] text-sm font-semibold text-primary">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgb(var(--primary)/0.14),rgb(var(--accent)/0.14))] text-sm font-semibold text-primary">
           {initials || "ST"}
         </div>
         <div className="min-w-0 flex-1">

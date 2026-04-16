@@ -149,19 +149,19 @@ function LeaveApplicationForm({
       className="fixed inset-0 z-50 bg-slate-950/58 backdrop-blur-[3px]"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(58,199,179,0.14),transparent_34rem)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgb(var(--glow-1)/0.14),transparent_34rem)]" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="absolute inset-x-0 bottom-0 flex h-[min(46rem,calc(100dvh-0.75rem))] w-full flex-col overflow-hidden rounded-t-[32px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.995),rgba(244,248,251,0.995))] shadow-[0_-18px_80px_-30px_rgba(2,12,24,0.84)] dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.995),rgba(8,18,31,0.995))] sm:inset-y-4 sm:bottom-auto sm:left-auto sm:right-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[32rem] sm:rounded-[32px] sm:shadow-[0_34px_90px_-40px_rgba(2,12,24,0.76)]"
+        className="absolute inset-x-0 bottom-0 flex h-[min(46rem,calc(100dvh-0.75rem))] w-full flex-col overflow-hidden rounded-t-[32px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.995),rgba(244,248,251,0.995))] shadow-[0_-18px_80px_-30px_rgba(10,14,24,0.84)] dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.995),rgba(8,18,31,0.995))] sm:inset-y-4 sm:bottom-auto sm:left-auto sm:right-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[32rem] sm:rounded-[32px] sm:shadow-[0_34px_90px_-40px_rgba(10,14,24,0.76)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-300/85 sm:hidden" />
 
         <div className="relative border-b border-border/70 bg-card/88 px-5 pb-5 pt-4 backdrop-blur-sm dark:bg-card/96 sm:px-6 sm:pt-5">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(58,199,179,0.14),transparent_72%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgb(var(--glow-1)/0.14),transparent_72%)]" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="space-y-3">
               <span className="inline-flex rounded-full border border-primary/10 bg-primary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/80">
@@ -186,7 +186,7 @@ function LeaveApplicationForm({
               size="icon"
               onClick={onClose}
               aria-label="Close"
-              className="shrink-0 rounded-full bg-card/78 text-foreground shadow-[0_14px_32px_-26px_rgba(15,23,42,0.5)] hover:bg-card"
+              className="shrink-0 rounded-full bg-card/78 text-foreground shadow-[0_14px_32px_-26px_rgba(15,40,69,0.5)] hover:bg-card"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -195,7 +195,7 @@ function LeaveApplicationForm({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-            <div className="rounded-[26px] border border-border/75 bg-card/84 p-4 shadow-[0_22px_44px_-34px_rgba(15,23,42,0.42)] dark:bg-card/92">
+            <div className="rounded-[26px] border border-border/75 bg-card/84 p-4 shadow-[0_22px_44px_-34px_rgba(15,40,69,0.42)] dark:bg-card/92">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">
                 Request details
               </p>
@@ -464,7 +464,7 @@ export default function ParentAttendancePage(): React.ReactElement {
       />
 
       <PageSection className="space-y-5">
-        <div className="inline-flex flex-wrap gap-2 rounded-full border border-border/70 bg-card/72 p-2 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:bg-card/88">
+        <div className="inline-flex flex-wrap gap-2 rounded-full border border-border/70 bg-card/72 p-2 shadow-[0_16px_36px_-30px_rgba(15,40,69,0.45)] backdrop-blur-sm dark:bg-card/88">
           <TabButton id="absences" label="Absence Records" />
           <TabButton id="leaves" label="Leave Applications" />
         </div>
