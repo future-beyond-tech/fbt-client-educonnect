@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, Pencil, XCircle } from "lucide-react";
 import type { TeacherClassItem } from "@/lib/types/teacher";
 
 type TakeStatus = "Present" | "Absent" | "Late";
@@ -77,23 +77,35 @@ export default function TeacherAttendancePage(): React.ReactElement {
   const [statusByStudentId, setStatusByStudentId] = React.useState<Record<string, TakeStatus>>({});
   const [reasonByStudentId, setReasonByStudentId] = React.useState<Record<string, string>>({});
 
+  // Tracks whether attendance has been saved (or was already persisted) for
+  // the current class+date. When true, rows are locked and show an Edit button.
+  const [hasSaved, setHasSaved] = React.useState(false);
+  // Students the user has explicitly re-opened for editing after a save.
+  const [editingStudentIds, setEditingStudentIds] = React.useState<Set<string>>(new Set());
+
   const [actionError, setActionError] = React.useState("");
   const [actionSuccess, setActionSuccess] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [leaveActionId, setLeaveActionId] = React.useState<string | null>(null);
 
+  // The /api/attendance/take endpoint requires IsClassTeacher=true on the
+  // teacher's assignment for the selected class — subject-teacher assignments
+  // get a 403 "Only the class teacher can take attendance for this class."
+  // Keep this list in lockstep with the backend rule so we never offer (or
+  // auto-select) a class the server will reject.
   const classesForTeacher = React.useMemo(() => {
     const map = new Map<string, { classId: string; className: string; section: string; isClassTeacher: boolean }>();
     for (const a of assignments) {
+      if (!a.isClassTeacher) continue;
       const existing = map.get(a.classId);
       if (existing) {
-        existing.isClassTeacher = existing.isClassTeacher || a.isClassTeacher;
+        existing.isClassTeacher = true;
       } else {
         map.set(a.classId, {
           classId: a.classId,
           className: a.className,
           section: a.section,
-          isClassTeacher: a.isClassTeacher,
+          isClassTeacher: true,
         });
       }
     }
@@ -101,6 +113,9 @@ export default function TeacherAttendancePage(): React.ReactElement {
       (a.className + a.section).localeCompare(b.className + b.section)
     );
   }, [assignments]);
+
+  const hasAnyAssignments = assignments.length > 0;
+  const hasClassTeacherAssignment = classesForTeacher.length > 0;
 
   const fetchAssignments = React.useCallback(async () => {
     setIsLoadingAssignments(true);
@@ -137,6 +152,11 @@ export default function TeacherAttendancePage(): React.ReactElement {
 
     setStatusByStudentId(nextStatus);
     setReasonByStudentId(nextReason);
+    // If the backend already has exception records for this class+date, the
+    // teacher has previously saved attendance — lock the rows and surface an
+    // Edit affordance. Fresh (never-saved) contexts stay fully editable.
+    setHasSaved(ctx.exceptions.length > 0);
+    setEditingStudentIds(new Set());
   }, []);
 
   const fetchContext = React.useCallback(async () => {
@@ -203,13 +223,46 @@ export default function TeacherAttendancePage(): React.ReactElement {
         items,
       });
 
-      setActionSuccess(res.message);
-      await fetchContext();
+      // Lock every row and surface the Edit affordance so the teacher has a
+      // clear visual confirmation the save took effect.
+      setHasSaved(true);
+      setEditingStudentIds(new Set());
+      setActionSuccess(
+        res.message ||
+          `Attendance saved successfully (${res.createdCount} created, ${res.updatedCount} updated).`
+      );
+
+      // Scroll the success banner into view — on mobile the teacher is often
+      // scrolled down to the last student when they hit Save, and the banner
+      // is rendered near the top of the page.
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      // Intentionally do NOT refetch here: fetchContext() clears
+      // actionSuccess, which would make the banner flash and disappear.
+      // Local state (hasSaved, statusByStudentId, reasonByStudentId) already
+      // reflects the write, and nothing returned by the /take GET can change
+      // as a side-effect of saving. The next class/date change will refetch.
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to save attendance.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const unlockStudentForEdit = (studentId: string): void => {
+    setEditingStudentIds((prev) => {
+      const next = new Set(prev);
+      next.add(studentId);
+      return next;
+    });
+    setActionSuccess("");
+  };
+
+  const isRowLocked = (studentId: string): boolean => {
+    if (!hasSaved) return false;
+    return !editingStudentIds.has(studentId);
   };
 
   const approveLeave = async (leaveId: string): Promise<void> => {
@@ -267,6 +320,13 @@ export default function TeacherAttendancePage(): React.ReactElement {
       {assignmentError ? <StatusBanner variant="error">{assignmentError}</StatusBanner> : null}
       {actionError ? <StatusBanner variant="error">{actionError}</StatusBanner> : null}
       {actionSuccess ? <StatusBanner variant="success">{actionSuccess}</StatusBanner> : null}
+      {!isLoadingAssignments && hasAnyAssignments && !hasClassTeacherAssignment ? (
+        <StatusBanner variant="info" title="You&apos;re not the class teacher for any class">
+          Attendance can only be taken by the assigned class teacher. You still have
+          subject-teacher assignments, but they don&apos;t allow marking attendance. Ask
+          your school admin if this looks wrong.
+        </StatusBanner>
+      ) : null}
 
       <PageSection className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
@@ -366,15 +426,39 @@ export default function TeacherAttendancePage(): React.ReactElement {
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-lg">Take attendance</CardTitle>
-                  <Button size="sm" onClick={saveAttendance} disabled={isSaving}>
-                    {isSaving ? <Spinner size="sm" /> : "Save attendance"}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle className="text-lg">Take attendance</CardTitle>
+                    {hasSaved && editingStudentIds.size === 0 ? (
+                      <Badge variant="default" aria-label="All attendance saved">
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                        Saved
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={saveAttendance}
+                    disabled={isSaving || (hasSaved && editingStudentIds.size === 0)}
+                    aria-live="polite"
+                  >
+                    {isSaving ? (
+                      <Spinner size="sm" />
+                    ) : hasSaved && editingStudentIds.size === 0 ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Saved
+                      </>
+                    ) : (
+                      "Save attendance"
+                    )}
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {context.students.map((s) => {
-                  const locked = isStudentOnApprovedLeave(s.id);
+                  const onLeave = isStudentOnApprovedLeave(s.id);
+                  const savedAndLocked = isRowLocked(s.id);
+                  const disabled = onLeave || savedAndLocked;
                   const currentStatus = statusByStudentId[s.id] ?? "Present";
 
                   return (
@@ -386,7 +470,12 @@ export default function TeacherAttendancePage(): React.ReactElement {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="truncate font-medium">{s.name}</span>
                           <Badge variant="secondary">{s.rollNumber}</Badge>
-                          {locked ? <Badge variant="outline">On leave</Badge> : null}
+                          {onLeave ? <Badge variant="outline">On leave</Badge> : null}
+                          {savedAndLocked && !onLeave ? (
+                            <Badge variant="default" aria-label="Attendance saved">
+                              Saved
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
 
@@ -397,7 +486,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
                             size="sm"
                             variant={currentStatus === "Present" ? "default" : "outline"}
                             onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Present" }))}
-                            disabled={locked}
+                            disabled={disabled}
                           >
                             <CheckCircle2 className="h-4 w-4" />
                             Present
@@ -407,7 +496,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
                             size="sm"
                             variant={currentStatus === "Absent" ? "destructive" : "outline"}
                             onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Absent" }))}
-                            disabled={locked}
+                            disabled={disabled}
                           >
                             <XCircle className="h-4 w-4" />
                             Absent
@@ -417,11 +506,23 @@ export default function TeacherAttendancePage(): React.ReactElement {
                             size="sm"
                             variant={currentStatus === "Late" ? "secondary" : "outline"}
                             onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Late" }))}
-                            disabled={locked}
+                            disabled={disabled}
                           >
                             <Clock className="h-4 w-4" />
                             Late
                           </Button>
+                          {savedAndLocked && !onLeave ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => unlockStudentForEdit(s.id)}
+                              aria-label={`Edit attendance for ${s.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit
+                            </Button>
+                          ) : null}
                         </div>
 
                         {currentStatus !== "Present" ? (
@@ -431,7 +532,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
                             onChange={(e) =>
                               setReasonByStudentId((p) => ({ ...p, [s.id]: e.target.value }))
                             }
-                            disabled={locked}
+                            disabled={disabled}
                           />
                         ) : null}
                       </div>
