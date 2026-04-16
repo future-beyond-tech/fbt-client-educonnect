@@ -155,10 +155,10 @@ export default function AdminTeachersPage(): React.ReactElement {
                   onClick={() =>
                     router.push(`/admin/teachers/${teacher.id}`)
                   }
-                  className="flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92"
+                  className="flex w-full flex-col items-start gap-3 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                   aria-label={`Staff account ${teacher.name}`}
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 w-full flex-1">
                     <p className="truncate text-base font-semibold text-foreground">
                       {teacher.name}
                     </p>
@@ -166,7 +166,7 @@ export default function AdminTeachersPage(): React.ReactElement {
                       {teacher.phone}
                     </p>
                   </div>
-                  <div className="ml-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:ml-3 sm:w-auto sm:shrink-0 sm:justify-end">
                     <Badge variant={teacher.role === "Admin" ? "default" : "secondary"}>
                       {teacher.role}
                     </Badge>
@@ -181,7 +181,7 @@ export default function AdminTeachersPage(): React.ReactElement {
                       <Badge variant="outline">School access</Badge>
                     )}
                     {teacher.role === "Teacher" && teacher.subjects.length > 0 && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="w-full text-xs text-muted-foreground sm:w-auto">
                         {teacher.subjects.slice(0, 3).join(", ")}
                         {teacher.subjects.length > 3 ? "..." : ""}
                       </span>
