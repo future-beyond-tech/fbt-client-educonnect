@@ -71,8 +71,8 @@ export default function AdminTeachersPage(): React.ReactElement {
     <PageShell>
       <PageHeader
         eyebrow="Admin operations"
-        title="Teachers"
-        description="Manage teacher accounts, search by name or phone, and review active assignments."
+        title="Staff"
+        description="Manage teacher and admin accounts, search by name or phone, and review active assignments."
         icon={<BookOpen className="h-6 w-6" aria-hidden="true" />}
         actions={(
           <div className="flex flex-wrap gap-2">
@@ -80,7 +80,7 @@ export default function AdminTeachersPage(): React.ReactElement {
               size="sm"
               onClick={() => router.push("/admin/teachers/new")}
             >
-              Add Teacher
+              Add Staff
             </Button>
             <Button
               variant="outline"
@@ -99,7 +99,7 @@ export default function AdminTeachersPage(): React.ReactElement {
           </div>
         )}
         stats={[
-          { label: "Teachers", value: totalCount.toString() },
+          { label: "Staff", value: totalCount.toString() },
           { label: "Page", value: totalPages > 0 ? `${page}/${totalPages}` : "1/1" },
         ]}
       />
@@ -122,11 +122,11 @@ export default function AdminTeachersPage(): React.ReactElement {
           <ErrorState title="Error" message={error} onRetry={fetchTeachers} />
         ) : teachers.length === 0 ? (
           <EmptyState
-            title="No teachers found"
+            title="No staff found"
             description={
               debouncedSearch
                 ? "Try adjusting your search."
-                : "No teachers are registered in this school yet."
+                : "No teacher or admin accounts are registered in this school yet."
             }
             icon={
               <BookOpen
@@ -137,7 +137,7 @@ export default function AdminTeachersPage(): React.ReactElement {
             action={
               !debouncedSearch
                 ? {
-                    label: "Add Teacher",
+                    label: "Add Staff",
                     onClick: () => router.push("/admin/teachers/new"),
                   }
                 : undefined
@@ -146,7 +146,7 @@ export default function AdminTeachersPage(): React.ReactElement {
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {totalCount} teacher{totalCount !== 1 ? "s" : ""}
+              {totalCount} staff account{totalCount !== 1 ? "s" : ""}
             </p>
             <div className="space-y-3">
               {teachers.map((teacher) => (
@@ -156,7 +156,7 @@ export default function AdminTeachersPage(): React.ReactElement {
                     router.push(`/admin/teachers/${teacher.id}`)
                   }
                   className="flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_20px_50px_-40px_rgba(15,23,42,0.45)] transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card/92"
-                  aria-label={`Teacher ${teacher.name}`}
+                  aria-label={`Staff account ${teacher.name}`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-semibold text-foreground">
@@ -167,15 +167,20 @@ export default function AdminTeachersPage(): React.ReactElement {
                     </p>
                   </div>
                   <div className="ml-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
-                    {teacher.assignedClassCount > 0 ? (
+                    <Badge variant={teacher.role === "Admin" ? "default" : "secondary"}>
+                      {teacher.role}
+                    </Badge>
+                    {teacher.role === "Teacher" && teacher.assignedClassCount > 0 ? (
                       <Badge variant="secondary">
                         {teacher.assignedClassCount} class
                         {teacher.assignedClassCount !== 1 ? "es" : ""}
                       </Badge>
-                    ) : (
+                    ) : teacher.role === "Teacher" ? (
                       <Badge variant="outline">Unassigned</Badge>
+                    ) : (
+                      <Badge variant="outline">School access</Badge>
                     )}
-                    {teacher.subjects.length > 0 && (
+                    {teacher.role === "Teacher" && teacher.subjects.length > 0 && (
                       <span className="text-xs text-muted-foreground">
                         {teacher.subjects.slice(0, 3).join(", ")}
                         {teacher.subjects.length > 3 ? "..." : ""}

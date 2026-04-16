@@ -7,6 +7,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS, defaultRouteByRole } from "@/lib/constants";
+import {
+  isValidJapanPhone,
+  JAPAN_PHONE_COUNTRY_CODE,
+  JAPAN_PHONE_COUNTRY_LABEL,
+  JAPAN_PHONE_LOCAL_DIGITS,
+  JAPAN_PHONE_VALIDATION_MESSAGE,
+  normalizeJapanPhoneInput,
+} from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -39,17 +47,9 @@ export function LoginForm(): React.ReactElement {
     }
   }, [isAuthLoading, router, user]);
 
-  const validatePhoneNumber = (phoneNumber: string): boolean => {
-    const cleaned = phoneNumber.replace(/\D/g, "");
-    return cleaned.length === 10;
-  };
-
   const handlePhoneChange = (value: string): void => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length <= 10) {
-      setPhone(cleaned);
-      setError("");
-    }
+    setPhone(normalizeJapanPhoneInput(value));
+    setError("");
   };
 
   const handlePinChange = (value: string): void => {
@@ -93,8 +93,8 @@ export function LoginForm(): React.ReactElement {
         return;
       }
     } else {
-      if (!validatePhoneNumber(phone)) {
-        setError("Please enter a valid 10-digit phone number");
+      if (!isValidJapanPhone(phone)) {
+        setError(JAPAN_PHONE_VALIDATION_MESSAGE);
         return;
       }
       if (!password) {
@@ -210,20 +210,20 @@ export function LoginForm(): React.ReactElement {
               aria-labelledby="phone"
             >
               <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1 text-sm font-semibold text-foreground/90">
-                <span className="text-muted-foreground">IN</span>
+                <span className="text-muted-foreground">{JAPAN_PHONE_COUNTRY_LABEL}</span>
                 <span className="h-4 w-px bg-border/70" aria-hidden="true" />
-                +91
+                {JAPAN_PHONE_COUNTRY_CODE}
               </span>
               <input
                 id="phone"
                 type="tel"
-                placeholder="Enter 10-digit number"
+                placeholder="Enter 11-digit number"
                 value={phone}
                 onChange={(e): void => handlePhoneChange(e.target.value)}
                 disabled={isLoading || isAuthLoading}
                 aria-invalid={!!error}
                 aria-describedby={error ? "form-error" : "staff-phone-hint"}
-                maxLength={10}
+                maxLength={JAPAN_PHONE_LOCAL_DIGITS}
                 inputMode="numeric"
                 pattern="[0-9]*"
                 autoComplete="tel-national"
@@ -233,7 +233,7 @@ export function LoginForm(): React.ReactElement {
               />
             </div>
             <p id="staff-phone-hint" className="text-xs text-muted-foreground">
-              Use the phone number registered with the school.
+              Use the 11-digit number registered with the school.
             </p>
           </div>
         )}

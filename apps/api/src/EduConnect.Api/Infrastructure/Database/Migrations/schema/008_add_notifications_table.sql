@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT chk_notification_type CHECK (
-        type IN ('notice_published', 'homework_assigned', 'absence_marked')
+        type IN ('notice_published', 'homework_assigned', 'absence_marked', 'leave_applied', 'leave_approved', 'leave_rejected')
     ),
     CONSTRAINT chk_notification_entity_type CHECK (
-        entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance')
+        entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance', 'leave_application')
     )
 );
 

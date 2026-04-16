@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -17,6 +18,7 @@ import { BookOpen, Pencil, Plus } from "lucide-react";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
 import type { AttachmentItem } from "@/lib/types/attachment";
+import type { TeacherClassItem } from "@/lib/types/teacher";
 
 interface HomeworkItem {
   homeworkId: string;
@@ -55,6 +57,10 @@ export default function TeacherHomeworkPage(): React.ReactElement {
   const [actionSuccess, setActionSuccess] = React.useState("");
   const [actionHomeworkId, setActionHomeworkId] = React.useState<string | null>(null);
 
+  // Filters (based on assignments)
+  const [classFilter, setClassFilter] = React.useState("");
+  const [subjectFilter, setSubjectFilter] = React.useState("");
+
   // Create form state
   const [showCreateForm, setShowCreateForm] = React.useState(false);
   const [createClassId, setCreateClassId] = React.useState("");
@@ -85,22 +91,106 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     Record<string, UploadedFile[]>
   >({});
 
+  // Teacher assignment metadata (classes + subjects)
+  const [assignments, setAssignments] = React.useState<TeacherClassItem[]>([]);
+  const [assignmentError, setAssignmentError] = React.useState("");
+  const [isLoadingAssignments, setIsLoadingAssignments] = React.useState(true);
+
+  const fetchAssignments = React.useCallback(async () => {
+    setIsLoadingAssignments(true);
+    setAssignmentError("");
+    try {
+      const data = await apiGet<TeacherClassItem[]>(API_ENDPOINTS.teachersMyClasses);
+      setAssignments(data);
+    } catch (err) {
+      setAssignmentError(err instanceof ApiError ? err.message : "Failed to load assignments.");
+    } finally {
+      setIsLoadingAssignments(false);
+    }
+  }, []);
+
   const fetchHomework = React.useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
-      const data = await apiGet<HomeworkItem[]>(API_ENDPOINTS.homework);
+      const params = new URLSearchParams();
+      if (classFilter) params.set("classId", classFilter);
+      if (subjectFilter) params.set("subject", subjectFilter);
+      const qs = params.toString();
+      const url = qs ? `${API_ENDPOINTS.homework}?${qs}` : API_ENDPOINTS.homework;
+      const data = await apiGet<HomeworkItem[]>(url);
       setHomework(data);
     } catch {
       setError("Failed to load homework.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [classFilter, subjectFilter]);
 
   React.useEffect(() => {
+    fetchAssignments();
     fetchHomework();
-  }, [fetchHomework]);
+  }, [fetchAssignments, fetchHomework]);
+
+  const classesForTeacher = React.useMemo(() => {
+    const map = new Map<string, { classId: string; className: string; section: string }>();
+    for (const a of assignments) {
+      if (!map.has(a.classId)) {
+        map.set(a.classId, { classId: a.classId, className: a.className, section: a.section });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const nameCompare = a.className.localeCompare(b.className);
+      if (nameCompare !== 0) return nameCompare;
+      return a.section.localeCompare(b.section);
+    });
+  }, [assignments]);
+
+  const subjectsForSelectedClass = React.useMemo(() => {
+    if (!createClassId) return [];
+    return assignments
+      .filter((a) => a.classId === createClassId)
+      .map((a) => a.subject)
+      .sort((a, b) => a.localeCompare(b));
+  }, [assignments, createClassId]);
+
+  const subjectsForFilterClass = React.useMemo(() => {
+    const list =
+      classFilter
+        ? assignments.filter((a) => a.classId === classFilter)
+        : assignments;
+    return Array.from(new Set(list.map((a) => a.subject))).sort((a, b) => a.localeCompare(b));
+  }, [assignments, classFilter]);
+
+  React.useEffect(() => {
+    // If class filter changes, keep subject filter valid
+    if (!subjectFilter) return;
+    if (subjectsForFilterClass.includes(subjectFilter)) return;
+    setSubjectFilter("");
+  }, [subjectFilter, subjectsForFilterClass]);
+
+  // When opening the create form, default to the first assignment
+  React.useEffect(() => {
+    if (!showCreateForm) return;
+    if (createClassId && createSubject) return;
+    if (classesForTeacher.length === 0) return;
+
+    const firstClassId = classesForTeacher[0]?.classId;
+    if (!firstClassId) return;
+
+    setCreateClassId(firstClassId);
+    const firstSubject = assignments.find((a) => a.classId === firstClassId)?.subject ?? "";
+    setCreateSubject(firstSubject);
+  }, [assignments, classesForTeacher, createClassId, createSubject, showCreateForm]);
+
+  // If the class changes, reset subject to the first subject for that class
+  React.useEffect(() => {
+    if (!showCreateForm) return;
+    if (!createClassId) return;
+    if (subjectsForSelectedClass.length === 0) return;
+    if (createSubject && subjectsForSelectedClass.includes(createSubject)) return;
+    setCreateSubject(subjectsForSelectedClass[0] ?? "");
+  }, [createClassId, createSubject, showCreateForm, subjectsForSelectedClass]);
 
   const mapAttachments = React.useCallback(
     (attachments: AttachmentItem[]): UploadedFile[] =>
@@ -376,23 +466,45 @@ export default function TeacherHomeworkPage(): React.ReactElement {
         <PageSection>
           <form onSubmit={handleCreate} className="space-y-4">
             <h3 className="text-lg font-semibold">Create Homework</h3>
+            {assignmentError ? (
+              <StatusBanner variant="error">{assignmentError}</StatusBanner>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                id="createClassId"
-                label="Class ID"
-                placeholder="Enter class ID"
+              <Select
+                label="Class"
                 value={createClassId}
                 onChange={(e) => setCreateClassId(e.target.value)}
-                disabled={isCreating}
-              />
-              <Input
-                id="createSubject"
+                disabled={isCreating || isLoadingAssignments}
+              >
+                <option value="" disabled>
+                  {isLoadingAssignments ? "Loading classes..." : "Select a class"}
+                </option>
+                {classesForTeacher.map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    {c.className}
+                    {c.section ? ` ${c.section}` : ""}
+                  </option>
+                ))}
+              </Select>
+              <Select
                 label="Subject"
-                placeholder="e.g. Mathematics"
                 value={createSubject}
                 onChange={(e) => setCreateSubject(e.target.value)}
-                disabled={isCreating}
-              />
+                disabled={isCreating || isLoadingAssignments || !createClassId}
+              >
+                <option value="" disabled>
+                  {!createClassId
+                    ? "Select a class first"
+                    : isLoadingAssignments
+                      ? "Loading subjects..."
+                      : "Select a subject"}
+                </option>
+                {subjectsForSelectedClass.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
             </div>
             <Input
               id="createTitle"
@@ -458,6 +570,38 @@ export default function TeacherHomeworkPage(): React.ReactElement {
         />
       ) : (
         <PageSection className="space-y-4">
+          {assignments.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+              <Select
+                label="Filter by class"
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
+                disabled={isLoadingAssignments}
+              >
+                <option value="">All classes</option>
+                {classesForTeacher.map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    {c.className}
+                    {c.section ? ` ${c.section}` : ""}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                label="Filter by subject"
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                disabled={isLoadingAssignments}
+              >
+                <option value="">All subjects</option>
+                {subjectsForFilterClass.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
+
           {homework.some((h) => h.status === "PendingApproval" && h.canApproveOrReject) && (
             <Card>
               <CardHeader className="pb-2">

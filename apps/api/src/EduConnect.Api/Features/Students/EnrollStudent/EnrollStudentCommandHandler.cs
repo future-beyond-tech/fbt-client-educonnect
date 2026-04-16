@@ -1,5 +1,6 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 
@@ -34,6 +35,14 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
             throw new ForbiddenException("Only admins can enroll students.");
         }
 
+        if (request.Parent is not null && request.ExistingParent is not null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                { "Parent", ["Choose either a new parent or an existing parent, not both."] }
+            });
+        }
+
         var trimmedRollNumber = request.RollNumber.Trim();
 
         // Verify class exists in this school
@@ -65,17 +74,18 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
         }
 
         UserEntity? parent = null;
+        UserEntity? existingParent = null;
         ParentStudentLinkEntity? parentLink = null;
 
         if (request.Parent is not null)
         {
-            var trimmedPhone = request.Parent.Phone.Trim();
+            var normalizedPhone = JapanPhoneNumber.NormalizeUserInput(request.Parent.Phone);
             var normalizedEmail = request.Parent.Email.Trim().ToLowerInvariant();
 
             var phoneExists = await _context.Users
                 .AnyAsync(u =>
                     u.SchoolId == _currentUserService.SchoolId &&
-                    u.Phone == trimmedPhone,
+                    u.Phone == normalizedPhone,
                     cancellationToken);
 
             if (phoneExists)
@@ -101,6 +111,24 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
                 });
             }
         }
+        else if (request.ExistingParent is not null)
+        {
+            existingParent = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.Id == request.ExistingParent.ParentId &&
+                    u.SchoolId == _currentUserService.SchoolId &&
+                    u.Role == "Parent" &&
+                    u.IsActive,
+                    cancellationToken);
+
+            if (existingParent == null)
+            {
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    { "ExistingParent.ParentId", ["Select an active parent account from this school."] }
+                });
+            }
+        }
 
         var student = new StudentEntity
         {
@@ -123,7 +151,7 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
                 Id = Guid.NewGuid(),
                 SchoolId = _currentUserService.SchoolId,
                 Name = request.Parent.Name.Trim(),
-                Phone = request.Parent.Phone.Trim(),
+                Phone = JapanPhoneNumber.NormalizeUserInput(request.Parent.Phone),
                 Email = request.Parent.Email.Trim().ToLowerInvariant(),
                 Role = "Parent",
                 PinHash = _pinService.HashPin(request.Parent.Pin),
@@ -142,6 +170,18 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
                 CreatedAt = DateTimeOffset.UtcNow
             };
         }
+        else if (request.ExistingParent is not null && existingParent is not null)
+        {
+            parentLink = new ParentStudentLinkEntity
+            {
+                Id = Guid.NewGuid(),
+                SchoolId = _currentUserService.SchoolId,
+                ParentId = existingParent.Id,
+                StudentId = student.Id,
+                Relationship = request.ExistingParent.Relationship.Trim().ToLowerInvariant(),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+        }
 
         _context.Students.Add(student);
         if (parent is not null)
@@ -157,8 +197,8 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Student enrolled: {StudentId} in class {ClassId} by admin {AdminId}. ParentCreated={ParentCreated} ParentId={ParentId}",
-            student.Id, request.ClassId, _currentUserService.UserId, parent is not null, parent?.Id);
+            "Student enrolled: {StudentId} in class {ClassId} by admin {AdminId}. ParentCreated={ParentCreated} LinkedParentId={ParentId}",
+            student.Id, request.ClassId, _currentUserService.UserId, parent is not null, parent?.Id ?? existingParent?.Id);
 
         return new EnrollStudentResponse(student.Id, "Student enrolled successfully.");
     }

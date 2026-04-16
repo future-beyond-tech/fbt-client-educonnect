@@ -1,5 +1,6 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 
 namespace EduConnect.Api.Features.Students.SearchParentsByPhone;
@@ -22,19 +23,19 @@ public class SearchParentsByPhoneQueryHandler : IRequestHandler<SearchParentsByP
             throw new ForbiddenException("Only admins can search for parents.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Trim().Length < 3)
+        var phoneSearch = JapanPhoneNumber.NormalizeSearchTerm(request.Phone);
+
+        if (phoneSearch.Length < 3)
         {
             return [];
         }
-
-        var phoneTrimmed = request.Phone.Trim();
 
         var parents = await _context.Users
             .Where(u =>
                 u.SchoolId == _currentUserService.SchoolId &&
                 u.Role == "Parent" &&
                 u.IsActive &&
-                u.Phone.Contains(phoneTrimmed))
+                u.Phone.Contains(phoneSearch))
             .OrderBy(u => u.Name)
             .Take(10)
             .Select(u => new ParentSearchResultDto(

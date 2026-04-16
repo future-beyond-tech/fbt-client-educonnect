@@ -13,6 +13,7 @@ using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using FluentAssertions;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -37,10 +38,11 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             passwordHasher,
+            Mock.Of<ISender>(),
             Mock.Of<ILogger<CreateTeacherCommandHandler>>());
 
         var response = await handler.Handle(
-            new CreateTeacherCommand("Asha Menon", "9876543210", "Asha@School.com", "EduConnect@2026"),
+            new CreateTeacherCommand("Asha Menon", "09876543210", "Asha@School.com", "EduConnect@2026"),
             CancellationToken.None);
 
         var teacher = await context.Users.FirstAsync(u => u.Id == response.TeacherId);
@@ -48,6 +50,98 @@ public class AdminOnboardingFlowTests
         teacher.Email.Should().Be("asha@school.com");
         teacher.PasswordHash.Should().NotBe("EduConnect@2026");
         passwordHasher.VerifyPassword("EduConnect@2026", teacher.PasswordHash!).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateTeacher_WithAdminRole_CreatesAdminWithoutAssignments()
+    {
+        var schoolId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(options, schoolId);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var passwordHasher = new PasswordHasher();
+        var handler = new CreateTeacherCommandHandler(
+            context,
+            currentUser,
+            passwordHasher,
+            Mock.Of<ISender>(),
+            Mock.Of<ILogger<CreateTeacherCommandHandler>>());
+
+        var response = await handler.Handle(
+            new CreateTeacherCommand("School Operator", "08888888888", "ops@school.com", "EduConnect@2026", "Admin"),
+            CancellationToken.None);
+
+        var admin = await context.Users.FirstAsync(u => u.Id == response.TeacherId);
+        admin.Role.Should().Be("Admin");
+        admin.Email.Should().Be("ops@school.com");
+        (await context.TeacherClassAssignments.CountAsync()).Should().Be(0);
+        response.Message.Should().Be("Admin created successfully.");
+    }
+
+    [Fact]
+    public async Task CreateTeacher_WithInitialAssignment_CreatesTeacherClassAssignment()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "8",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            subjects:
+            [
+                new SubjectEntity { Id = Guid.NewGuid(), SchoolId = schoolId, Name = "Physics" }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var passwordHasher = new PasswordHasher();
+        var assignHandler = new AssignClassToTeacherCommandHandler(
+            context,
+            currentUser,
+            Mock.Of<ILogger<AssignClassToTeacherCommandHandler>>());
+        var sender = new AssignOnlySender(assignHandler);
+
+        var createHandler = new CreateTeacherCommandHandler(
+            context,
+            currentUser,
+            passwordHasher,
+            sender,
+            Mock.Of<ILogger<CreateTeacherCommandHandler>>());
+
+        var response = await createHandler.Handle(
+            new CreateTeacherCommand(
+                "Ravi Kumar",
+                "09123456789",
+                "ravi@school.com",
+                "StrongPass1",
+                "Teacher",
+                classId,
+                "Physics",
+                false),
+            CancellationToken.None);
+
+        var teacher = await context.Users.FirstAsync(u => u.Id == response.TeacherId);
+        teacher.Role.Should().Be("Teacher");
+
+        var assignment = await context.TeacherClassAssignments
+            .SingleAsync(tca => tca.TeacherId == teacher.Id && tca.ClassId == classId);
+        assignment.Subject.Should().Be("Physics");
+        assignment.IsClassTeacher.Should().BeFalse();
     }
 
     [Fact]
@@ -68,7 +162,7 @@ public class AdminOnboardingFlowTests
             Mock.Of<ILogger<CreateParentCommandHandler>>());
 
         var response = await handler.Handle(
-            new CreateParentCommand("Meera Das", "9123456789", "Meera@Home.com", "1234"),
+            new CreateParentCommand("Meera Das", "09123456789", "Meera@Home.com", "1234"),
             CancellationToken.None);
 
         var parent = await context.Users.FirstAsync(u => u.Id == response.ParentId);
@@ -161,7 +255,7 @@ public class AdminOnboardingFlowTests
                 new DateOnly(2014, 10, 3),
                 new EnrollStudentParentRequest(
                     "Lakshmi Rao",
-                    "9123456789",
+                    "09123456789",
                     "Lakshmi@Home.com",
                     "1234",
                     "guardian")),
@@ -179,6 +273,63 @@ public class AdminOnboardingFlowTests
         link.ParentId.Should().Be(parent.Id);
         link.StudentId.Should().Be(student.Id);
         link.Relationship.Should().Be("guardian");
+    }
+
+    [Fact]
+    public async Task EnrollStudent_WithExistingParent_LinksExistingParentWithoutCreatingAnotherParent()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "6",
+                    Section = "C",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateParentUser(parentId, schoolId, "09123450000", "Keiko Sato", "keiko@test.com")
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new EnrollStudentCommandHandler(
+            context,
+            currentUser,
+            new PinService(),
+            Mock.Of<ILogger<EnrollStudentCommandHandler>>());
+
+        var response = await handler.Handle(
+            new EnrollStudentCommand(
+                "Ren Sato",
+                "2026-6C-003",
+                classId,
+                new DateOnly(2014, 7, 14),
+                null,
+                new EnrollStudentExistingParentRequest(parentId, "parent")),
+            CancellationToken.None);
+
+        var student = await context.Students.FirstAsync(s => s.Id == response.StudentId);
+        var parents = await context.Users.Where(u => u.Role == "Parent").ToListAsync();
+        var link = await context.ParentStudentLinks.FirstAsync(l => l.StudentId == student.Id);
+
+        student.Name.Should().Be("Ren Sato");
+        parents.Should().HaveCount(1);
+        parents.Single().Id.Should().Be(parentId);
+        link.ParentId.Should().Be(parentId);
+        link.StudentId.Should().Be(student.Id);
+        link.Relationship.Should().Be("parent");
     }
 
     [Fact]
@@ -233,7 +384,7 @@ public class AdminOnboardingFlowTests
                 null,
                 new EnrollStudentParentRequest(
                     "Parent One",
-                    "9234567890",
+                    "09234567890",
                     "parent.one@test.com",
                     "1234",
                     "parent")),
@@ -272,7 +423,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateParentUser(Guid.NewGuid(), schoolId, "9345678901", "Existing Parent", "existing.parent@test.com")
+                CreateParentUser(Guid.NewGuid(), schoolId, "09345678901", "Existing Parent", "existing.parent@test.com")
             ]);
 
         await using var context = new AppDbContext(options, currentUser);
@@ -290,7 +441,7 @@ public class AdminOnboardingFlowTests
                 null,
                 new EnrollStudentParentRequest(
                     "Parent Two",
-                    "9345678901",
+                    "09345678901",
                     "new.parent@test.com",
                     "4567",
                     "parent")),
@@ -329,7 +480,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateParentUser(Guid.NewGuid(), schoolId, "9456789012", "Existing Parent", "existing.parent@test.com")
+                CreateParentUser(Guid.NewGuid(), schoolId, "09456789012", "Existing Parent", "existing.parent@test.com")
             ]);
 
         await using var context = new AppDbContext(options, currentUser);
@@ -347,7 +498,7 @@ public class AdminOnboardingFlowTests
                 null,
                 new EnrollStudentParentRequest(
                     "Parent Three",
-                    "9567890123",
+                    "09567890123",
                     "Existing.Parent@Test.com",
                     "4567",
                     "guardian")),
@@ -387,7 +538,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherId, schoolId, "9000000024", "Teacher User", "teacher@school.com")
+                CreateTeacherUser(teacherId, schoolId, "09000000024", "Teacher User", "teacher@school.com")
             ]);
 
         await using var context = new AppDbContext(options, currentUser);
@@ -405,7 +556,7 @@ public class AdminOnboardingFlowTests
                 null,
                 new EnrollStudentParentRequest(
                     "Parent Four",
-                    "9678901234",
+                    "09678901234",
                     "parent.four@test.com",
                     "1234",
                     "parent")),
@@ -478,8 +629,8 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherOneId, schoolId, "9000000002", "Teacher One", "one@school.com"),
-                CreateTeacherUser(teacherTwoId, schoolId, "9000000003", "Teacher Two", "two@school.com")
+                CreateTeacherUser(teacherOneId, schoolId, "09000000002", "Teacher One", "one@school.com"),
+                CreateTeacherUser(teacherTwoId, schoolId, "09000000003", "Teacher Two", "two@school.com")
             ],
             subjects:
             [
@@ -548,8 +699,8 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherOneId, schoolId, "9000000010", "Teacher One", "one@school.com"),
-                CreateTeacherUser(teacherTwoId, schoolId, "9000000011", "Teacher Two", "two@school.com")
+                CreateTeacherUser(teacherOneId, schoolId, "09000000010", "Teacher One", "one@school.com"),
+                CreateTeacherUser(teacherTwoId, schoolId, "09000000011", "Teacher Two", "two@school.com")
             ],
             assignments:
             [
@@ -619,7 +770,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherId, schoolId, "9000000020", "Teacher", "teacher@school.com")
+                CreateTeacherUser(teacherId, schoolId, "09000000020", "Teacher", "teacher@school.com")
             ],
             assignments:
             [
@@ -696,7 +847,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherId, schoolId, "9000000021", "Teacher", "teacher@school.com")
+                CreateTeacherUser(teacherId, schoolId, "09000000021", "Teacher", "teacher@school.com")
             ],
             assignments:
             [
@@ -767,7 +918,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherId, schoolId, "9000000022", "Teacher", "teacher@school.com")
+                CreateTeacherUser(teacherId, schoolId, "09000000022", "Teacher", "teacher@school.com")
             ],
             assignments:
             [
@@ -842,7 +993,7 @@ public class AdminOnboardingFlowTests
             ],
             users:
             [
-                CreateTeacherUser(teacherId, schoolId, "9000000023", "Teacher", "teacher@school.com")
+                CreateTeacherUser(teacherId, schoolId, "09000000023", "Teacher", "teacher@school.com")
             ],
             assignments:
             [
@@ -956,7 +1107,7 @@ public class AdminOnboardingFlowTests
             Name = "Test School",
             Code = $"SCH-{schoolId.ToString()[..6]}",
             Address = "Test Address",
-            ContactPhone = "9999999999",
+            ContactPhone = "09999999999",
             ContactEmail = "school@test.com",
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -994,5 +1145,47 @@ public class AdminOnboardingFlowTests
         }
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>Routes <see cref="AssignClassToTeacherCommand"/> to the real handler for tests (in-memory DB has no transactions).
+    /// </summary>
+    private sealed class AssignOnlySender : ISender
+    {
+        private readonly AssignClassToTeacherCommandHandler _assignHandler;
+
+        public AssignOnlySender(AssignClassToTeacherCommandHandler assignHandler) =>
+            _assignHandler = assignHandler;
+
+        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        {
+            if (request is AssignClassToTeacherCommand cmd)
+            {
+                return (Task<TResponse>)(object)_assignHandler.Handle(cmd, cancellationToken);
+            }
+
+            throw new NotSupportedException($"Unexpected request type: {request?.GetType().Name}");
+        }
+
+        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+            where TRequest : IRequest =>
+            throw new NotSupportedException();
+
+        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
+        {
+            if (request is AssignClassToTeacherCommand cmd)
+            {
+                return (Task<object?>)(object)_assignHandler.Handle(cmd, cancellationToken);
+            }
+
+            throw new NotSupportedException($"Unexpected request type: {request?.GetType().Name}");
+        }
+
+        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(
+            IStreamRequest<TResponse> request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

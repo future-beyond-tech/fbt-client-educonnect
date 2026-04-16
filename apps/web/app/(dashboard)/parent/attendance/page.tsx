@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { apiGet, apiPost, ApiError } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
+import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import type {
   AttendanceRecord,
   LeaveApplication,
   ApplyLeaveRequest,
+  UpdateLeaveRequest,
   GetLeaveApplicationsResponse,
 } from "@/lib/types/attendance";
 import type { ParentChildItem } from "@/lib/types/student";
@@ -35,16 +37,21 @@ type TabId = "absences" | "leaves";
 interface LeaveFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  initialLeave?: LeaveApplication | null;
 }
 
-function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.ReactElement {
+function LeaveApplicationForm({
+  onClose,
+  onSuccess,
+  initialLeave,
+}: LeaveFormProps): React.ReactElement {
   const today = new Date().toISOString().slice(0, 10);
   const titleId = React.useId();
   const descriptionId = React.useId();
-  const [studentId, setStudentId] = React.useState("");
-  const [startDate, setStartDate] = React.useState(today);
-  const [endDate, setEndDate] = React.useState(today);
-  const [reason, setReason] = React.useState("");
+  const [studentId, setStudentId] = React.useState(initialLeave?.studentId ?? "");
+  const [startDate, setStartDate] = React.useState(initialLeave?.startDate ?? today);
+  const [endDate, setEndDate] = React.useState(initialLeave?.endDate ?? today);
+  const [reason, setReason] = React.useState(initialLeave?.reason ?? "");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
 
@@ -81,11 +88,18 @@ function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.Rea
     apiGet<ParentChildItem[]>(API_ENDPOINTS.studentsMyChildren)
       .then((data) => {
         setStudents(data);
+        if (initialLeave?.studentId) {
+          // Keep the student locked to the original leave request when editing.
+          setStudentId(initialLeave.studentId);
+          return;
+        }
+
         const first = data[0];
         if (first) {
           setStudentId(first.id);
           return;
         }
+
         setError("No linked students were found for this parent account.");
       })
       .catch((err) =>
@@ -94,7 +108,7 @@ function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.Rea
         )
       )
       .finally(() => setLoadingStudents(false));
-  }, []);
+  }, [initialLeave?.studentId]);
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -112,8 +126,13 @@ function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.Rea
 
     setIsSubmitting(true);
     try {
-      const payload: ApplyLeaveRequest = { studentId, startDate, endDate, reason };
-      await apiPost(API_ENDPOINTS.leaveApplications, payload);
+      if (initialLeave?.id) {
+        const payload: UpdateLeaveRequest = { startDate, endDate, reason };
+        await apiPut(`${API_ENDPOINTS.leaveApplications}/${initialLeave.id}`, payload);
+      } else {
+        const payload: ApplyLeaveRequest = { studentId, startDate, endDate, reason };
+        await apiPost(API_ENDPOINTS.leaveApplications, payload);
+      }
       onSuccess();
       onClose();
     } catch (err) {
@@ -197,6 +216,7 @@ function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.Rea
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 className="bg-card/96 backdrop-blur-none"
+                disabled={!!initialLeave?.id}
                 required
               >
                 {students.map((s) => (
@@ -280,7 +300,13 @@ function LeaveApplicationForm({ onClose, onSuccess }: LeaveFormProps): React.Rea
                 disabled={isSubmitting || loadingStudents || students.length === 0}
                 className="w-full sm:flex-1"
               >
-                {isSubmitting ? <Spinner size="sm" /> : "Submit Application"}
+                {isSubmitting ? (
+                  <Spinner size="sm" />
+                ) : initialLeave?.id ? (
+                  "Update Request"
+                ) : (
+                  "Submit Application"
+                )}
               </Button>
             </div>
           </div>
@@ -305,6 +331,7 @@ function leaveStatusVariant(
 // ─── Main page ──────────────────────────────────────────────────────────────
 
 export default function ParentAttendancePage(): React.ReactElement {
+  const { token, isLoading: isAuthLoading } = useAuth();
   // ── Tabs
   const [activeTab, setActiveTab] = React.useState<TabId>("absences");
 
@@ -320,6 +347,7 @@ export default function ParentAttendancePage(): React.ReactElement {
   const [isLoadingLeaves, setIsLoadingLeaves] = React.useState(false);
   const [leavesError, setLeavesError] = React.useState("");
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
+  const [editingLeave, setEditingLeave] = React.useState<LeaveApplication | null>(null);
 
   // ── Fetch absence records
   const fetchAttendance = React.useCallback(async () => {
@@ -330,8 +358,12 @@ export default function ParentAttendancePage(): React.ReactElement {
         `${API_ENDPOINTS.attendance}?month=${selectedMonth}&year=${selectedYear}`
       );
       setRecords(data);
-    } catch {
-      setRecordsError("Failed to load attendance records.");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setRecordsError(err.message || "Failed to load attendance records.");
+      } else {
+        setRecordsError("Failed to load attendance records.");
+      }
     } finally {
       setIsLoadingRecords(false);
     }
@@ -353,9 +385,25 @@ export default function ParentAttendancePage(): React.ReactElement {
     }
   }, []);
 
+  const handleCancelLeave = async (leaveId: string): Promise<void> => {
+    const ok = window.confirm("Cancel this leave request? This cannot be undone.");
+    if (!ok) return;
+
+    try {
+      await apiDelete(`${API_ENDPOINTS.leaveApplications}/${leaveId}`);
+      fetchLeaves();
+    } catch (err) {
+      setLeavesError(
+        err instanceof ApiError ? err.message : "Failed to cancel leave application."
+      );
+    }
+  };
+
   React.useEffect(() => {
+    if (isAuthLoading) return;
+    if (!token) return;
     fetchAttendance();
-  }, [fetchAttendance]);
+  }, [fetchAttendance, isAuthLoading, token]);
 
   React.useEffect(() => {
     if (activeTab === "leaves") fetchLeaves();
@@ -399,7 +447,10 @@ export default function ParentAttendancePage(): React.ReactElement {
         icon={<CalendarDays className="h-6 w-6" aria-hidden="true" />}
         actions={(
           <Button
-            onClick={() => setShowLeaveForm(true)}
+            onClick={() => {
+              setEditingLeave(null);
+              setShowLeaveForm(true);
+            }}
             className="shrink-0"
           >
             <PlusCircle className="h-4 w-4" />
@@ -522,9 +573,34 @@ export default function ParentAttendancePage(): React.ReactElement {
                             </p>
                           )}
                         </div>
-                        <Badge variant={leaveStatusVariant(leave.status)} className="shrink-0">
-                          {leave.status}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge variant={leaveStatusVariant(leave.status)} className="shrink-0">
+                            {leave.status}
+                          </Badge>
+                          {leave.status === "Pending" ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingLeave(leave);
+                                  setShowLeaveForm(true);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelLeave(leave.id)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -537,8 +613,12 @@ export default function ParentAttendancePage(): React.ReactElement {
 
       {showLeaveForm && (
         <LeaveApplicationForm
-          onClose={() => setShowLeaveForm(false)}
+          onClose={() => {
+            setShowLeaveForm(false);
+            setEditingLeave(null);
+          }}
           onSuccess={fetchLeaves}
+          initialLeave={editingLeave}
         />
       )}
     </PageShell>

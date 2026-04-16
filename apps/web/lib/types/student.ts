@@ -78,12 +78,18 @@ export interface EnrollStudentParentRequest extends CreateParentRequest {
   relationship: string;
 }
 
+export interface EnrollStudentExistingParentRequest {
+  parentId: string;
+  relationship: string;
+}
+
 export interface EnrollStudentRequest {
   name: string;
   rollNumber: string;
   classId: string;
   dateOfBirth: string | null;
   parent?: EnrollStudentParentRequest;
+  existingParent?: EnrollStudentExistingParentRequest;
 }
 
 export interface UpdateStudentRequest {

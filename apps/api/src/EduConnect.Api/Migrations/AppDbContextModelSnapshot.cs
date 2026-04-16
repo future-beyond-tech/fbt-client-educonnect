@@ -692,9 +692,9 @@ namespace EduConnect.Api.Migrations
 
                     b.ToTable("notifications", null, t =>
                         {
-                            t.HasCheckConstraint("chk_notification_entity_type", "entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance')");
+                            t.HasCheckConstraint("chk_notification_entity_type", "entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance', 'leave_application')");
 
-                            t.HasCheckConstraint("chk_notification_type", "type IN ('notice_published', 'homework_assigned', 'absence_marked')");
+                            t.HasCheckConstraint("chk_notification_type", "type IN ('notice_published', 'homework_assigned', 'absence_marked', 'leave_applied', 'leave_approved', 'leave_rejected')");
                         });
                 });
 

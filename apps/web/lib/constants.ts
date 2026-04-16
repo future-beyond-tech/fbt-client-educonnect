@@ -61,7 +61,7 @@ export const navigationByRole: Record<RoleType, NavItem[]> = {
     { label: "Notices", href: "/admin/notices", icon: "Bell" },
     { label: "Students", href: "/admin/students", icon: "Users" },
     { label: "Classes", href: "/admin/classes", icon: "School" },
-    { label: "Teachers", href: "/admin/teachers", icon: "BookOpen" },
+    { label: "Staff", href: "/admin/teachers", icon: "BookOpen" },
   ],
 };
 
@@ -136,7 +136,7 @@ export const retentionStepsByRole: Record<RoleType, RetentionStep[]> = {
     },
     {
       id: "teachers",
-      label: "Review teachers",
+      label: "Review staff",
       href: "/admin/teachers",
     },
   ],

@@ -214,19 +214,19 @@ After the API boots successfully in `Development`, the seed migrations provide:
 
 | Role | Phone | Password |
 |---|---|---|
-| Admin | `9000000001` | `EduConnect@2026` |
-| Teacher | `9000000002` | `EduConnect@2026` |
-| Teacher | `9000000003` | `EduConnect@2026` |
+| Admin | `09000000001` | `EduConnect@2026` |
+| Teacher | `09000000002` | `EduConnect@2026` |
+| Teacher | `09000000003` | `EduConnect@2026` |
 
 ### Parent login
 
 | Role | Phone | PIN |
 |---|---|---|
-| Parent | `9100000001` | `1234` |
-| Parent | `9100000002` | `1234` |
-| Parent | `9100000003` | `1234` |
-| Parent | `9100000004` | `1234` |
-| Parent | `9100000005` | `1234` |
+| Parent | `09100000001` | `1234` |
+| Parent | `09100000002` | `1234` |
+| Parent | `09100000003` | `1234` |
+| Parent | `09100000004` | `1234` |
+| Parent | `09100000005` | `1234` |
 
 ### Classes and students
 

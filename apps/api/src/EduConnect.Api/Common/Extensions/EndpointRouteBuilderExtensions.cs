@@ -2,7 +2,13 @@ using EduConnect.Api.Features.Attendance.GetAttendance;
 using EduConnect.Api.Features.Attendance.MarkAbsence;
 using EduConnect.Api.Features.Attendance.AdminOverride;
 using EduConnect.Api.Features.Attendance.ApplyLeave;
+using EduConnect.Api.Features.Attendance.ApproveLeave;
+using EduConnect.Api.Features.Attendance.CancelLeaveApplication;
+using EduConnect.Api.Features.Attendance.GetAttendanceTakeContext;
 using EduConnect.Api.Features.Attendance.GetLeaveApplications;
+using EduConnect.Api.Features.Attendance.RejectLeave;
+using EduConnect.Api.Features.Attendance.SubmitAttendanceTake;
+using EduConnect.Api.Features.Attendance.UpdateLeaveApplication;
 using EduConnect.Api.Features.Auth.Login;
 using EduConnect.Api.Features.Auth.LoginParent;
 using EduConnect.Api.Features.Auth.SetPin;
@@ -96,6 +102,12 @@ public static class EndpointRouteBuilderExtensions
         group.MapPut("/{recordId}/override", AdminOverrideEndpoint.Handle).WithName("AdminOverride");
         group.MapPost("/leave", ApplyLeaveEndpoint.Handle).WithName("ApplyLeave");
         group.MapGet("/leave", GetLeaveApplicationsEndpoint.Handle).WithName("GetLeaveApplications");
+        group.MapPut("/leave/{id}", UpdateLeaveApplicationEndpoint.Handle).WithName("UpdateLeaveApplication");
+        group.MapDelete("/leave/{id}", CancelLeaveApplicationEndpoint.Handle).WithName("CancelLeaveApplication");
+        group.MapPut("/leave/{id}/approve", ApproveLeaveEndpoint.Handle).WithName("ApproveLeave");
+        group.MapPut("/leave/{id}/reject", RejectLeaveEndpoint.Handle).WithName("RejectLeave");
+        group.MapGet("/take", GetAttendanceTakeContextEndpoint.Handle).WithName("GetAttendanceTakeContext");
+        group.MapPost("/take", SubmitAttendanceTakeEndpoint.Handle).WithName("SubmitAttendanceTake");
     }
 
     private static void MapHomeworkEndpoints(this WebApplication app)

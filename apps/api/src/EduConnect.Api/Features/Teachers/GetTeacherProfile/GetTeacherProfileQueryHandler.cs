@@ -32,12 +32,12 @@ public class GetTeacherProfileQueryHandler : IRequestHandler<GetTeacherProfileQu
             .FirstOrDefaultAsync(u =>
                 u.Id == request.TeacherId &&
                 u.SchoolId == _currentUserService.SchoolId &&
-                u.Role == "Teacher",
+                (u.Role == "Teacher" || u.Role == "Admin"),
                 cancellationToken);
 
         if (teacher == null)
         {
-            throw new NotFoundException($"Teacher with ID {request.TeacherId} not found.");
+            throw new NotFoundException($"Staff account with ID {request.TeacherId} not found.");
         }
 
         var assignments = await _context.TeacherClassAssignments
@@ -63,6 +63,7 @@ public class GetTeacherProfileQueryHandler : IRequestHandler<GetTeacherProfileQu
             teacher.Name,
             teacher.Phone,
             teacher.Email ?? string.Empty,
+            teacher.Role,
             teacher.IsActive,
             teacher.CreatedAt,
             assignments);

@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.PhoneNumbers;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Students.EnrollStudent;
@@ -26,10 +27,20 @@ public class EnrollStudentCommandValidator : AbstractValidator<EnrollStudentComm
             .When(x => x.DateOfBirth.HasValue)
             .WithMessage("Date of birth cannot be in the future.");
 
+        RuleFor(x => x)
+            .Must(x => x.Parent is null || x.ExistingParent is null)
+            .WithMessage("Choose either a new parent or an existing parent, not both.");
+
         When(x => x.Parent is not null, () =>
         {
             RuleFor(x => x.Parent!)
                 .SetValidator(new EnrollStudentParentRequestValidator());
+        });
+
+        When(x => x.ExistingParent is not null, () =>
+        {
+            RuleFor(x => x.ExistingParent!)
+                .SetValidator(new EnrollStudentExistingParentRequestValidator());
         });
     }
 
@@ -43,7 +54,7 @@ public class EnrollStudentCommandValidator : AbstractValidator<EnrollStudentComm
 
             RuleFor(x => x.Phone)
                 .NotEmpty().WithMessage("Phone number is required.")
-                .Matches(@"^\d{10}$").WithMessage("Phone number must be exactly 10 digits.");
+                .Must(JapanPhoneNumber.IsValidInput).WithMessage(JapanPhoneNumber.ValidationMessage);
 
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("Email is required.")
@@ -53,6 +64,22 @@ public class EnrollStudentCommandValidator : AbstractValidator<EnrollStudentComm
             RuleFor(x => x.Pin)
                 .NotEmpty().WithMessage("PIN is required.")
                 .Matches(@"^\d{4,6}$").WithMessage("PIN must be 4-6 digits.");
+
+            RuleFor(x => x.Relationship)
+                .NotEmpty().WithMessage("Relationship is required.")
+                .MaximumLength(30).WithMessage("Relationship cannot exceed 30 characters.")
+                .Must(r => !string.IsNullOrWhiteSpace(r) &&
+                           AllowedRelationships.Contains(r.ToLowerInvariant()))
+                .WithMessage($"Relationship must be one of: {string.Join(", ", AllowedRelationships)}.");
+        }
+    }
+
+    private sealed class EnrollStudentExistingParentRequestValidator : AbstractValidator<EnrollStudentExistingParentRequest>
+    {
+        public EnrollStudentExistingParentRequestValidator()
+        {
+            RuleFor(x => x.ParentId)
+                .NotEmpty().WithMessage("Parent ID is required.");
 
             RuleFor(x => x.Relationship)
                 .NotEmpty().WithMessage("Relationship is required.")

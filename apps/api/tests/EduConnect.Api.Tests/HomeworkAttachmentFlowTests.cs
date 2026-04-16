@@ -514,7 +514,7 @@ public class HomeworkAttachmentFlowTests
             Name = "Test School",
             Code = $"SCH-{schoolId.ToString()[..6]}",
             Address = "Test Address",
-            ContactPhone = "9999999999",
+            ContactPhone = "09999999999",
             ContactEmail = "school@test.com",
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,

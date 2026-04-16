@@ -4,6 +4,13 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import {
+  isValidJapanPhone,
+  JAPAN_PHONE_LOCAL_DIGITS,
+  JAPAN_PHONE_VALIDATION_MESSAGE,
+  normalizeJapanPhoneInput,
+  normalizeJapanPhoneSearch,
+} from "@/lib/phone";
 import { PARENT_RELATIONSHIP_OPTIONS } from "@/lib/student-relationships";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +64,9 @@ export default function LinkParentPage(): React.ReactElement {
   }, []);
 
   const handleSearch = async (): Promise<void> => {
-    if (phone.trim().length < 3) {
+    const searchPhone = normalizeJapanPhoneSearch(phone.trim());
+
+    if (searchPhone.length < 3) {
       setError("Enter at least 3 digits to search.");
       return;
     }
@@ -69,7 +78,7 @@ export default function LinkParentPage(): React.ReactElement {
     resetCreateForm();
     try {
       const data = await apiGet<ParentSearchResult[]>(
-        `${API_ENDPOINTS.studentsSearchParents}?phone=${encodeURIComponent(phone.trim())}`
+        `${API_ENDPOINTS.studentsSearchParents}?phone=${encodeURIComponent(searchPhone)}`
       );
       setSearchResults(data);
       setHasSearched(true);
@@ -117,7 +126,7 @@ export default function LinkParentPage(): React.ReactElement {
     setError("");
     setSuccessMessage("");
     setShowCreateForm(true);
-    setNewParentPhone(phone.trim());
+    setNewParentPhone(normalizeJapanPhoneInput(phone.trim()));
   };
 
   const handleCreateParentAndLink = async (): Promise<void> => {
@@ -130,8 +139,8 @@ export default function LinkParentPage(): React.ReactElement {
       return;
     }
 
-    if (!/^\d{10}$/.test(trimmedPhone)) {
-      setError("Phone number must be exactly 10 digits.");
+    if (!isValidJapanPhone(trimmedPhone)) {
+      setError(JAPAN_PHONE_VALIDATION_MESSAGE);
       return;
     }
 
@@ -229,7 +238,7 @@ export default function LinkParentPage(): React.ReactElement {
                   label="Parent Phone Number"
                   placeholder="Enter phone number to search"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setPhone(normalizeJapanPhoneInput(e.target.value))}
                   disabled={isSearching}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -243,7 +252,10 @@ export default function LinkParentPage(): React.ReactElement {
                 <div className="flex gap-2">
                   <Button
                     onClick={handleSearch}
-                    disabled={isSearching || phone.trim().length < 3}
+                    disabled={
+                      isSearching ||
+                      normalizeJapanPhoneSearch(phone.trim()).length < 3
+                    }
                     size="default"
                   >
                     {isSearching ? (
@@ -352,10 +364,11 @@ export default function LinkParentPage(): React.ReactElement {
                 <Input
                   label="Phone Number"
                   value={newParentPhone}
-                  onChange={(e) => setNewParentPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setNewParentPhone(normalizeJapanPhoneInput(e.target.value))}
                   disabled={isCreatingParent}
-                  placeholder="10-digit phone number"
+                  placeholder="11-digit phone number"
                   inputMode="numeric"
+                  maxLength={JAPAN_PHONE_LOCAL_DIGITS}
                 />
                 <Input
                   label="Email"

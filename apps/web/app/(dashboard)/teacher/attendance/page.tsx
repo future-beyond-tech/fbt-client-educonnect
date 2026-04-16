@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
+import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -13,106 +14,242 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
+import type { TeacherClassItem } from "@/lib/types/teacher";
 
-interface AttendanceRecord {
-  recordId: string;
-  studentId: string;
-  date: string;
-  status: string;
-  reason: string | null;
-  enteredByRole: string;
-  createdAt: string;
+type TakeStatus = "Present" | "Absent" | "Late";
+
+interface TakeStudent {
+  id: string;
+  name: string;
+  rollNumber: string;
 }
 
-interface MarkAbsenceResponse {
-  recordId: string;
-  status: string;
+interface TakeException {
+  studentId: string;
+  status: "Absent" | "Late";
+  reason: string | null;
+}
+
+interface TakeLeave {
+  leaveId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: "Pending" | "Approved";
+}
+
+interface TakeContextResponse {
+  classId: string;
+  date: string;
+  students: TakeStudent[];
+  exceptions: TakeException[];
+  approvedLeaves: TakeLeave[];
+  pendingLeaves: TakeLeave[];
+}
+
+interface SubmitAttendanceResponse {
+  createdCount: number;
+  updatedCount: number;
+  clearedCount: number;
   message: string;
 }
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 export default function TeacherAttendancePage(): React.ReactElement {
-  const [records, setRecords] = React.useState<AttendanceRecord[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-  const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
+  const { token, isLoading: isAuthLoading } = useAuth();
+  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Mark absence form state
-  const [showForm, setShowForm] = React.useState(false);
-  const [rollNumber, setRollNumber] = React.useState("");
-  const [absenceDate, setAbsenceDate] = React.useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [reason, setReason] = React.useState("");
-  const [formError, setFormError] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [successMessage, setSuccessMessage] = React.useState("");
+  // Assignments => classes dropdown
+  const [assignments, setAssignments] = React.useState<TeacherClassItem[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = React.useState(true);
+  const [assignmentError, setAssignmentError] = React.useState("");
 
-  const fetchAttendance = React.useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const data = await apiGet<AttendanceRecord[]>(
-        `${API_ENDPOINTS.attendance}?month=${selectedMonth}&year=${selectedYear}`
-      );
-      setRecords(data);
-    } catch {
-      setError("Failed to load attendance records.");
-    } finally {
-      setIsLoading(false);
+  // Take attendance state
+  const [classId, setClassId] = React.useState("");
+  const [date, setDate] = React.useState(today);
+  const [context, setContext] = React.useState<TakeContextResponse | null>(null);
+  const [isLoadingContext, setIsLoadingContext] = React.useState(false);
+  const [contextError, setContextError] = React.useState("");
+
+  const [statusByStudentId, setStatusByStudentId] = React.useState<Record<string, TakeStatus>>({});
+  const [reasonByStudentId, setReasonByStudentId] = React.useState<Record<string, string>>({});
+
+  const [actionError, setActionError] = React.useState("");
+  const [actionSuccess, setActionSuccess] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [leaveActionId, setLeaveActionId] = React.useState<string | null>(null);
+
+  const classesForTeacher = React.useMemo(() => {
+    const map = new Map<string, { classId: string; className: string; section: string; isClassTeacher: boolean }>();
+    for (const a of assignments) {
+      const existing = map.get(a.classId);
+      if (existing) {
+        existing.isClassTeacher = existing.isClassTeacher || a.isClassTeacher;
+      } else {
+        map.set(a.classId, {
+          classId: a.classId,
+          className: a.className,
+          section: a.section,
+          isClassTeacher: a.isClassTeacher,
+        });
+      }
     }
-  }, [selectedMonth, selectedYear]);
+    // Only show class-teacher classes for “take attendance” UX
+    return Array.from(map.values())
+      .filter((c) => c.isClassTeacher)
+      .sort((a, b) => (a.className + a.section).localeCompare(b.className + b.section));
+  }, [assignments]);
+
+  const fetchAssignments = React.useCallback(async () => {
+    setIsLoadingAssignments(true);
+    setAssignmentError("");
+    try {
+      const data = await apiGet<TeacherClassItem[]>(API_ENDPOINTS.teachersMyClasses);
+      setAssignments(data);
+    } catch (err) {
+      setAssignmentError(err instanceof ApiError ? err.message : "Failed to load assignments.");
+    } finally {
+      setIsLoadingAssignments(false);
+    }
+  }, []);
+
+  const hydrateFormFromContext = React.useCallback((ctx: TakeContextResponse) => {
+    const nextStatus: Record<string, TakeStatus> = {};
+    const nextReason: Record<string, string> = {};
+
+    for (const s of ctx.students) {
+      nextStatus[s.id] = "Present";
+      nextReason[s.id] = "";
+    }
+
+    for (const ex of ctx.exceptions) {
+      nextStatus[ex.studentId] = ex.status === "Late" ? "Late" : "Absent";
+      nextReason[ex.studentId] = ex.reason ?? "";
+    }
+
+    // Approved leave: lock to Present (excused)
+    for (const leave of ctx.approvedLeaves) {
+      nextStatus[leave.studentId] = "Present";
+      nextReason[leave.studentId] = "";
+    }
+
+    setStatusByStudentId(nextStatus);
+    setReasonByStudentId(nextReason);
+  }, []);
+
+  const fetchContext = React.useCallback(async () => {
+    if (!classId || !date) return;
+    setIsLoadingContext(true);
+    setContextError("");
+    setActionError("");
+    setActionSuccess("");
+
+    try {
+      const data = await apiGet<TakeContextResponse>(
+        `${API_ENDPOINTS.attendance}/take?classId=${classId}&date=${date}`
+      );
+      setContext(data);
+      hydrateFormFromContext(data);
+    } catch (err) {
+      setContext(null);
+      setContextError(err instanceof ApiError ? err.message : "Failed to load attendance.");
+    } finally {
+      setIsLoadingContext(false);
+    }
+  }, [classId, date, hydrateFormFromContext]);
 
   React.useEffect(() => {
-    fetchAttendance();
-  }, [fetchAttendance]);
+    if (isAuthLoading) return;
+    if (!token) return;
+    fetchAssignments();
+  }, [fetchAssignments, isAuthLoading, token]);
 
-  const handleMarkAbsence = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault();
-    setFormError("");
-    setSuccessMessage("");
-
-    if (!rollNumber.trim()) {
-      setFormError("Roll number is required.");
-      return;
+  React.useEffect(() => {
+    if (classId && date) {
+      void fetchContext();
     }
+  }, [classId, date, fetchContext]);
 
-    setIsSubmitting(true);
+  React.useEffect(() => {
+    // Default to first class-teacher assignment
+    if (classId) return;
+    if (classesForTeacher.length === 0) return;
+    setClassId(classesForTeacher[0]?.classId ?? "");
+  }, [classId, classesForTeacher]);
+
+  const isStudentOnApprovedLeave = React.useCallback(
+    (studentId: string): boolean => !!context?.approvedLeaves.some((l) => l.studentId === studentId),
+    [context?.approvedLeaves]
+  );
+
+  const saveAttendance = async (): Promise<void> => {
+    if (!context) return;
+    setIsSaving(true);
+    setActionError("");
+    setActionSuccess("");
+
     try {
-      const response = await apiPost<MarkAbsenceResponse>(API_ENDPOINTS.attendance, {
-        rollNumber,
-        date: absenceDate,
-        reason: reason || null,
+      const items = context.students.map((s) => ({
+        studentId: s.id,
+        status: statusByStudentId[s.id] ?? "Present",
+        reason: (reasonByStudentId[s.id] ?? "").trim() || null,
+      }));
+
+      const res = await apiPost<SubmitAttendanceResponse>(`${API_ENDPOINTS.attendance}/take`, {
+        classId: context.classId,
+        date: context.date,
+        items,
       });
-      setSuccessMessage(response.message);
-      setRollNumber("");
-      setReason("");
-      setShowForm(false);
-      fetchAttendance();
+
+      setActionSuccess(res.message);
+      await fetchContext();
     } catch (err) {
-      if (err instanceof ApiError) {
-        setFormError(err.message);
-      } else {
-        setFormError("Failed to mark absence.");
-      }
+      setActionError(err instanceof ApiError ? err.message : "Failed to save attendance.");
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
-  const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr + "T00:00:00");
-    return date.toLocaleDateString("en-IN", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
+  const approveLeave = async (leaveId: string): Promise<void> => {
+    setLeaveActionId(leaveId);
+    setActionError("");
+    setActionSuccess("");
+    try {
+      const res = await apiPut<{ message: string }>(
+        `${API_ENDPOINTS.leaveApplications}/${leaveId}/approve`,
+        {}
+      );
+      setActionSuccess(res.message);
+      await fetchContext();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to approve leave.");
+    } finally {
+      setLeaveActionId(null);
+    }
+  };
+
+  const rejectLeave = async (leaveId: string): Promise<void> => {
+    const note = window.prompt("Rejection note");
+    if (!note) return;
+
+    setLeaveActionId(leaveId);
+    setActionError("");
+    setActionSuccess("");
+    try {
+      const res = await apiPut<{ message: string }>(
+        `${API_ENDPOINTS.leaveApplications}/${leaveId}/reject`,
+        { reviewNote: note }
+      );
+      setActionSuccess(res.message);
+      await fetchContext();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to reject leave.");
+    } finally {
+      setLeaveActionId(null);
+    }
   };
 
   return (
@@ -120,143 +257,190 @@ export default function TeacherAttendancePage(): React.ReactElement {
       <PageHeader
         eyebrow="Teacher tools"
         title="Attendance"
-        description="Track recorded absences and quickly log a new absence for a student."
+        description="Take class attendance quickly and review leave requests."
         icon={<CalendarDays className="h-6 w-6" aria-hidden="true" />}
-        actions={(
-          <Button
-            onClick={() => {
-              setShowForm(!showForm);
-              setFormError("");
-              setSuccessMessage("");
-            }}
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-            Mark Absence
-          </Button>
-        )}
         stats={[
-          { label: "Records", value: records.length.toString() },
-          { label: "Period", value: `${MONTHS[selectedMonth - 1]} ${selectedYear}` },
+          { label: "Classes", value: classesForTeacher.length.toString() },
+          { label: "Date", value: date },
         ]}
       />
 
-      {successMessage && (
-        <StatusBanner variant="success">{successMessage}</StatusBanner>
-      )}
-
-      {showForm && (
-        <PageSection>
-          <form onSubmit={handleMarkAbsence} className="space-y-4">
-            <h3 className="text-lg font-semibold">Mark Student Absent</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                id="rollNumber"
-                label="Roll Number"
-                placeholder="e.g. 5A-001"
-                value={rollNumber}
-                onChange={(e) => setRollNumber(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <Input
-                id="absenceDate"
-                label="Date"
-                type="date"
-                value={absenceDate}
-                onChange={(e) => setAbsenceDate(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <Input
-              id="reason"
-              label="Reason (optional)"
-              placeholder="Reason for absence"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={isSubmitting}
-            />
-            {formError && (
-              <StatusBanner variant="error">{formError}</StatusBanner>
-            )}
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={isSubmitting}>
-                {isSubmitting ? <Spinner size="sm" /> : "Submit"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowForm(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </PageSection>
-      )}
+      {assignmentError ? <StatusBanner variant="error">{assignmentError}</StatusBanner> : null}
+      {actionError ? <StatusBanner variant="error">{actionError}</StatusBanner> : null}
+      {actionSuccess ? <StatusBanner variant="success">{actionSuccess}</StatusBanner> : null}
 
       <PageSection className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
           <Select
-            value={selectedMonth.toString()}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            label="Month"
+            value={classId}
+            onChange={(e) => setClassId(e.target.value)}
+            label="Class"
+            disabled={isLoadingAssignments || classesForTeacher.length === 0}
           >
-            {MONTHS.map((name, i) => (
-              <option key={name} value={i + 1}>
-                {name}
+            <option value="" disabled>
+              {isLoadingAssignments ? "Loading classes..." : "Select a class"}
+            </option>
+            {classesForTeacher.map((c) => (
+              <option key={c.classId} value={c.classId}>
+                {c.className}{c.section ? ` ${c.section}` : ""}
               </option>
             ))}
           </Select>
-          <Select
-            value={selectedYear.toString()}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            label="Year"
-          >
-            {[selectedYear - 1, selectedYear, selectedYear + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </Select>
+          <Input
+            type="date"
+            label="Date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={!classId}
+          />
         </div>
 
-        {isLoading ? (
+        {isLoadingContext ? (
           <div className="flex min-h-96 items-center justify-center">
             <Spinner size="lg" />
           </div>
-        ) : error ? (
-          <ErrorState title="Error" message={error} onRetry={fetchAttendance} />
-        ) : records.length === 0 ? (
+        ) : contextError ? (
+          <ErrorState title="Error" message={contextError} onRetry={fetchContext} />
+        ) : !context || context.students.length === 0 ? (
           <EmptyState
-            title="No records"
-            description={`No attendance records for ${MONTHS[selectedMonth - 1]} ${selectedYear}.`}
+            title="No students"
+            description="No active students found for this class."
             icon={<CalendarDays className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
           />
         ) : (
-          <div className="space-y-3">
-            {records.map((record) => (
-              <Card key={record.recordId}>
-                <CardContent className="flex items-center justify-between gap-4 p-4">
-                  <div className="space-y-1">
-                    <p className="font-medium">{formatDate(record.date)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Student: {record.studentId.slice(0, 8)}...
-                    </p>
-                    {record.reason && (
-                      <p className="text-sm text-muted-foreground">{record.reason}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Badge variant="destructive">{record.status}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      by {record.enteredByRole}
-                    </span>
-                  </div>
+          <div className="space-y-4">
+            {context.pendingLeaves.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Leave requests (pending)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {context.pendingLeaves.map((leave) => (
+                    <div
+                      key={leave.leaveId}
+                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{leave.studentName}</span>
+                          <Badge variant="secondary">{leave.rollNumber}</Badge>
+                          <Badge variant="outline">Pending</Badge>
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {leave.startDate} → {leave.endDate}
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">{leave.reason}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approveLeave(leave.leaveId)}
+                          disabled={leaveActionId === leave.leaveId}
+                        >
+                          {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              Approve
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectLeave(leave.leaveId)}
+                          disabled={leaveActionId === leave.leaveId}
+                        >
+                          {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
+                            <>
+                              <XCircle className="h-4 w-4" />
+                              Reject
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
-            ))}
+            )}
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-lg">Take attendance</CardTitle>
+                  <Button size="sm" onClick={saveAttendance} disabled={isSaving}>
+                    {isSaving ? <Spinner size="sm" /> : "Save attendance"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {context.students.map((s) => {
+                  const locked = isStudentOnApprovedLeave(s.id);
+                  const currentStatus = statusByStudentId[s.id] ?? "Present";
+
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">{s.name}</span>
+                          <Badge variant="secondary">{s.rollNumber}</Badge>
+                          {locked ? <Badge variant="outline">On leave</Badge> : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-1 flex-col gap-2 sm:max-w-xl sm:flex-row sm:items-center sm:justify-end">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={currentStatus === "Present" ? "default" : "outline"}
+                            onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Present" }))}
+                            disabled={locked}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Present
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={currentStatus === "Absent" ? "destructive" : "outline"}
+                            onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Absent" }))}
+                            disabled={locked}
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Absent
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={currentStatus === "Late" ? "secondary" : "outline"}
+                            onClick={() => setStatusByStudentId((p) => ({ ...p, [s.id]: "Late" }))}
+                            disabled={locked}
+                          >
+                            <Clock className="h-4 w-4" />
+                            Late
+                          </Button>
+                        </div>
+
+                        {currentStatus !== "Present" ? (
+                          <Input
+                            label="Reason (optional)"
+                            value={reasonByStudentId[s.id] ?? ""}
+                            onChange={(e) =>
+                              setReasonByStudentId((p) => ({ ...p, [s.id]: e.target.value }))
+                            }
+                            disabled={locked}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </div>
         )}
       </PageSection>
