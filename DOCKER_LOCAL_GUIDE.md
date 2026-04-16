@@ -212,8 +212,8 @@ This script:
 
 You should see Serilog output streaming in the terminal. Look for:
 ```
-[INFO] SqlMigrationRunner: Applying schema migration 001_foundation_tables.sql ... done
-[INFO] SqlMigrationRunner: Applying seed migration 002_seed_development_data.sql ... done
+[INFO] EF Core Migrations applied successfully.
+[INFO] Executing seed file: 002_seed_development_data.sql
 [INFO] Now listening on: http://localhost:5000
 ```
 
@@ -527,19 +527,17 @@ pnpm local:backend:test
 dotnet test apps/api/tests/EduConnect.Api.Tests/EduConnect.Api.Tests.csproj -c Release
 ```
 
-> **Note:** The test project is currently a scaffold — no tests are written yet. This command will complete with 0 tests run. See the full analysis report for recommended test areas.
-
-### SQL Migration Lint (same as CI)
+### Database Migration Check (same direction as CI and deploy)
 
 ```bash
 # Requires a running Postgres instance
 pnpm db:status
 
-# Manually run migrations against a test DB to verify idempotency:
-for file in apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/schema/*.sql; do
-  echo "Testing: $file"
-  # Run against your local DB — idempotent, safe to replay
-done
+# Apply pending EF Core migrations manually:
+pnpm db:update
+
+# Or just start the API — startup applies pending EF Core migrations automatically:
+pnpm local:backend:run
 ```
 
 ---

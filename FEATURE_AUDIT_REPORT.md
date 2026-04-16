@@ -76,7 +76,7 @@ FEATURE: Homework Management
              NOTE: Admin homework approval is surfaced on the teacher homework page via canApproveOrReject flag —
              there is no separate /admin/homework route. This is functional but may cause UX confusion.
   Key files: apps/api/src/.../Features/Homework/CreateHomework/CreateHomeworkCommandHandler.cs
-             apps/api/src/.../Infrastructure/Database/Migrations/schema/012_add_homework_approval_workflow.sql
+             apps/api/src/.../Features/Homework/ApproveHomework/ApproveHomeworkCommandHandler.cs
              apps/web/app/(dashboard)/teacher/homework/page.tsx
              apps/web/app/(dashboard)/parent/homework/page.tsx
 
@@ -92,7 +92,7 @@ FEATURE: Homework File Attachments (PDF/Word/Images)
              AttachmentList renders existing attachments with delete capability.
              Both teacher homework page and parent homework view use attachment components.
   Key files: apps/api/src/.../Features/Attachments/RequestUploadUrlV2/RequestUploadUrlV2CommandHandler.cs
-             apps/api/src/.../Infrastructure/Database/Migrations/schema/013_expand_attachment_content_types_for_word_documents.sql
+             apps/api/src/.../Features/Attachments/AttachFileToEntity/AttachFileToEntityCommandHandler.cs
              apps/web/components/shared/attachment-uploader.tsx
              apps/web/components/shared/attachment-list.tsx
 
@@ -388,13 +388,6 @@ NOTABLE ISSUES FOUND
    - A shared typed API client was scaffolded in packages/api-client but never implemented.
      The frontend duplicates type definitions across lib/types/. This is manageable now but
      will become a drift risk as the API grows.
-
-[P3] No EF Migration Tooling
-   - The project uses a custom SQL migration runner (SqlMigrationRunner.cs) rather than
-     dotnet-ef migrations. This is intentional (idempotent SQL files) but means there is no
-     automatic rollback mechanism. Migrations 002 and 005/006 numbers are missing from the
-     sequence (seed files fill 002, but schema 002 and 005/006 are absent), suggesting some
-     migrations were renumbered or removed. Confirm the runner handles gaps gracefully.
 
 [P3] No Teacher Notices Capability
    - Teachers have no route or endpoint to post notices. Only Admins can create/publish notices.

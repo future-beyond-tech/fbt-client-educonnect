@@ -22,7 +22,7 @@
 ## Executive summary
 
 - **What it is.** EduConnect is a modular-monolith school communication platform: a .NET 8 minimal-API backend (`apps/api`) and a Next.js 15 / React 19 PWA (`apps/web`) in a pnpm + Turbo monorepo, persisted in PostgreSQL 16 and deployed to Railway. It covers attendance, homework, notices, students/teachers/subjects, notifications, and file attachments.
-- **Architecture is sound and opinionated.** Vertical-slice + CQRS via MediatR, FluentValidation pipeline behavior, SQL migrations auto-applied on startup via a custom `SqlMigrationRunner`, and multi-tenancy enforced by EF Core global query filters keyed to a scoped `CurrentUserService`. The separation between pipeline behaviors, middleware, and features is clean.
+- **Architecture is sound and opinionated.** Vertical-slice + CQRS via MediatR, FluentValidation pipeline behavior, EF Core migrations auto-applied on startup, and multi-tenancy enforced by EF Core global query filters keyed to a scoped `CurrentUserService`. The separation between pipeline behaviors, middleware, and features is clean.
 - **Biggest risks cluster in operational hygiene, not design.** Test coverage is effectively zero for business logic (5 test methods total, all infrastructural), the CI `migrations` job globs the wrong path and the CI `api` test job has a `--no-build` / build-scope mismatch, `docker-compose.yml` hard-codes a literal JWT secret, and there is no failed-login throttling specific to auth endpoints despite a 4-digit parent PIN.
 - **Security posture is above-average for an MVP.** BCrypt (work factor 12) for passwords and PINs, HttpOnly + Secure + SameSite=Strict refresh cookies, SHA-256-hashed reset tokens, strict JWT validation (ClockSkew=Zero), Serilog destructuring redacts sensitive fields, Sentry configs strip auth headers, and row-level tenant filters are enforced globally at the DbContext level. The main gaps are auth-endpoint rate limiting, some unverified authZ paths, and XSS-adjacent surfaces where free-text fields propagate into notifications.
 - **Frontend is lean and mobile-first.** Next.js 15 App Router with grouped routes `(auth)` and `(dashboard)`, Tailwind v4, lucide-react, framer-motion, Sentry, a service worker + manifest for PWA install, and an in-memory access-token session (no `localStorage`). Accessibility has a few specific WCAG Level A misses (unlabeled `<select>` controls in attendance pages) but color tokens meet AAA contrast.
@@ -38,7 +38,7 @@ educonnect/                                      — pnpm + Turbo monorepo root 
 ├── .env / .env.local / .env.docker              — local profiles (gitignored); contain a dev JWT_SECRET literal
 ├── .env.example                                 — canonical required-var contract
 ├── .github/workflows/
-│   ├── ci.yml                                   — web lint/type-check/build + api build/test + docker build + sql migration lint (broken glob, see Lens 2)
+│   ├── ci.yml                                   — web lint/type-check/build + api build/test + docker build + API startup migration smoke test
 │   └── deploy.yml                               — Railway deploy for api + web, post-deploy /health curl check
 ├── docker-compose.yml                           — Postgres 16 + api + web; hard-codes dev JWT_SECRET literal
 ├── turbo.json                                   — build / dev / lint / type-check pipeline
@@ -72,11 +72,10 @@ educonnect/                                      — pnpm + Turbo monorepo root 
 │   │   │       ├── Database/
 │   │   │       │   ├── AppDbContext.cs          — 14 DbSets + global query filters for tenancy + snake_case naming
 │   │   │       │   ├── DatabaseConnectionStringResolver.cs — parses `postgresql://` URLs into Npgsql connection strings
-│   │   │       │   ├── SqlMigrationRunner.cs    — startup SQL migration runner with pg advisory lock (per Program.cs comment)
+│   │   │       │   ├── DatabaseSeeder.cs        — production bootstrap + development seed SQL execution
 │   │   │       │   ├── Configurations/          — EF IEntityTypeConfiguration for each entity
 │   │   │       │   ├── Entities/                — POCOs (14 entities)
 │   │   │       │   └── Migrations/
-│   │   │       │       ├── schema/001..009      — forward-only DDL
 │   │   │       │       └── seed/002, 004, 005, 007 — dev seed data
 │   │   │       └── Services/                    — DateTimeProvider, ResendEmailService, S3StorageService, NotificationService
 │   │   └── tests/EduConnect.Api.Tests/          — xUnit project with 3 test files, 5 test methods total
@@ -122,7 +121,7 @@ graph TD
         Handlers[Command/Query Handlers<br/>Features/**/*Handler.cs]
         EF[AppDbContext<br/>+ Global Query Filters]
         Services[Infrastructure Services<br/>JwtTokenService, PasswordHasher, PinService,<br/>ResetTokenService, NotificationService,<br/>ResendEmailService, S3StorageService]
-        MigRunner[SqlMigrationRunner<br/>startup, pg advisory lock]
+        MigRunner[EF Core MigrateAsync<br/>startup migration step]
         MW --> Endpoints --> MediatR --> Handlers
         Handlers --> EF
         Handlers --> Services
@@ -197,9 +196,8 @@ Ordered by severity × likelihood. S = high, M = medium, L = low.
 | # | Risk | Severity | Likelihood | Fix cost | Evidence |
 |---|---|---|---|---|---|
 | 1 | **No auth-endpoint rate limiting / lockout.** Global rate limiter keys on userId-or-IP at 60/min, but parent PINs are 4 digits (10k space). Login / forgot-pin / reset-pin inherit only the global IP bucket, which is too loose for credential stuffing. | S | M | M | `Program.cs:165-190` (single partitioned limiter); `Common/Auth/PinService.cs:25-31` (4-6 digit PIN allowed); no login-attempt counter seen in `Features/Auth/Login*` |
-| 2 | **CI `migrations` job is a no-op.** The bash loop globs `apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/*.sql`, but all files live under `.../Migrations/schema/*.sql` and `.../Migrations/seed/*.sql`. The loop matches nothing, `psql` is never invoked, the job passes trivially. | S | H | L | `.github/workflows/ci.yml:125-137`; actual migration layout under `apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/{schema,seed}/` |
-| 3 | **CI `api` test step has a build-scope / `--no-build` mismatch.** The build step runs `dotnet build src/EduConnect.Api/EduConnect.Api.csproj` (API project only), then the test step runs `dotnet test tests/ -c Release --no-build`. The test project is never built, so either `--no-build` fails or the test binary is stale. | S | H | L | `.github/workflows/ci.yml:75-91` |
-| 4 | **Near-zero business-logic test coverage.** Exactly 5 test methods across 3 files (`DatabaseConnectionStringResolverTests`, `DatabaseSchemaMappingTests`, `TenantIsolationTests`). No handler tests, no endpoint tests, no validator tests, no frontend tests at all. Combined with risk #2/#3, CI green signals very little. | S | H | L-M | `apps/api/tests/EduConnect.Api.Tests/Common/*.cs`; `apps/web` has no `tests/` dir |
+| 2 | **CI `api` test step has a build-scope / `--no-build` mismatch.** The build step runs `dotnet build src/EduConnect.Api/EduConnect.Api.csproj` (API project only), then the test step runs `dotnet test tests/ -c Release --no-build`. The test project is never built, so either `--no-build` fails or the test binary is stale. | S | H | L | `.github/workflows/ci.yml:75-91` |
+| 3 | **Near-zero business-logic test coverage.** Exactly 5 test methods across 3 files (`DatabaseConnectionStringResolverTests`, `DatabaseSchemaMappingTests`, `TenantIsolationTests`). No handler tests, no endpoint tests, no validator tests, no frontend tests at all. Combined with risk #2, CI green signals very little. | S | H | L-M | `apps/api/tests/EduConnect.Api.Tests/Common/*.cs`; `apps/web` has no `tests/` dir |
 | 5 | **Committed dev JWT secret in `docker-compose.yml`.** A literal `dev-secret-key-minimum-64-characters-long-for-hmac-sha256-signing-requirement` is checked into source. Any developer who copy-pastes compose env into a real environment inherits it. | M | M | L | `docker-compose.yml:44` |
 | 6 | **Tenant query filter has a footgun for anonymous paths.** `AppDbContext` filters use `!_currentUserService.IsAuthenticated || SchoolId == …`, which means when `CurrentUserService` is unset (login, refresh, forgot-password) the filter returns **all rows**. Login handlers must manually constrain by phone-and-school, and a single forgotten `.Where(u => u.SchoolId == …)` on an anonymous path becomes a cross-tenant leak. | M | M | M | `Infrastructure/Database/AppDbContext.cs:44-73`; `Common/Middleware/TenantIsolationMiddleware.cs:15-22` (exempts `/api/auth/login`, `/login-parent`, `/refresh`) |
 | 7 | **Middleware ordering has `UseCors` after `UseAuthorization` and after rate limiter.** Per ASP.NET Core guidance, `UseCors` should sit between `UseRouting` and `UseAuthentication`. Preflight OPTIONS requests can be blocked or mis-charged against the rate limiter. | M | M | L | `Program.cs:202-219` |
@@ -208,7 +206,7 @@ Ordered by severity × likelihood. S = high, M = medium, L = low.
 | 10 | **PIN length configurable below 4 but enforcement split.** `PinService.ValidatePinFormat` hardcodes 4-6 digits, while env vars `PIN_MIN_LENGTH` / `PIN_MAX_LENGTH` are validated only for presence (`ServiceCollectionExtensions.ValidateEnvironment`). A misconfigured env value is silently ignored. | L | M | L | `Common/Auth/PinService.cs:25-31`; `Common/Extensions/ServiceCollectionExtensions.cs:6-29` |
 | 11 | **Unlabeled `<select>` controls in attendance pages.** Month / year filters render without `<label htmlFor>` associations — WCAG 2.2 Level A failure on Form Controls. | M | H | L | `apps/web/app/(dashboard)/teacher/attendance/page.tsx` (select region); `apps/web/app/(dashboard)/parent/attendance/page.tsx` |
 | 12 | **Missing validator for `DeactivateStudentCommand`.** Every other mutation has a FluentValidation sibling; this one does not, so the MediatR `ValidationBehavior` is a no-op for it. | L | M | L | `Features/Students/DeactivateStudent/` directory (no `*Validator.cs`) |
-| 13 | **Missing index on `refresh_tokens.expires_at` for cleanup.** A scheduled or startup cleanup of expired tokens would full-scan. Low blast radius today (few rows), grows linearly. | L | M | L | `apps/api/src/EduConnect.Api/Infrastructure/Database/Migrations/schema/001_foundation_tables.sql` (no `idx_refresh_tokens_expires_at`) |
+| 13 | **Missing index on `refresh_tokens.expires_at` for cleanup.** A scheduled or startup cleanup of expired tokens would full-scan. Low blast radius today (few rows), grows linearly. | L | M | L | `apps/api/src/EduConnect.Api/Migrations/AppDbContextModelSnapshot.cs` (no `idx_refresh_tokens_expires_at`) |
 | 14 | **Per-attachment presigned-URL generation without caching.** Even if in-process, the signing cost compounds on large lists. | L | M | L | same as #8 |
 | 15 | **`pnpm-workspace.yaml` does not include `packages/api-client`, but root `package.json` references it via `pnpm --dir packages/api-client run generate`.** Either the script is dead or the workspace file is incomplete. | L | L | L | `pnpm-workspace.yaml` only lists `apps/web` + `packages/*` — actually `packages/*` globs it, so this is resolved; however `packages/api-client/src/index.ts` is still a stub. Demoted to L. |
 | 16 | **`.env`, `.env.local`, `.env.docker` contain a real-looking JWT secret literal on disk.** Gitignored, so not a source-control leak, but any developer machine backup or shared screenshare exposes it; rotation when a developer leaves is not guaranteed. | L | M | L | `.env:14`, `.env.local:22`, `.env.docker:22` |
@@ -245,11 +243,11 @@ Most important observations across all lenses.
 
 ### Lens 1 — Architecture Map
 
-- **Layers (.NET):** presentation = minimal-API endpoints (`Features/**/*Endpoint.cs`), application = MediatR handlers + pipeline behaviors (`Features/**/*Handler.cs`, `Common/Behaviors/*.cs`), domain = EF entities + configurations (`Infrastructure/Database/Entities`, `Infrastructure/Database/Configurations`), infrastructure = `AppDbContext`, `SqlMigrationRunner`, `Services/*` (S3, Resend, Notification). Cross-cutting = `Common/Middleware/*`, `Common/Auth/*`.
+- **Layers (.NET):** presentation = minimal-API endpoints (`Features/**/*Endpoint.cs`), application = MediatR handlers + pipeline behaviors (`Features/**/*Handler.cs`, `Common/Behaviors/*.cs`), domain = EF entities + configurations (`Infrastructure/Database/Entities`, `Infrastructure/Database/Configurations`), infrastructure = `AppDbContext`, `DatabaseSeeder`, `Services/*` (S3, Resend, Notification). Cross-cutting = `Common/Middleware/*`, `Common/Auth/*`.
 - **Layers (web):** route segments under `app/(auth)` and `app/(dashboard)` are presentation; `lib/api-client.ts` + `lib/auth/*` + `providers/auth-provider.tsx` are application; `components/` are presentation primitives; `hooks/` are reusable view logic; `public/sw.js` is the PWA boundary.
 - **No cycles observed.** Every feature imports `Common/**`, `Infrastructure/**`; nothing in `Common` or `Infrastructure` imports back into `Features`.
 - **Entry points:**
-  - API: `Program.cs` → `app.MapAllEndpoints()` in `Common/Extensions/EndpointRouteBuilderExtensions.cs` groups under `/api/auth`, `/api/attendance`, `/api/homework`, `/api/notices`, `/api/students`, `/api/classes`, `/api/teachers`, `/api/subjects`, `/api/notifications`, `/api/attachments`, plus `MapHealthEndpoints()` → `/health`. Startup also runs `SqlMigrationRunner.ApplyAsync`.
+  - API: `Program.cs` → `app.MapAllEndpoints()` in `Common/Extensions/EndpointRouteBuilderExtensions.cs` groups under `/api/auth`, `/api/attendance`, `/api/homework`, `/api/notices`, `/api/students`, `/api/classes`, `/api/teachers`, `/api/subjects`, `/api/notifications`, `/api/attachments`, plus `MapHealthEndpoints()` → `/health`. Startup also runs `Database.MigrateAsync()` before serving traffic.
   - Web: `app/page.tsx` (root), `app/(auth)/**`, `app/(dashboard)/**`. Service worker registers via `components/pwa/sw-registrar.tsx`.
 - **Request path (authenticated):** client fetch with `credentials:"include"` → CORS → CorrelationId → RequestLogging → GlobalException → JwtBearer → RateLimiter → Authorization → TenantIsolation (sets `CurrentUserService`) → endpoint → MediatR → ValidationBehavior → LoggingBehavior → handler → `AppDbContext` (global filters apply) / `Services/*` → response → GlobalException wraps exceptions into `ProblemDetailsResponse`.
 - **Flag:** `UseCors` is invoked *after* `UseAuthorization` and right before `MapAllEndpoints`. Preflight OPTIONS on `/api/**` endpoints marked `RequireAuthorization()` will be handled before CORS sees them. Move `UseCors` to just after `UseRouting`.
@@ -339,7 +337,7 @@ Features mapped to primary files. Tag = `shipped` unless otherwise noted. Derive
 - **N+1 (minor):** `GetAttachmentsForEntityQueryHandler.cs:36-42` loops attachments and mints a presigned URL per row. Fine for S3 SDK signing (in-process); problematic if the storage adapter ever proxies through an external signing service.
 - **Unbounded lists:** most list endpoints clamp `pageSize` (e.g. `GetStudentsByClass` caps at 1-100). `GetNotifications` paginates and also applies a 90-day cutoff. `SearchParentsByPhone` hard-limits to 10.
 - **Caching:** no HTTP cache headers or ETags set; no in-process caching on hot reads (classes, subjects, roster). For the described workload (a single school per API request) this is acceptable; add caching only after measuring.
-- **Startup cost:** `SqlMigrationRunner.ApplyAsync` is awaited before the app serves traffic (`Program.cs:197-200`). This intentionally fails closed on schema errors but also means every cold start incurs migration discovery and advisory-lock acquisition.
+- **Startup cost:** `Database.MigrateAsync()` is awaited before the app serves traffic. This intentionally fails closed on schema errors but also means every cold start incurs migration discovery and application work before the API becomes healthy.
 - **Bundle bloat:** `apps/web` dependencies are narrow (Next 15, React 19, Tailwind 4, lucide-react, framer-motion, CVA + tailwind-merge, Sentry). `framer-motion` is the heaviest; worth a code-split review if Lighthouse regresses.
 - **Server Components opportunity:** ADR-006 declares PPR as a goal, but every page file in the sampled list uses the client-side `auth-provider` context, which forces client rendering for authenticated content. Revisit which dashboard pages can render the shell on the server.
 
@@ -453,7 +451,7 @@ Source → sink summary:
 - **Auth reset → Resend → email → browser.** Raw token generated, hashed and persisted, email sent via `ResendEmailService` using a scoped `HttpClient` (10 s timeout). Raw token returns to the browser via the email link; only the hash is in the DB.
 - **Notification fan-out.** `NotificationService` writes to `notifications` rows; no push / SMS / WebSocket channel was detected — clients poll via `GET /api/notifications/unread-count`.
 - **Logs.** Serilog writes to console (template) and rolling JSON file (`logs/educonnect-{yyyyMMdd}.json`, 50 MB cap, 30-day retention). Optional Sentry sink when DSN set.
-- **Migrations.** At startup `SqlMigrationRunner.ApplyAsync` reads `Migrations/schema/*.sql` (and `Migrations/seed/*.sql` in Development per Program.cs:196 comment), acquires a pg advisory lock, applies missing files in order, records applied state. On failure, startup aborts.
+- **Migrations.** At startup the API calls `dbContext.Database.MigrateAsync()` to apply pending EF Core migrations from `apps/api/src/EduConnect.Api/Migrations/`. In `Development`, it then executes `Infrastructure/Database/Migrations/seed/*.sql`. On failure, startup aborts.
 
 ### Lens 9 — Test Coverage & Strategy
 
@@ -479,7 +477,7 @@ No skipped / xit / `.only` usage was found in the 3 test files. The in-memory da
 
 | # | Action | Owner | Effort |
 |---|---|---|---|
-| 1 | Fix CI `migrations` glob: change to `Migrations/schema/*.sql` then (optionally) `Migrations/seed/*.sql` for a dedicated test DB. (`.github/workflows/ci.yml:125-137`) | Backend/DevOps | 15 min |
+| 1 | Keep CI aligned with the runtime migration path by booting the API against Postgres and verifying startup succeeds after EF Core migrations apply. (`.github/workflows/ci.yml`) | Backend/DevOps | 15 min |
 | 2 | Fix CI `api` build-vs-test mismatch: `dotnet build tests/EduConnect.Api.Tests/EduConnect.Api.Tests.csproj -c Release` before `dotnet test ... --no-build`, or drop `--no-build`. (`.github/workflows/ci.yml:75-91`) | Backend/DevOps | 15 min |
 | 3 | Replace the literal `JWT_SECRET` in `docker-compose.yml` with `${JWT_SECRET}` and require it from a host env file. | Backend | 10 min |
 | 4 | Add throttling to `/api/auth/login`, `/login-parent`, `/forgot-password`, `/forgot-pin`, `/reset-*` (per-IP + per-account counter; block after N failures). Simplest path: a named rate-limit partition in the existing limiter plus a failed-attempt column on `users`. | Backend | 0.5–1 day |
