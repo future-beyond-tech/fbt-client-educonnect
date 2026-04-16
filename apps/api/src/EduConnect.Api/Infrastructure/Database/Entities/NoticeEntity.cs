@@ -7,7 +7,6 @@ public class NoticeEntity
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public string TargetAudience { get; set; } = string.Empty;
-    public Guid? TargetClassId { get; set; }
     public Guid PublishedById { get; set; }
     public bool IsPublished { get; set; } = false;
     public DateTimeOffset? PublishedAt { get; set; }
@@ -18,6 +17,6 @@ public class NoticeEntity
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public SchoolEntity? School { get; set; }
-    public ClassEntity? TargetClass { get; set; }
     public UserEntity? PublishedBy { get; set; }
+    public ICollection<NoticeTargetClassEntity> TargetClasses { get; set; } = [];
 }

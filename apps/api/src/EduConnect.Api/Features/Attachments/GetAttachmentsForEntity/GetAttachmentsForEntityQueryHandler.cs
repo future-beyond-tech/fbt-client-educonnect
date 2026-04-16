@@ -191,7 +191,15 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        if (notice.TargetClassId.HasValue && studentClassIds.Contains(notice.TargetClassId.Value))
+        var targetClassIds = await _context.NoticeTargetClasses
+            .Where(targetClass =>
+                targetClass.SchoolId == _currentUserService.SchoolId &&
+                targetClass.NoticeId == notice.Id)
+            .Select(targetClass => targetClass.ClassId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (targetClassIds.Any(targetClassId => studentClassIds.Contains(targetClassId)))
         {
             return;
         }

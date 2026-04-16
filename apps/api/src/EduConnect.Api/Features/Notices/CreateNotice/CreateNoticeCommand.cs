@@ -4,7 +4,7 @@ public record CreateNoticeCommand(
     string Title,
     string Body,
     string TargetAudience,
-    Guid? TargetClassId = null,
+    List<Guid>? TargetClassIds = null,
     DateTimeOffset? ExpiresAt = null) : IRequest<CreateNoticeResponse>;
 
 public record CreateNoticeResponse(Guid NoticeId, string Message);

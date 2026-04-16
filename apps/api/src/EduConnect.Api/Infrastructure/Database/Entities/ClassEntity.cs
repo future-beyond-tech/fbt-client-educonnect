@@ -14,5 +14,5 @@ public class ClassEntity
     public ICollection<StudentEntity> Students { get; set; } = [];
     public ICollection<TeacherClassAssignmentEntity> TeacherClassAssignments { get; set; } = [];
     public ICollection<HomeworkEntity> Homeworks { get; set; } = [];
-    public ICollection<NoticeEntity> Notices { get; set; } = [];
+    public ICollection<NoticeTargetClassEntity> NoticeTargetClasses { get; set; } = [];
 }

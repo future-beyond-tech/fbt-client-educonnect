@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<AttendanceRecordEntity> AttendanceRecords { get; set; }
     public DbSet<HomeworkEntity> Homeworks { get; set; }
     public DbSet<NoticeEntity> Notices { get; set; }
+    public DbSet<NoticeTargetClassEntity> NoticeTargetClasses { get; set; }
     public DbSet<SubjectEntity> Subjects { get; set; }
     public DbSet<NotificationEntity> Notifications { get; set; }
     public DbSet<AttachmentEntity> Attachments { get; set; }
@@ -59,6 +60,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<HomeworkEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<NoticeEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<NoticeTargetClassEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<SubjectEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);

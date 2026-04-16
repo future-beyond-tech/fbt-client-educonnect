@@ -3,26 +3,20 @@
 import * as React from "react";
 import { apiGet } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { formatNoticeAudienceDetails, formatNoticeAudienceLabel } from "@/lib/notice-targeting";
+import type { NoticeItem } from "@/lib/types/notice";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import {
+  PageHeader,
+  PageSection,
+  PageShell,
+} from "@/components/shared/page-shell";
 import { Bell } from "lucide-react";
 import { AttachmentList } from "@/components/shared/attachment-list";
-
-interface NoticeItem {
-  noticeId: string;
-  title: string;
-  body: string;
-  targetAudience: string;
-  targetClassId: string | null;
-  isPublished: boolean;
-  publishedAt: string | null;
-  expiresAt: string | null;
-  createdAt: string;
-}
 
 export default function ParentNoticesPage(): React.ReactElement {
   const [notices, setNotices] = React.useState<NoticeItem[]>([]);
@@ -44,7 +38,7 @@ export default function ParentNoticesPage(): React.ReactElement {
   }, []);
 
   React.useEffect(() => {
-    fetchNotices();
+    void fetchNotices();
   }, [fetchNotices]);
 
   const formatDate = (dateStr: string): string => {
@@ -91,7 +85,7 @@ export default function ParentNoticesPage(): React.ReactElement {
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-lg">{notice.title}</CardTitle>
                   <Badge variant={notice.targetAudience === "All" ? "default" : "secondary"}>
-                    {notice.targetAudience}
+                    {formatNoticeAudienceLabel(notice)}
                   </Badge>
                 </div>
                 {notice.publishedAt && (
@@ -103,6 +97,11 @@ export default function ParentNoticesPage(): React.ReactElement {
               {expandedId === notice.noticeId && (
                 <CardContent>
                   <p className="whitespace-pre-wrap text-sm">{notice.body}</p>
+                  {formatNoticeAudienceDetails(notice) && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {formatNoticeAudienceDetails(notice)}
+                    </p>
+                  )}
                   <div className="mt-3">
                     <AttachmentList entityId={notice.noticeId} entityType="notice" />
                   </div>
