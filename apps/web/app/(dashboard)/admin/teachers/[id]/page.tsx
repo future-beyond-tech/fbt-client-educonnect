@@ -171,25 +171,26 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
   }
 
   if (!teacher) return <></>;
+  const isTeacherAccount = teacher.role === "Teacher";
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Admin operations"
         title={teacher.name}
-        description={teacher.phone}
+        description={`${teacher.role} account • ${teacher.phone}`}
         backAction={(
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push("/admin/teachers")}
-            aria-label="Back to teachers"
+            aria-label="Back to staff"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Teachers
+            Back to Staff
           </Button>
         )}
-        actions={(
+        actions={isTeacherAccount ? (
           <Button
             size="sm"
             variant="outline"
@@ -201,15 +202,16 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
             <Plus className="h-4 w-4" />
             Assign
           </Button>
-        )}
+        ) : undefined}
         stats={[
+          { label: "Role", value: teacher.role },
           { label: "Assignments", value: teacher.assignments.length.toString() },
           { label: "Joined", value: formatDate(teacher.createdAt) },
         ]}
       />
 
       {!teacher.isActive && (
-        <StatusBanner variant="warning">This teacher account is currently inactive.</StatusBanner>
+        <StatusBanner variant="warning">This {teacher.role.toLowerCase()} account is currently inactive.</StatusBanner>
       )}
       {successMessage && (
         <StatusBanner variant="success">{successMessage}</StatusBanner>
@@ -237,6 +239,10 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
               <span className="text-sm font-medium text-right break-all">{teacher.email || "—"}</span>
             </div>
             <div className="flex justify-between gap-4">
+              <span className="text-sm text-muted-foreground">Role</span>
+              <span className="text-sm font-medium text-right">{teacher.role}</span>
+            </div>
+            <div className="flex justify-between gap-4">
               <span className="text-sm text-muted-foreground">Joined</span>
               <span className="text-sm font-medium text-right">
                 {formatDate(teacher.createdAt)}
@@ -250,7 +256,12 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
             <CardTitle className="text-lg">Assignments</CardTitle>
           </CardHeader>
           <CardContent className="px-0 pb-0">
-            {showAssignForm && (
+            {!isTeacherAccount && (
+              <StatusBanner variant="info">
+                Admin accounts do not have class or subject assignments.
+              </StatusBanner>
+            )}
+            {isTeacherAccount && showAssignForm && (
               <form
                 onSubmit={handleAssign}
                 className="mb-4 space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.42)] dark:bg-card/88"
@@ -321,7 +332,9 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
 
             {teacher.assignments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No class assignments yet.
+                {isTeacherAccount
+                  ? "No class assignments yet."
+                  : "No assignments apply to admin accounts."}
               </p>
             ) : (
               <ul className="space-y-3" aria-label="Teacher assignments">

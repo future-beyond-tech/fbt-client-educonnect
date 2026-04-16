@@ -1,5 +1,6 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 
@@ -32,13 +33,13 @@ public class CreateParentCommandHandler : IRequestHandler<CreateParentCommand, C
         }
 
         var trimmedName = request.Name.Trim();
-        var trimmedPhone = request.Phone.Trim();
+        var normalizedPhone = JapanPhoneNumber.NormalizeUserInput(request.Phone);
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
         var phoneExists = await _context.Users
             .AnyAsync(u =>
                 u.SchoolId == _currentUserService.SchoolId &&
-                u.Phone == trimmedPhone,
+                u.Phone == normalizedPhone,
                 cancellationToken);
 
         if (phoneExists)
@@ -69,7 +70,7 @@ public class CreateParentCommandHandler : IRequestHandler<CreateParentCommand, C
             Id = Guid.NewGuid(),
             SchoolId = _currentUserService.SchoolId,
             Name = trimmedName,
-            Phone = trimmedPhone,
+            Phone = normalizedPhone,
             Email = normalizedEmail,
             Role = "Parent",
             PinHash = _pinService.HashPin(request.Pin),

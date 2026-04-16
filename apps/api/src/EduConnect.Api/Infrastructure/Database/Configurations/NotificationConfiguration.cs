@@ -12,10 +12,10 @@ public class NotificationConfiguration : IEntityTypeConfiguration<NotificationEn
         {
             tableBuilder.HasCheckConstraint(
                 "chk_notification_type",
-                "type IN ('notice_published', 'homework_assigned', 'absence_marked')");
+                "type IN ('notice_published', 'homework_assigned', 'absence_marked', 'leave_applied', 'leave_approved', 'leave_rejected')");
             tableBuilder.HasCheckConstraint(
                 "chk_notification_entity_type",
-                "entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance')");
+                "entity_type IS NULL OR entity_type IN ('notice', 'homework', 'attendance', 'leave_application')");
         });
 
         builder.HasKey(x => x.Id);

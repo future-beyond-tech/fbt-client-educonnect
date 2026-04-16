@@ -29,6 +29,12 @@ export interface ApplyLeaveRequest {
   reason: string;
 }
 
+export interface UpdateLeaveRequest {
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;   // "YYYY-MM-DD"
+  reason: string;
+}
+
 export interface GetLeaveApplicationsResponse {
   items: LeaveApplication[];
   totalCount: number;

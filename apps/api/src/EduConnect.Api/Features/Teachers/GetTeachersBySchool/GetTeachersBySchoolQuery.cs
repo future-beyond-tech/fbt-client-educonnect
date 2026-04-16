@@ -11,6 +11,7 @@ public record TeacherListDto(
     Guid Id,
     string Name,
     string Phone,
+    string Role,
     bool IsActive,
     int AssignedClassCount,
     List<string> Subjects);

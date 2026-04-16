@@ -235,19 +235,19 @@ Once both services are running, the database is automatically seeded with develo
 
 | Role | Phone | Password | School |
 |---|---|---|---|
-| Admin | `9000000001` | `EduConnect@2026` | Dev School |
-| Teacher | `9000000002` | `EduConnect@2026` | Dev School |
-| Teacher | `9000000003` | `EduConnect@2026` | Dev School |
+| Admin | `09000000001` | `EduConnect@2026` | Dev School |
+| Teacher | `09000000002` | `EduConnect@2026` | Dev School |
+| Teacher | `09000000003` | `EduConnect@2026` | Dev School |
 
 ### Parent Login (Phone + PIN)
 
 | Phone | PIN | Linked Students |
 |---|---|---|
-| `9100000001` | `1234` | Arjun Meena (5-A) |
-| `9100000002` | `1234` | Kavitha Suresh (5-A) |
-| `9100000003` | `1234` | Ravi Lakshmi (5-A) |
-| `9100000004` | `1234` | Arun Rajan (5-B) |
-| `9100000005` | `1234` | Sneha Deepa (5-B) |
+| `09100000001` | `1234` | Arjun Meena (5-A) |
+| `09100000002` | `1234` | Kavitha Suresh (5-A) |
+| `09100000003` | `1234` | Ravi Lakshmi (5-A) |
+| `09100000004` | `1234` | Arun Rajan (5-B) |
+| `09100000005` | `1234` | Sneha Deepa (5-B) |
 
 ### Classes & Students
 
@@ -268,7 +268,7 @@ All API tests below assume the API is running at `http://localhost:5000`.
 ```bash
 curl -s -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"phone":"9000000001","password":"EduConnect@2026"}' | python3 -m json.tool
+  -d '{"phone":"09000000001","password":"EduConnect@2026"}' | python3 -m json.tool
 ```
 
 Save the `accessToken` from the response:
@@ -281,7 +281,7 @@ TOKEN="paste-access-token-here"
 ```bash
 curl -s -X POST http://localhost:5000/api/auth/login-parent \
   -H "Content-Type: application/json" \
-  -d '{"phone":"9100000001","pin":"1234"}' | python3 -m json.tool
+  -d '{"phone":"09100000001","pin":"1234"}' | python3 -m json.tool
 ```
 
 Save parent's `accessToken`:
@@ -364,7 +364,7 @@ First get the Teacher token:
 ```bash
 curl -s -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"phone":"9000000002","password":"EduConnect@2026"}' | python3 -m json.tool
+  -d '{"phone":"09000000002","password":"EduConnect@2026"}' | python3 -m json.tool
 
 TEACHER_TOKEN="paste-teacher-access-token-here"
 ```
@@ -443,7 +443,7 @@ curl -s http://localhost:5000/api/notifications/unread-count \
 # Use -c to save and -b to send cookies:
 curl -s -c cookies.txt -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"phone":"9000000001","password":"EduConnect@2026"}'
+  -d '{"phone":"09000000001","password":"EduConnect@2026"}'
 
 # Now refresh using the cookie
 curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:5000/api/auth/refresh | python3 -m json.tool
@@ -473,7 +473,7 @@ Open your browser at `http://localhost:3000`.
 
 **Flow 1 — Admin**
 1. Go to `http://localhost:3000/login`
-2. Enter phone `9000000001`, password `EduConnect@2026` → click Login
+2. Enter phone `09000000001`, password `EduConnect@2026` → click Login
 3. You should land on the Admin dashboard
 4. Navigate to **Students** → verify the class list and student list load
 5. Click **New Student** → fill in the form → Submit
@@ -483,7 +483,7 @@ Open your browser at `http://localhost:3000`.
 
 **Flow 2 — Teacher**
 1. Logout (or open a private/incognito window)
-2. Login with phone `9000000002`, password `EduConnect@2026`
+2. Login with phone `09000000002`, password `EduConnect@2026`
 3. Navigate to **My Classes** → select class 5-A
 4. Navigate to **Attendance** → mark a student absent
 5. Navigate to **Homework** → create a new homework assignment
@@ -491,7 +491,7 @@ Open your browser at `http://localhost:3000`.
 
 **Flow 3 — Parent**
 1. Open a new private window, go to `http://localhost:3000/login`
-2. Enter phone `9100000001`, PIN `1234` → click Login
+2. Enter phone `09100000001`, PIN `1234` → click Login
 3. You should see the Parent dashboard
 4. Navigate to **Attendance** → check your child's attendance history
 5. Navigate to **Homework** → see assignments for your child's class
@@ -636,7 +636,7 @@ netstat -ano | findstr :5000
 
 ### Forgot-password / reset-pin email not arriving
 Expected — the seed data has no email addresses, and `RESEND_API_KEY` is a placeholder. To test email flows:
-1. Add an email to a user in psql: `UPDATE users SET email = 'your@email.com' WHERE phone = '9000000001';`
+1. Add an email to a user in psql: `UPDATE users SET email = 'your@email.com' WHERE phone = '09000000001';`
 2. Replace `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in `.env` with real Resend credentials
 3. Restart the API
 

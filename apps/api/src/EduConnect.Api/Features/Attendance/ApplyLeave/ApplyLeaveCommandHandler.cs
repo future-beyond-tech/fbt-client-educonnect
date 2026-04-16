@@ -91,6 +91,33 @@ public class ApplyLeaveCommandHandler : IRequestHandler<ApplyLeaveCommand, Apply
                 cancellationToken);
         }
 
+        // 4. Notify class teacher(s) assigned to the student's class
+        var classId = parentStudentLink.Student?.ClassId;
+        if (classId.HasValue)
+        {
+            var teacherIds = await _context.TeacherClassAssignments
+                .Where(tca =>
+                    tca.SchoolId == _currentUserService.SchoolId &&
+                    tca.ClassId == classId.Value &&
+                    tca.IsClassTeacher)
+                .Select(tca => tca.TeacherId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (teacherIds.Count > 0)
+            {
+                await _notificationService.SendBatchAsync(
+                    _currentUserService.SchoolId,
+                    teacherIds,
+                    "leave_applied",
+                    $"Leave Application: {studentName}",
+                    $"A leave application has been submitted for {studentName} ({dateRange}). Reason: {request.Reason}",
+                    leaveApplication.Id,
+                    "leave_application",
+                    cancellationToken);
+            }
+        }
+
         _logger.LogInformation(
             "Leave application {LeaveId} created for student {StudentId} by parent {ParentId}",
             leaveApplication.Id, request.StudentId, _currentUserService.UserId);

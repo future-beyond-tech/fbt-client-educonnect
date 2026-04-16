@@ -19,7 +19,7 @@ VALUES (
     'Sunrise International School',
     'SRIS-CHN',
     '42 Anna Nagar, Chennai, Tamil Nadu 600040',
-    '+919876543210',
+    '+8109876543210',
     'admin@sunriseschool.edu.in'
 )
 ON CONFLICT (id) DO NOTHING;
@@ -29,7 +29,7 @@ INSERT INTO users (id, school_id, phone, name, role, password_hash)
 VALUES (
     'b1b2c3d4-0001-4000-8000-000000000001',
     'a1b2c3d4-0001-4000-8000-000000000001',
-    '9000000001',
+    '09000000001',
     'Rajesh Kumar',
     'Admin',
     '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'
@@ -39,18 +39,18 @@ ON CONFLICT (id) DO NOTHING;
 -- ─── TEACHERS ─────────────────────────────────
 INSERT INTO users (id, school_id, phone, name, role, password_hash)
 VALUES
-  ('b1b2c3d4-0002-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9000000002', 'Priya Sharma',     'Teacher', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
-  ('b1b2c3d4-0003-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9000000003', 'Anand Venkatesh',  'Teacher', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa')
+  ('b1b2c3d4-0002-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09000000002', 'Priya Sharma',     'Teacher', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
+  ('b1b2c3d4-0003-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09000000003', 'Anand Venkatesh',  'Teacher', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa')
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── PARENTS ──────────────────────────────────
 INSERT INTO users (id, school_id, phone, name, role, pin_hash)
 VALUES
-  ('b1b2c3d4-0010-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9100000001', 'Meena Devi',       'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
-  ('b1b2c3d4-0011-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9100000002', 'Suresh Babu',      'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
-  ('b1b2c3d4-0012-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9100000003', 'Lakshmi Narayan',  'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
-  ('b1b2c3d4-0013-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9100000004', 'Karthik Rajan',    'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
-  ('b1b2c3d4-0014-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '9100000005', 'Deepa Sundar',     'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa')
+  ('b1b2c3d4-0010-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09100000001', 'Meena Devi',       'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
+  ('b1b2c3d4-0011-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09100000002', 'Suresh Babu',      'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
+  ('b1b2c3d4-0012-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09100000003', 'Lakshmi Narayan',  'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
+  ('b1b2c3d4-0013-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09100000004', 'Karthik Rajan',    'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa'),
+  ('b1b2c3d4-0014-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', '09100000005', 'Deepa Sundar',     'Parent', '$2a$12$LJ3m4ys7CQbMgOYFm5UMAO5eRvNPZ5vHQxdGBqH1x1zZt1TdGfJSa')
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── CLASSES ──────────────────────────────────

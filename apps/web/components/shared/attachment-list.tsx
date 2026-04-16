@@ -63,7 +63,11 @@ export function AttachmentList({
   }
 
   if (attachments.length === 0) {
-    return <></>;
+    return (
+      <div className="py-2">
+        <p className="text-sm text-muted-foreground">No attachments.</p>
+      </div>
+    );
   }
 
   const getFileIcon = (contentType: string): React.ReactNode => {

@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.PhoneNumbers;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Auth.Login;
@@ -8,7 +9,7 @@ public class LoginCommandValidator : AbstractValidator<LoginCommand>
     {
         RuleFor(x => x.Phone)
             .NotEmpty().WithMessage("Phone number is required.")
-            .Matches(@"^\d{10}$").WithMessage("Phone number must be exactly 10 digits.");
+            .Must(JapanPhoneNumber.IsValidInput).WithMessage(JapanPhoneNumber.ValidationMessage);
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")

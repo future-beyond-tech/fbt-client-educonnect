@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.PhoneNumbers;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Parents.CreateParent;
@@ -12,7 +13,7 @@ public class CreateParentCommandValidator : AbstractValidator<CreateParentComman
 
         RuleFor(x => x.Phone)
             .NotEmpty().WithMessage("Phone number is required.")
-            .Matches(@"^\d{10}$").WithMessage("Phone number must be exactly 10 digits.");
+            .Must(JapanPhoneNumber.IsValidInput).WithMessage(JapanPhoneNumber.ValidationMessage);
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")

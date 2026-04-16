@@ -4,6 +4,7 @@ export interface TeacherListItem {
   id: string;
   name: string;
   phone: string;
+  role: string;
   isActive: boolean;
   assignedClassCount: number;
   subjects: string[];
@@ -16,6 +17,7 @@ export interface TeacherProfile {
   name: string;
   phone: string;
   email: string;
+  role: string;
   isActive: boolean;
   createdAt: string;
   assignments: TeacherAssignment[];
@@ -59,6 +61,11 @@ export interface CreateTeacherRequest {
   phone: string;
   email: string;
   password: string;
+  role?: string;
+  /** When set with `subject`, creates an initial class assignment. */
+  classId?: string;
+  subject?: string;
+  isClassTeacher?: boolean;
 }
 
 export interface TeacherMutationResponse {

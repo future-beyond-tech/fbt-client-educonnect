@@ -7,6 +7,7 @@ public record TeacherProfileDto(
     string Name,
     string Phone,
     string Email,
+    string Role,
     bool IsActive,
     DateTimeOffset CreatedAt,
     List<TeacherAssignmentDto> Assignments);

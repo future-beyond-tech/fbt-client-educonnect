@@ -1,4 +1,5 @@
 using System.Reflection;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,7 @@ public static class DatabaseSeeder
                 Name = "Default School",
                 Code = "DEFAULT-001",
                 Address = "Update Address",
-                ContactPhone = "0000000000",
+                ContactPhone = $"{JapanPhoneNumber.CountryCode}00000000000",
                 ContactEmail = "admin@example.com"
             };
             context.Schools.Add(defaultSchool);
@@ -39,7 +40,7 @@ public static class DatabaseSeeder
                 {
                     Id = Guid.Parse("b1b2c3d4-0001-4000-8000-000000000001"),
                     SchoolId = schoolId,
-                    Phone = "9000000001",
+                    Phone = "09000000001",
                     Name = "System Administrator",
                     Role = "Admin",
                     PasswordHash = correctHash // Password: EduConnect@2026

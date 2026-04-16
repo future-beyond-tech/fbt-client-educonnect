@@ -1,6 +1,7 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Common.Logging;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 using MediatR;
 using BCrypt.Net;
@@ -31,8 +32,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
 
     public async Task<string> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        var normalizedPhone = JapanPhoneNumber.NormalizeUserInput(request.Phone);
+
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Phone == request.Phone && u.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Phone == normalizedPhone && u.IsActive, cancellationToken);
 
         if (user == null)
         {

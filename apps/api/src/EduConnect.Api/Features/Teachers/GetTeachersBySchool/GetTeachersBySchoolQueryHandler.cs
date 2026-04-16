@@ -1,6 +1,7 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Common.Models;
+using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 
 namespace EduConnect.Api.Features.Teachers.GetTeachersBySchool;
@@ -26,15 +27,16 @@ public class GetTeachersBySchoolQueryHandler : IRequestHandler<GetTeachersByScho
         var query = _context.Users
             .Where(u =>
                 u.SchoolId == _currentUserService.SchoolId &&
-                u.Role == "Teacher")
+                (u.Role == "Teacher" || u.Role == "Admin"))
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchLower = request.Search.Trim().ToLower();
+            var phoneSearch = JapanPhoneNumber.NormalizeSearchTerm(request.Search);
             query = query.Where(u =>
                 u.Name.ToLower().Contains(searchLower) ||
-                u.Phone.Contains(searchLower));
+                (!string.IsNullOrEmpty(phoneSearch) && u.Phone.Contains(phoneSearch)));
         }
 
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
@@ -51,6 +53,7 @@ public class GetTeachersBySchoolQueryHandler : IRequestHandler<GetTeachersByScho
                 u.Id,
                 u.Name,
                 u.Phone,
+                u.Role,
                 u.IsActive,
                 Assignments = _context.TeacherClassAssignments
                     .Where(tca => tca.TeacherId == u.Id && tca.SchoolId == _currentUserService.SchoolId)
@@ -62,6 +65,7 @@ public class GetTeachersBySchoolQueryHandler : IRequestHandler<GetTeachersByScho
             t.Id,
             t.Name,
             t.Phone,
+            t.Role,
             t.IsActive,
             t.Assignments.Select(a => a.ClassId).Distinct().Count(),
             t.Assignments.Select(a => a.Subject).Distinct().OrderBy(s => s).ToList()
