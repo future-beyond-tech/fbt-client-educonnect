@@ -97,10 +97,9 @@ export default function TeacherAttendancePage(): React.ReactElement {
         });
       }
     }
-    // Only show class-teacher classes for “take attendance” UX
-    return Array.from(map.values())
-      .filter((c) => c.isClassTeacher)
-      .sort((a, b) => (a.className + a.section).localeCompare(b.className + b.section));
+    return Array.from(map.values()).sort((a, b) =>
+      (a.className + a.section).localeCompare(b.className + b.section)
+    );
   }, [assignments]);
 
   const fetchAssignments = React.useCallback(async () => {
