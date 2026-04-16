@@ -20,4 +20,5 @@ public class SchoolEntity
     public ICollection<AttendanceRecordEntity> AttendanceRecords { get; set; } = [];
     public ICollection<HomeworkEntity> Homeworks { get; set; } = [];
     public ICollection<NoticeEntity> Notices { get; set; } = [];
+    public ICollection<NoticeTargetClassEntity> NoticeTargetClasses { get; set; } = [];
 }

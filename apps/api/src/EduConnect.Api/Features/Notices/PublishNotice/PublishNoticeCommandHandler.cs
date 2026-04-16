@@ -36,6 +36,7 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
         }
 
         var notice = await _context.Notices
+            .Include(n => n.TargetClasses)
             .FirstOrDefaultAsync(n =>
                 n.Id == request.NoticeId &&
                 n.SchoolId == _currentUserService.SchoolId &&
@@ -61,7 +62,10 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
         await _context.SaveChangesAsync(cancellationToken);
 
         // Notify targeted users based on audience
-        var targetUserIds = await ResolveTargetUserIds(notice.TargetAudience, notice.TargetClassId, cancellationToken);
+        var targetUserIds = await ResolveTargetUserIds(
+            notice.TargetAudience,
+            notice.TargetClasses.Select(targetClass => targetClass.ClassId).ToList(),
+            cancellationToken);
 
         if (targetUserIds.Count > 0)
         {
@@ -84,7 +88,9 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
     }
 
     private async Task<List<Guid>> ResolveTargetUserIds(
-        string targetAudience, Guid? targetClassId, CancellationToken cancellationToken)
+        string targetAudience,
+        IReadOnlyCollection<Guid> targetClassIds,
+        CancellationToken cancellationToken)
     {
         var schoolId = _currentUserService.SchoolId;
 
@@ -97,17 +103,21 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
                 .ToListAsync(cancellationToken);
         }
 
-        if ((targetAudience == "Class" || targetAudience == "Section") && targetClassId.HasValue)
+        if ((targetAudience == "Class" || targetAudience == "Section") && targetClassIds.Count > 0)
         {
-            // Notify teachers assigned to the class + parents of students in the class
+            // Notify teachers assigned to the targeted class sections + parents of students in those sections.
             var teacherIds = await _context.TeacherClassAssignments
-                .Where(tca => tca.SchoolId == schoolId && tca.ClassId == targetClassId.Value)
+                .Where(tca => tca.SchoolId == schoolId && targetClassIds.Contains(tca.ClassId))
                 .Select(tca => tca.TeacherId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
             var parentIds = await _context.ParentStudentLinks
-                .Where(psl => psl.SchoolId == schoolId && psl.Student != null && psl.Student.ClassId == targetClassId.Value && psl.Student.IsActive)
+                .Where(psl =>
+                    psl.SchoolId == schoolId &&
+                    psl.Student != null &&
+                    targetClassIds.Contains(psl.Student.ClassId) &&
+                    psl.Student.IsActive)
                 .Select(psl => psl.ParentId)
                 .Distinct()
                 .ToListAsync(cancellationToken);

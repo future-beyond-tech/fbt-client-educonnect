@@ -19,8 +19,17 @@ public class CreateNoticeCommandValidator : AbstractValidator<CreateNoticeComman
             .Must(x => x == "All" || x == "Class" || x == "Section")
             .WithMessage("Target audience must be 'All', 'Class', or 'Section'.");
 
-        RuleFor(x => x.TargetClassId)
-            .NotEmpty().WithMessage("Target class ID is required when targeting a specific class or section.")
+        RuleFor(x => x.TargetClassIds)
+            .Must(ids => ids == null || ids.Count == ids.Distinct().Count())
+            .WithMessage("Duplicate class targets are not allowed.");
+
+        RuleFor(x => x.TargetClassIds)
+            .Must(ids => ids == null || ids.Count == 0)
+            .When(x => x.TargetAudience == "All")
+            .WithMessage("Whole-school notices cannot include targeted classes.");
+
+        RuleFor(x => x.TargetClassIds)
+            .NotEmpty().WithMessage("Select at least one class section when targeting a class or section.")
             .When(x => x.TargetAudience == "Class" || x.TargetAudience == "Section");
     }
 }

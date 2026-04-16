@@ -34,8 +34,8 @@ public class GetNoticesQueryHandler : IRequestHandler<GetNoticesQuery, List<Noti
             query = query.Where(n =>
                 n.IsPublished &&
                 (n.TargetAudience == "All" ||
-                (n.TargetAudience == "Class" && n.TargetClassId != null && studentClassIds.Contains(n.TargetClassId.Value)) ||
-                (n.TargetAudience == "Section" && n.TargetClassId != null && studentClassIds.Contains(n.TargetClassId.Value))))
+                ((n.TargetAudience == "Class" || n.TargetAudience == "Section") &&
+                 n.TargetClasses.Any(targetClass => studentClassIds.Contains(targetClass.ClassId)))))
                 .Where(n => n.ExpiresAt == null || n.ExpiresAt > DateTimeOffset.UtcNow);
         }
 
@@ -46,7 +46,16 @@ public class GetNoticesQueryHandler : IRequestHandler<GetNoticesQuery, List<Noti
                 n.Title,
                 n.Body,
                 n.TargetAudience,
-                n.TargetClassId,
+                n.TargetClasses
+                    .OrderBy(targetClass => targetClass.TargetClass!.Name)
+                    .ThenBy(targetClass => targetClass.TargetClass!.AcademicYear)
+                    .ThenBy(targetClass => targetClass.TargetClass!.Section)
+                    .Select(targetClass => new NoticeTargetClassDto(
+                        targetClass.ClassId,
+                        targetClass.TargetClass!.Name,
+                        targetClass.TargetClass!.Section,
+                        targetClass.TargetClass!.AcademicYear))
+                    .ToList(),
                 n.IsPublished,
                 n.PublishedAt,
                 n.ExpiresAt,

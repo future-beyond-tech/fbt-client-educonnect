@@ -28,7 +28,6 @@ public class NoticeConfiguration : IEntityTypeConfiguration<NoticeEntity>
 
         builder.HasIndex(x => x.SchoolId);
         builder.HasIndex(x => x.PublishedById);
-        builder.HasIndex(x => x.TargetClassId);
         builder.HasIndex(x => new { x.SchoolId, x.IsPublished, x.IsDeleted })
             .HasFilter("is_published = true AND is_deleted = false");
 
@@ -41,10 +40,5 @@ public class NoticeConfiguration : IEntityTypeConfiguration<NoticeEntity>
             .WithMany()
             .HasForeignKey(x => x.PublishedById)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(x => x.TargetClass)
-            .WithMany(x => x.Notices)
-            .HasForeignKey(x => x.TargetClassId)
-            .OnDelete(DeleteBehavior.SetNull);
     }
 }
