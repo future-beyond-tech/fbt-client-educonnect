@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import type {
 } from "@/lib/types/student";
 
 export default function AdminClassesPage(): React.ReactElement {
+  const router = useRouter();
   const [classes, setClasses] = React.useState<ClassItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -243,14 +245,23 @@ export default function AdminClassesPage(): React.ReactElement {
                       {classItem.studentCount} student{classItem.studentCount !== 1 ? "s" : ""}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEditForm(classItem)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/admin/classes/${classItem.id}`)}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditForm(classItem)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Edit
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

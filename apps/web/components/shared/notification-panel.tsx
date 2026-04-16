@@ -129,7 +129,7 @@ export function NotificationPanel({
 
   return (
     <div
-      className="absolute right-0 top-full z-50 mt-3 min-h-[200px] w-[min(calc(100vw-2rem),25rem)] origin-top-right rounded-[28px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,251,0.96))] shadow-[0_34px_90px_-38px_rgba(15,23,42,0.62)] backdrop-blur-2xl dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.98),rgba(8,18,31,0.96))] dark:shadow-[0_38px_96px_-42px_rgba(2,12,24,0.92)]"
+      className="fixed right-4 top-[5.25rem] z-50 min-h-[200px] w-[min(calc(100vw-2rem),25rem)] origin-top-right rounded-[28px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,251,0.96))] shadow-[0_34px_90px_-38px_rgba(15,23,42,0.62)] backdrop-blur-2xl dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.98),rgba(8,18,31,0.96))] dark:shadow-[0_38px_96px_-42px_rgba(2,12,24,0.92)] sm:absolute sm:right-0 sm:top-full sm:mt-3"
       role="dialog"
       aria-label="Notifications"
     >
