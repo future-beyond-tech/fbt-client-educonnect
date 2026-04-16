@@ -195,7 +195,6 @@ export function LoginForm(): React.ReactElement {
             aria-invalid={!!error}
             aria-describedby={error ? "form-error" : undefined}
             autoComplete="username"
-            inputMode="numeric"
             hint="As provided by the school."
           />
         ) : (
