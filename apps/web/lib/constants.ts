@@ -1,4 +1,5 @@
 export const APP_NAME = "EduConnect";
+export const SCHOOL_NAME = "Rainbow International School";
 
 export const Roles = {
   Parent: "Parent",

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { navigationByRole, APP_NAME } from "@/lib/constants";
+import { navigationByRole, APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -38,14 +39,19 @@ export function Sidebar(): React.ReactElement {
     <aside className="hidden md:fixed md:inset-y-4 md:left-4 md:z-40 md:flex md:w-72 md:flex-col">
       <div className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgb(var(--sidebar-from)),rgb(var(--sidebar-to)))] text-white shadow-[0_35px_90px_-40px_rgba(10,14,24,0.9)]">
         <div className="border-b border-white/10 px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 shadow-inner shadow-white/10">
-              <div className="h-6 w-6 rounded-full bg-[linear-gradient(135deg,rgb(var(--accent)),rgb(var(--glow-2)))]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
-              <p className="text-sm text-white/65">School communication, refined.</p>
-            </div>
+          <div className="flex items-center justify-center rounded-[20px] bg-white/95 px-3 py-3 shadow-inner shadow-black/10">
+            <Image
+              src="/ris-logo.png"
+              alt={SCHOOL_NAME}
+              width={280}
+              height={44}
+              priority
+              className="h-auto w-full max-w-[220px] object-contain"
+            />
+          </div>
+          <div className="mt-4 text-center">
+            <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
+            <p className="text-sm text-white/65">School communication, refined.</p>
           </div>
           <div className="mt-5 rounded-[24px] border border-white/10 bg-white/8 px-4 py-4 text-sm leading-6 text-white/75">
             One workspace for notices, attendance, homework, and relationships with families.
@@ -66,7 +72,7 @@ export function Sidebar(): React.ReactElement {
                 className={cn(
                   "focus-ring group relative flex min-h-[56px] items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all focus-visible:ring-offset-transparent",
                   isActive
-                    ? "border-l-2 border-l-[rgb(var(--primary))] bg-white text-slate-900 shadow-[0_18px_42px_-26px_rgba(31,60,95,0.55)]"
+                    ? "rainbow-bg text-white shadow-[0_18px_42px_-26px_rgba(31,60,95,0.55)]"
                     : "border-l-2 border-l-transparent text-white/70 hover:bg-white/10 hover:text-white"
                 )}
                 aria-current={isActive ? "page" : undefined}
@@ -75,7 +81,7 @@ export function Sidebar(): React.ReactElement {
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
                     isActive
-                      ? "border-slate-200 bg-slate-100 text-primary"
+                      ? "border-white/40 bg-white/20 text-white"
                       : "border-white/10 bg-white/6 text-white/80 group-hover:border-white/20 group-hover:bg-white/10"
                   )}
                 >

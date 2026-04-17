@@ -1,4 +1,5 @@
-import { APP_NAME } from "@/lib/constants";
+import Image from "next/image";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Aurora } from "@/components/effects/aurora";
@@ -12,13 +13,24 @@ export default function AuthLayout({
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-10 lg:px-8">
       <Aurora intensity={0.9} />
+      <div
+        aria-hidden="true"
+        className="rainbow-bg pointer-events-none fixed inset-x-0 top-0 z-50 h-1"
+      />
       <ThemeToggle className="absolute right-4 top-4 z-10 lg:right-8 lg:top-8" />
       <div className="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl flex-col justify-center">
         <Card className="relative w-full overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgb(var(--glow-1)/0.18),transparent_70%)]" />
           <CardHeader className="relative space-y-3 border-b border-border/50 bg-card/35 text-center dark:bg-card/55">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--accent)))] text-base font-semibold text-primary-foreground shadow-[0_18px_42px_-26px_rgba(15,40,69,0.55)]">
-              {APP_NAME.slice(0, 2)}
+            <div className="mx-auto flex w-full max-w-[320px] items-center justify-center">
+              <Image
+                src="/ris-logo.png"
+                alt={SCHOOL_NAME}
+                width={280}
+                height={44}
+                priority
+                className="h-auto w-full max-w-[280px] object-contain"
+              />
             </div>
             <div className="space-y-1.5">
               <SplitText

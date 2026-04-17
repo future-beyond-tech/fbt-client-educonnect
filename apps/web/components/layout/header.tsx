@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/shared/notification-bell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -33,12 +34,17 @@ export function Header(): React.ReactElement {
 
   return (
     <header className="sticky top-0 z-30 px-4 pt-4 md:pl-[19rem] md:pr-6">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 rounded-[28px] border border-[rgb(var(--border))] bg-[rgb(var(--page-wash)/0.85)] px-4 shadow-[0_20px_70px_-38px_rgba(15,40,69,0.35)] backdrop-blur-md dark:bg-card/84 dark:shadow-[0_26px_90px_-46px_rgba(10,14,24,0.82)] md:px-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-sm font-semibold text-primary-foreground shadow-[0_16px_32px_-22px_rgba(15,40,69,0.55)] md:hidden">
-            {APP_NAME.slice(0, 2)}
-          </div>
-          <div className="min-w-0">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 rounded-[28px] border border-[rgb(var(--border))] bg-[rgb(var(--page-wash)/0.85)] px-3 shadow-[0_20px_70px_-38px_rgba(15,40,69,0.35)] backdrop-blur-md dark:bg-card/84 dark:shadow-[0_26px_90px_-46px_rgba(10,14,24,0.82)] md:gap-4 md:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Image
+            src="/ris-logo.png"
+            alt={SCHOOL_NAME}
+            width={280}
+            height={44}
+            priority
+            className="h-6 w-auto shrink-0 object-contain sm:h-7 md:hidden"
+          />
+          <div className="hidden min-w-0 md:block">
             <p className="text-xs font-semibold uppercase tracking-[0.26em] text-primary/80">
               {workspaceLabel}
             </p>
@@ -48,7 +54,7 @@ export function Header(): React.ReactElement {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
           <ThemeToggle />
           {user && <NotificationBell />}
           {user && (

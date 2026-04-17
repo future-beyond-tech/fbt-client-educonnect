@@ -309,3 +309,90 @@
     animation: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   Rainbow effects (used for school brand + tabs)
+   ───────────────────────────────────────────────────────── */
+@keyframes rainbow-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.rainbow-text {
+  background-image: linear-gradient(
+    90deg,
+    #ff4d6d,
+    #ff9a3c,
+    #ffd23f,
+    #6fcf97,
+    #4aa3ff,
+    #8a6cff,
+    #e568ff,
+    #ff4d6d
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: rainbow-shift 8s linear infinite;
+}
+
+.rainbow-bg {
+  background-image: linear-gradient(
+    90deg,
+    #ff4d6d,
+    #ff9a3c,
+    #ffd23f,
+    #6fcf97,
+    #4aa3ff,
+    #8a6cff,
+    #e568ff,
+    #ff4d6d
+  );
+  background-size: 200% 100%;
+  animation: rainbow-shift 6s linear infinite;
+}
+
+.rainbow-border {
+  position: relative;
+}
+
+.rainbow-border::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background-image: linear-gradient(
+    90deg,
+    #ff4d6d,
+    #ff9a3c,
+    #ffd23f,
+    #6fcf97,
+    #4aa3ff,
+    #8a6cff,
+    #e568ff,
+    #ff4d6d
+  );
+  background-size: 200% 100%;
+  animation: rainbow-shift 6s linear infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rainbow-text,
+  .rainbow-bg,
+  .rainbow-border::before {
+    animation: none;
+  }
+}
