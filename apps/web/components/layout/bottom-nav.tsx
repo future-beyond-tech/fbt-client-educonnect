@@ -50,7 +50,7 @@ export function BottomNav(): React.ReactElement | null {
               className={cn(
                 "focus-ring flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 text-[11px] font-medium uppercase tracking-[0.14em] transition-all",
                 isActive
-                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_16px_38px_-20px_rgba(15,40,69,0.55)]"
+                  ? "rainbow-bg text-white shadow-[0_16px_38px_-20px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
               )}
               aria-current={isActive ? "page" : undefined}
@@ -59,7 +59,7 @@ export function BottomNav(): React.ReactElement | null {
                 <IconComponent
                   className={cn(
                     "h-5 w-5",
-                    isActive ? "text-primary-foreground" : "text-muted-foreground"
+                    isActive ? "text-white" : "text-muted-foreground"
                   )}
                 />
               )}

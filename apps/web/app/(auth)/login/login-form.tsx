@@ -150,7 +150,7 @@ export function LoginForm(): React.ReactElement {
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "parent"
-                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
+                  ? "rainbow-bg text-white shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
               ].join(" ")}
             >
@@ -166,7 +166,7 @@ export function LoginForm(): React.ReactElement {
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "staff"
-                  ? "bg-[linear-gradient(135deg,rgb(var(--primary)),rgb(var(--primary-strong)))] text-primary-foreground shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
+                  ? "rainbow-bg text-white shadow-[0_16px_36px_-22px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
               ].join(" ")}
             >

@@ -1,4 +1,4 @@
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Aurora } from "@/components/effects/aurora";
@@ -21,6 +21,12 @@ export default function AuthLayout({
               {APP_NAME.slice(0, 2)}
             </div>
             <div className="space-y-1.5">
+              <h2
+                aria-label={SCHOOL_NAME}
+                className="rainbow-text text-xl font-extrabold tracking-tight md:text-2xl"
+              >
+                {SCHOOL_NAME}
+              </h2>
               <SplitText
                 as="h1"
                 text={APP_NAME}
