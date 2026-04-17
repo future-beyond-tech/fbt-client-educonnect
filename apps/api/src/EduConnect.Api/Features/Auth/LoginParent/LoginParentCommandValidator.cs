@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.PhoneNumbers;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Auth.LoginParent;
@@ -6,9 +7,9 @@ public class LoginParentCommandValidator : AbstractValidator<LoginParentCommand>
 {
     public LoginParentCommandValidator()
     {
-        RuleFor(x => x.RollNumber)
-            .NotEmpty().WithMessage("Roll number is required.")
-            .MaximumLength(50).WithMessage("Roll number must not exceed 50 characters.");
+        RuleFor(x => x.Phone)
+            .NotEmpty().WithMessage("Phone number is required.")
+            .Must(JapanPhoneNumber.IsValidInput).WithMessage(JapanPhoneNumber.ValidationMessage);
 
         RuleFor(x => x.Pin)
             .NotEmpty().WithMessage("PIN is required.")

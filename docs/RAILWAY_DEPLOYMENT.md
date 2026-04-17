@@ -108,6 +108,7 @@ Notes:
 
 - `NEXT_PUBLIC_*` values are compiled into the frontend during `next build`.
 - If you change `NEXT_PUBLIC_API_URL`, redeploy the web service so the new value is baked into the build.
+- The checked-in Swagger/OpenAPI route (`/openapi/v1.json`) is enabled only in `Development`; its absence in Railway `Production` is expected.
 
 ## 5. Smoke Test After Deploy
 

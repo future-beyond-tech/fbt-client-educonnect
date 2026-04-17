@@ -139,6 +139,8 @@ Recommended wrapper:
 pnpm local:backend:run
 ```
 
+When the API runs in `Development`, it also serves Swagger JSON at `http://localhost:5000/openapi/v1.json`. The shared `packages/api-client` artifacts are generated from that document.
+
 What it does:
 
 - loads `.env`
@@ -263,6 +265,7 @@ pnpm test
 pnpm build
 pnpm build:web
 pnpm build:api
+pnpm openapi:generate
 
 # Web-only shortcuts
 pnpm dev

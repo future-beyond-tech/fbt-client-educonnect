@@ -1,6 +1,6 @@
 # EduConnect — Full Project Analysis
-**Generated:** April 13, 2026  
-**Analysed by:** Claude (Cowork)  
+**Generated:** April 17, 2026
+**Analysed by:** Claude (Cowork)
 **Project Owner:** Future Beyond Technology (FBT) / FIROSE Enterprises, Chennai, India
 
 ---
@@ -20,7 +20,7 @@ The project is a **pnpm monorepo** orchestrated by **Turborepo**, containing two
 ```
 educonnect/
 ├── apps/
-│   ├── web/          → Next.js 15 frontend (PPR)
+│   ├── web/          → Next.js 15 App Router frontend / PWA
 │   └── api/          → .NET 8 Minimal API (VSA + CQRS)
 ├── packages/
 │   ├── api-client/   → Generated TypeScript API client
@@ -65,7 +65,7 @@ educonnect/
 |---|---|
 | Framework | Next.js 15.0.7 |
 | React | React 19.0.0 |
-| Rendering | PPR (Partial Prerendering) |
+| Rendering | App Router with client-rendered authenticated dashboard routes |
 | Styling | Tailwind CSS v4 |
 | Animations | Framer Motion 11 |
 | Icons | Lucide React |
@@ -87,9 +87,9 @@ Seven foundational decisions are locked in and documented:
 
 **ADR-04 — Row-level multi-tenancy via `school_id` (Very High Reversal Cost):** Every table carries a `school_id` FK. EF Core global query filters enforce tenant isolation at the ORM layer. `TenantIsolationMiddleware` enforces it at the HTTP layer.
 
-**ADR-05 — Custom JWT (High Reversal Cost):** Parents authenticate with Phone + PIN (4–6 digits). Teachers/Admins authenticate with Phone + Password (BCrypt). Standard auth providers don't support this dual-mode flow. Access tokens ≤ 15 min (in-memory only). Refresh tokens in HttpOnly Secure cookies with rotation.
+**ADR-05 — Custom JWT (High Reversal Cost):** Parents authenticate with Phone + PIN (4–6 digits). Teachers/Admins authenticate with Phone + Password (BCrypt). Standard auth providers don't support this dual-mode flow. Access tokens are short-lived JWTs cached in browser session state and restored from `localStorage`. Refresh tokens live in HttpOnly Secure cookies with rotation.
 
-**ADR-06 — PPR (Partial Prerendering):** Static shell renders instantly (target FCP < 1.5s); dynamic islands hydrate with authenticated data. The static shell eliminates CLS.
+**ADR-06 — Next.js App Router + client auth context:** The checked-in web app uses App Router layouts and a client-side auth provider to hydrate authenticated dashboard routes. Static/public routes remain build-friendly, while role-based dashboard content resolves after auth state restoration.
 
 **ADR-07 — Extend-only API versioning:** No URL versioning for MVP. Breaking changes trigger `/v1/` prefix. Both client and server are controlled.
 
@@ -250,7 +250,7 @@ app/
 │   ├── reset-password/
 │   ├── forgot-pin/
 │   └── reset-pin/
-├── (dashboard)/         ← Authenticated shell (PPR static)
+├── (dashboard)/         ← Authenticated shell via App Router layout + client auth context
 │   ├── parent/
 │   │   ├── attendance/
 │   │   ├── homework/
@@ -298,7 +298,7 @@ Convenience scripts are provided for both **bash** (Linux/macOS) and **PowerShel
 
 **`ci.yml`** runs on push to `main`/`develop` and on PRs:
 - **Web job:** install → lint (ESLint) → type-check (tsc) → build (Next.js)
-- **API job:** restore → build (.NET Release) → test (dotnet test, skipped gracefully if no tests)
+- **API job:** restore → build (.NET Release) → run the backend test project
 - **Docker job:** (PRs only) build both Docker images to verify Dockerfile integrity
 - **Migrations job:** spins up a test Postgres container, boots the API, and verifies startup succeeds after EF Core migrations apply
 
@@ -317,8 +317,8 @@ Both services are containerised (Dockerfiles present in each app). `railway.toml
 
 | Concern | Implementation |
 |---|---|
-| Access tokens | HS256 JWT, ≤ 15 min lifetime, stored in-memory only |
-| Refresh tokens | Hashed in DB, HttpOnly + Secure + SameSite=Lax cookie, rotated on every use |
+| Access tokens | HS256 JWT, ≤ 15 min lifetime, cached in module state and restored from `localStorage` on refresh |
+| Refresh tokens | Hashed in DB, HttpOnly + Secure + SameSite=Strict cookie, rotated on every use |
 | Parent auth | Phone + PIN (4–6 digit, bcrypt-hashed) |
 | Staff auth | Phone + password (BCrypt) |
 | Tenant isolation | `school_id` on all tables, EF Core global query filters, `TenantIsolationMiddleware` |
@@ -333,7 +333,7 @@ Both services are containerised (Dockerfiles present in each app). `railway.toml
 
 ## 11. Shared Packages
 
-**`packages/api-client`** — Placeholder for a generated TypeScript client from the OpenAPI spec. Generation is triggered via `pnpm openapi:generate`. The `src/generated/` directory currently contains only a `.gitkeep`.
+**`packages/api-client`** — Generated OpenAPI artifacts for the backend. `pnpm openapi:generate` boots or reuses the development API, fetches `/openapi/v1.json`, and refreshes `src/generated/openapi.json` plus `src/generated/schema.ts`. The package currently exports schema/types; the web app still uses its local fetch wrapper instead of importing this package directly.
 
 **`packages/ui`** — Design token definitions in TypeScript:
 - `colors.ts` — brand palette
@@ -371,11 +371,11 @@ These rules are documented as non-negotiable:
 - PWA support is complete (manifest, service worker, offline page, full icon set).
 
 ### Notable Gaps & Risks
-- **No backend tests yet.** The CI pipeline handles the missing test directory gracefully (`echo "skipping"`), but `EduConnect.Api.Tests.csproj` exists as an empty scaffold. Tenant isolation and auth flows are the highest-risk areas without test coverage.
-- **`packages/api-client` is empty.** The TypeScript client has not been generated from the OpenAPI spec yet. The frontend currently uses a hand-rolled `api-client.ts` rather than the generated typed client.
+- **Backend test coverage is improving but still selective.** The repo now has 34 backend tests across auth, onboarding, homework, notice targeting, and common infrastructure, but there are still no end-to-end HTTP tests and no frontend unit/component tests.
+- **`packages/api-client` is generated but not yet consumed by the web app.** The schema artifacts are current, but the frontend still uses its own `apps/web/lib/api-client.ts` wrapper and local type modules.
 - **No mobile app.** `apps/mobile` (Expo/React Native) is referenced in the Product Genesis blueprint and ADR but is absent from the repository. The monorepo scaffold did not include it.
 - **SQL migration numbering gap.** Migrations jump from `003` to `004`, then `006`–`009`, with no `002` or `005` in the schema folder (those numbers are used in the seed folder). This is not a bug, but the numbering could confuse future contributors.
-- **No OpenAPI spec file.** `docs/API/openapi.yaml` is referenced in the blueprint but is not present in the repository. The TypeScript client generation script has nothing to generate from.
+- **No checked-in hand-authored OpenAPI spec file.** The generated client relies on the development API's live Swagger document (`/openapi/v1.json`) rather than a maintained `docs/API/openapi.yaml` source file.
 - **`is_editable` on homework is not automated.** The schema comment says it should be set to `FALSE` at end of day, but there is no background job or scheduled task to do this. It would need a cron job or database trigger.
 - **Email service is hardcoded to Resend.** The `IEmailService` interface is injected, but there is only one implementation. If Resend is unavailable in a region or the account is suspended, there is no fallback.
 - **Railway cold-start risk** is acknowledged in the Product Genesis document. The API is a .NET container which can have slow cold starts after inactivity. The health check endpoint mitigates this partially, but pre-warming is not automated.
@@ -384,6 +384,6 @@ These rules are documented as non-negotiable:
 
 ## 14. Summary
 
-EduConnect is a well-architected, production-grade school communication platform at an early but functional stage. The backend feature surface is nearly complete across all 11 domain areas. The frontend covers all three user roles across auth and dashboard flows. The infrastructure, CI/CD, and security model are production-ready. The main outstanding work is: populating the TypeScript API client from the OpenAPI spec, writing backend tests (especially tenant isolation), and building the mobile app.
+EduConnect is a well-architected, production-grade school communication platform at an early but functional stage. The backend feature surface is nearly complete across all 11 domain areas. The frontend covers all three user roles across auth and dashboard flows. The infrastructure, CI/CD, and security model are production-ready. The main outstanding work is deeper HTTP/e2e coverage, deciding whether the generated `packages/api-client` should replace the web-local fetch/types layer, and clarifying the future of the deferred mobile app.
 
 The codebase reflects careful decision-making with documented trade-offs — a strong foundation for a solo product targeting Indian schools.

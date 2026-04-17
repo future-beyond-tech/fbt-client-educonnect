@@ -1687,7 +1687,7 @@
       "LoginParentCommand": {
         "type": "object",
         "properties": {
-          "rollNumber": {
+          "phone": {
             "type": "string",
             "nullable": true
           },
