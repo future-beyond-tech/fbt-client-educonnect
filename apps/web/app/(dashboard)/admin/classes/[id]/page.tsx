@@ -8,6 +8,7 @@ import { API_ENDPOINTS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -15,8 +16,15 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { ArrowLeft, GraduationCap, Trash2, UserPlus } from "lucide-react";
-import type { ClassItem, StudentListItem, MutationResponse, PagedResult } from "@/lib/types/student";
+import { ArrowLeft, GraduationCap, Pencil, Trash2, UserPlus } from "lucide-react";
+import type {
+  ClassItem,
+  ClassMutationResponse,
+  StudentListItem,
+  MutationResponse,
+  PagedResult,
+  UpdateClassRequest,
+} from "@/lib/types/student";
 import type {
   AssignClassRequest,
   SubjectItem,
@@ -51,6 +59,14 @@ export default function AdminClassDetailPage(): React.ReactElement {
 
   const [actionAssignmentId, setActionAssignmentId] = React.useState<string | null>(null);
   const assignFormRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Edit-class dialog state
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState("");
+  const [editSection, setEditSection] = React.useState("");
+  const [editAcademicYear, setEditAcademicYear] = React.useState("");
+  const [editError, setEditError] = React.useState("");
+  const [isSavingClass, setIsSavingClass] = React.useState(false);
 
   const getBestErrorMessage = React.useCallback((err: unknown, fallback: string): string => {
     if (!(err instanceof ApiError)) return fallback;
@@ -207,6 +223,56 @@ export default function AdminClassDetailPage(): React.ReactElement {
     }
   };
 
+  const openEditDialog = (): void => {
+    if (!classItem) return;
+    setSuccessMessage("");
+    setEditError("");
+    setEditName(classItem.name);
+    setEditSection(classItem.section);
+    setEditAcademicYear(classItem.academicYear);
+    setEditDialogOpen(true);
+  };
+
+  const closeEditDialog = (): void => {
+    setEditDialogOpen(false);
+    setEditError("");
+  };
+
+  const handleUpdateClass = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setEditError("");
+    setSuccessMessage("");
+
+    const trimmedName = editName.trim();
+    const trimmedSection = editSection.trim();
+    const trimmedYear = editAcademicYear.trim();
+
+    if (!trimmedName || !trimmedSection || !trimmedYear) {
+      setEditError("Class name, section, and academic year are required.");
+      return;
+    }
+
+    setIsSavingClass(true);
+    try {
+      const body: UpdateClassRequest = {
+        name: trimmedName,
+        section: trimmedSection,
+        academicYear: trimmedYear,
+      };
+      const result = await apiPut<ClassMutationResponse>(
+        `${API_ENDPOINTS.classes}/${classId}`,
+        body
+      );
+      setSuccessMessage(result.message);
+      setEditDialogOpen(false);
+      await fetchAll();
+    } catch (err) {
+      setEditError(getBestErrorMessage(err, "Failed to update class."));
+    } finally {
+      setIsSavingClass(false);
+    }
+  };
+
   const handleUnassign = async (assignment: ClassAssignmentItem): Promise<void> => {
     if (
       !confirm(`Unassign ${assignment.teacherName} from ${assignment.subject}?`)
@@ -270,17 +336,29 @@ export default function AdminClassDetailPage(): React.ReactElement {
           </Button>
         )}
         actions={(
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setShowAssignForm((p) => !p);
-              setAssignError("");
-            }}
-          >
-            <UserPlus className="h-4 w-4" />
-            Assign teacher
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={openEditDialog}
+              disabled={!classItem}
+              aria-label="Edit class details"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit details
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setShowAssignForm((p) => !p);
+                setAssignError("");
+              }}
+            >
+              <UserPlus className="h-4 w-4" />
+              Assign teacher
+            </Button>
+          </div>
         )}
         stats={[
           { label: "Students", value: (classItem?.studentCount ?? students.length).toString() },
@@ -519,6 +597,63 @@ export default function AdminClassDetailPage(): React.ReactElement {
           </Card>
         </PageSection>
       </div>
+
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(next) => {
+          if (!next) closeEditDialog();
+          else setEditDialogOpen(true);
+        }}
+        title="Edit class"
+        description="Update the class name, section, or academic year."
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeEditDialog}
+              disabled={isSavingClass}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="class-detail-edit-form"
+              disabled={isSavingClass}
+            >
+              {isSavingClass ? <Spinner size="sm" /> : "Save changes"}
+            </Button>
+          </>
+        }
+      >
+        <form id="class-detail-edit-form" onSubmit={handleUpdateClass} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Input
+              label="Class name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="e.g. 5"
+              disabled={isSavingClass}
+              data-autofocus
+            />
+            <Input
+              label="Section"
+              value={editSection}
+              onChange={(e) => setEditSection(e.target.value)}
+              placeholder="e.g. A"
+              disabled={isSavingClass}
+            />
+            <Input
+              label="Academic year"
+              value={editAcademicYear}
+              onChange={(e) => setEditAcademicYear(e.target.value)}
+              placeholder="e.g. 2026-27"
+              disabled={isSavingClass}
+            />
+          </div>
+          {editError && <StatusBanner variant="error">{editError}</StatusBanner>}
+        </form>
+      </Dialog>
     </PageShell>
   );
 }

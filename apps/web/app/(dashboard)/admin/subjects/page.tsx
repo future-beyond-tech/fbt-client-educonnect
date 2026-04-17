@@ -6,7 +6,7 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -23,8 +23,8 @@ export default function AdminSubjectsPage(): React.ReactElement {
   const [error, setError] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
 
-  // Create form
-  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  // Dialog state for create
+  const [dialogOpen, setDialogOpen] = React.useState(false);
   const [newSubjectName, setNewSubjectName] = React.useState("");
   const [isCreating, setIsCreating] = React.useState(false);
   const [createError, setCreateError] = React.useState("");
@@ -47,6 +47,19 @@ export default function AdminSubjectsPage(): React.ReactElement {
   React.useEffect(() => {
     fetchSubjects();
   }, [fetchSubjects]);
+
+  const openCreateDialog = (): void => {
+    setSuccessMessage("");
+    setNewSubjectName("");
+    setCreateError("");
+    setDialogOpen(true);
+  };
+
+  const closeDialog = (): void => {
+    setDialogOpen(false);
+    setNewSubjectName("");
+    setCreateError("");
+  };
 
   const handleCreate = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -72,8 +85,7 @@ export default function AdminSubjectsPage(): React.ReactElement {
         body
       );
       setSuccessMessage(result.message);
-      setShowCreateForm(false);
-      setNewSubjectName("");
+      closeDialog();
       fetchSubjects();
     } catch (err) {
       setCreateError(
@@ -102,13 +114,7 @@ export default function AdminSubjectsPage(): React.ReactElement {
           </Button>
         )}
         actions={(
-          <Button
-            size="sm"
-            onClick={() => {
-              setShowCreateForm(!showCreateForm);
-              setCreateError("");
-            }}
-          >
+          <Button size="sm" onClick={openCreateDialog}>
             <Plus className="h-4 w-4" />
             Add Subject
           </Button>
@@ -119,49 +125,6 @@ export default function AdminSubjectsPage(): React.ReactElement {
 
       {successMessage && (
         <StatusBanner variant="success">{successMessage}</StatusBanner>
-      )}
-
-      {showCreateForm && (
-        <PageSection>
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg">New Subject</CardTitle>
-          </CardHeader>
-          <CardContent className="px-0 pb-0">
-            <form onSubmit={handleCreate} className="space-y-3">
-              <Input
-                id="subjectName"
-                label="Subject Name"
-                value={newSubjectName}
-                onChange={(e) => setNewSubjectName(e.target.value)}
-                placeholder="e.g. Mathematics"
-                disabled={isCreating}
-                maxLength={80}
-                autoFocus
-              />
-              {createError && (
-                <p className="text-sm text-destructive">{createError}</p>
-              )}
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={isCreating}>
-                  {isCreating ? <Spinner size="sm" /> : "Create"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setNewSubjectName("");
-                    setCreateError("");
-                  }}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </PageSection>
       )}
 
       {isLoading ? (
@@ -180,6 +143,7 @@ export default function AdminSubjectsPage(): React.ReactElement {
               aria-hidden="true"
             />
           }
+          action={{ label: "Add Subject", onClick: openCreateDialog }}
         />
       ) : (
         <PageSection className="space-y-4">
@@ -204,6 +168,49 @@ export default function AdminSubjectsPage(): React.ReactElement {
           </div>
         </PageSection>
       )}
+
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(next) => {
+          if (!next) closeDialog();
+          else setDialogOpen(true);
+        }}
+        title="New subject"
+        description="Add a subject to the catalog so teachers can be assigned to it."
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeDialog}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="subject-form"
+              disabled={isCreating}
+            >
+              {isCreating ? <Spinner size="sm" /> : "Create subject"}
+            </Button>
+          </>
+        }
+      >
+        <form id="subject-form" onSubmit={handleCreate} className="space-y-4">
+          <Input
+            id="subjectName"
+            label="Subject name"
+            value={newSubjectName}
+            onChange={(e) => setNewSubjectName(e.target.value)}
+            placeholder="e.g. Mathematics"
+            disabled={isCreating}
+            maxLength={80}
+            data-autofocus
+          />
+          {createError && <StatusBanner variant="error">{createError}</StatusBanner>}
+        </form>
+      </Dialog>
     </PageShell>
   );
 }

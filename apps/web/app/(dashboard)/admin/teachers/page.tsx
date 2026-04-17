@@ -16,7 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TeacherListItem, TeacherPagedResult } from "@/lib/types/teacher";
+
+type StaffRoleFilter = "all" | "teacher" | "admin";
 
 export default function AdminTeachersPage(): React.ReactElement {
   const router = useRouter();
@@ -28,6 +31,7 @@ export default function AdminTeachersPage(): React.ReactElement {
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [roleFilter, setRoleFilter] = React.useState<StaffRoleFilter>("all");
 
   const pageSize = 20;
 
@@ -67,6 +71,21 @@ export default function AdminTeachersPage(): React.ReactElement {
     fetchTeachers();
   }, [fetchTeachers]);
 
+  const visibleTeachers = React.useMemo(() => {
+    if (roleFilter === "all") return teachers;
+    if (roleFilter === "admin") return teachers.filter((t) => t.role === "Admin");
+    return teachers.filter((t) => t.role === "Teacher");
+  }, [roleFilter, teachers]);
+
+  const roleCounts = React.useMemo(
+    () => ({
+      all: teachers.length,
+      teacher: teachers.filter((t) => t.role === "Teacher").length,
+      admin: teachers.filter((t) => t.role === "Admin").length,
+    }),
+    [teachers]
+  );
+
   return (
     <PageShell>
       <PageHeader
@@ -105,13 +124,40 @@ export default function AdminTeachersPage(): React.ReactElement {
       />
 
       <PageSection className="space-y-4">
-        <div className="max-w-md">
-          <Input
-            placeholder="Search by name or phone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search teachers"
-          />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="w-full max-w-md">
+            <Input
+              placeholder="Search by name or phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search teachers"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              { key: "all", label: `All (${roleCounts.all})` },
+              { key: "teacher", label: `Teachers (${roleCounts.teacher})` },
+              { key: "admin", label: `Admins (${roleCounts.admin})` },
+            ] as const).map((option) => {
+              const isActive = roleFilter === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setRoleFilter(option.key)}
+                  aria-pressed={isActive}
+                  className={cn(
+                    "focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                    isActive
+                      ? "rainbow-bg border-transparent text-white shadow-[0_10px_24px_-16px_rgba(15,40,69,0.55)]"
+                      : "border-border/70 bg-card/70 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {isLoading ? (
@@ -143,13 +189,32 @@ export default function AdminTeachersPage(): React.ReactElement {
                 : undefined
             }
           />
+        ) : visibleTeachers.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-border/70 bg-card/60 p-8 text-center shadow-[0_18px_46px_-34px_rgba(15,40,69,0.3)] dark:bg-card/80">
+            <p className="text-sm font-medium text-foreground">
+              No staff match the {roleFilter === "admin" ? "Admins" : "Teachers"} filter.
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Switch to a different role filter to see more results.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setRoleFilter("all")}
+              className="mt-4"
+            >
+              Show all
+            </Button>
+          </div>
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {totalCount} staff account{totalCount !== 1 ? "s" : ""}
+              Showing {visibleTeachers.length} of {totalCount} staff account
+              {totalCount !== 1 ? "s" : ""}
+              {roleFilter !== "all" ? ` (${roleFilter === "admin" ? "admins" : "teachers"} only)` : ""}
             </p>
             <div className="space-y-3">
-              {teachers.map((teacher) => (
+              {visibleTeachers.map((teacher) => (
                 <button
                   key={teacher.id}
                   onClick={() =>
