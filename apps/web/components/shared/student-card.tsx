@@ -22,7 +22,6 @@ export function StudentCard({
   showInactiveBadge = true,
   onClick,
 }: StudentCardProps): React.ReactElement {
-  const Wrapper = onClick ? "button" : "div";
   const initials = name
     .split(" ")
     .filter(Boolean)
@@ -30,16 +29,14 @@ export function StudentCard({
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-  return (
-    <Wrapper
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_22px_60px_-42px_rgba(15,40,69,0.45)] transition-all backdrop-blur-sm dark:bg-card/92 dark:shadow-[0_24px_68px_-44px_rgba(10,14,24,0.84)] ${
-        onClick
-          ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          : ""
-      } ${!isActive ? "opacity-60" : ""}`}
-      aria-label={`Student ${name}, roll number ${rollNumber}`}
-    >
+  const cardClassName = `flex w-full items-center justify-between gap-4 rounded-[26px] border border-border/70 bg-card/86 p-4 text-left shadow-[0_22px_60px_-42px_rgba(15,40,69,0.45)] transition-all backdrop-blur-sm dark:bg-card/92 dark:shadow-[0_24px_68px_-44px_rgba(10,14,24,0.84)] ${
+    onClick
+      ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      : ""
+  } ${!isActive ? "opacity-60" : ""}`;
+
+  const content = (
+    <>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgb(var(--primary)/0.14),rgb(var(--accent)/0.14))] text-sm font-semibold text-primary">
           {initials || "ST"}
@@ -58,6 +55,28 @@ export function StudentCard({
           <Badge variant="destructive">Inactive</Badge>
         )}
       </div>
-    </Wrapper>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cardClassName}
+        aria-label={`Student ${name}, roll number ${rollNumber}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className={cardClassName}
+      aria-label={`Student ${name}, roll number ${rollNumber}`}
+    >
+      {content}
+    </div>
   );
 }

@@ -14,6 +14,7 @@ import type { ClassItem } from "@/lib/types/student";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -28,7 +29,8 @@ import {
 import { StatusBanner } from "@/components/shared/status-banner";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
-import { Bell, Check, Plus, Send } from "lucide-react";
+import { Bell, Check, Paperclip, Plus, Search, Send, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type NoticeTargetAudience = "All" | "Class" | "Section";
 
@@ -64,7 +66,8 @@ export default function AdminNoticesPage(): React.ReactElement {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
-  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  // Dialog state for create
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [createTitle, setCreateTitle] = React.useState("");
   const [createBody, setCreateBody] = React.useState("");
   const [createTargetAudience, setCreateTargetAudience] =
@@ -78,6 +81,12 @@ export default function AdminNoticesPage(): React.ReactElement {
   const [isPublishing, setIsPublishing] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState("");
 
+  // List filter + search
+  const [stateFilter, setStateFilter] = React.useState<"all" | "draft" | "published">("all");
+  const [listSearch, setListSearch] = React.useState("");
+
+  // Dialog state for attach-after-create
+  const [attachDialogOpen, setAttachDialogOpen] = React.useState(false);
   const [newNoticeId, setNewNoticeId] = React.useState<string | null>(null);
   const [newNoticeAttachments, setNewNoticeAttachments] = React.useState<UploadedFile[]>([]);
 
@@ -284,6 +293,24 @@ export default function AdminNoticesPage(): React.ReactElement {
     setCreateError("");
   }, []);
 
+  const openCreateDialog = (): void => {
+    setSuccessMessage("");
+    resetCreateForm();
+    setCreateDialogOpen(true);
+  };
+
+  const closeCreateDialog = (): void => {
+    setCreateDialogOpen(false);
+    resetCreateForm();
+  };
+
+  const closeAttachDialog = (): void => {
+    setAttachDialogOpen(false);
+    setNewNoticeId(null);
+    setNewNoticeAttachments([]);
+    void fetchNotices();
+  };
+
   const handleCreate = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setCreateError("");
@@ -322,10 +349,11 @@ export default function AdminNoticesPage(): React.ReactElement {
     try {
       const response = await apiPost<CreateNoticeResponse>(API_ENDPOINTS.notices, body);
       setSuccessMessage(response.message);
-      setShowCreateForm(false);
+      setCreateDialogOpen(false);
       resetCreateForm();
       setNewNoticeId(response.noticeId);
       setNewNoticeAttachments([]);
+      setAttachDialogOpen(true);
       void fetchNotices();
     } catch (err) {
       setCreateError(
@@ -373,8 +401,43 @@ export default function AdminNoticesPage(): React.ReactElement {
     });
   };
 
-  const drafts = notices.filter((notice) => !notice.isPublished);
-  const published = notices.filter((notice) => notice.isPublished);
+  // Single-pass partition for total counts.
+  const { drafts, published } = React.useMemo(() => {
+    const draftBucket: typeof notices = [];
+    const publishedBucket: typeof notices = [];
+    for (const notice of notices) {
+      if (notice.isPublished) publishedBucket.push(notice);
+      else draftBucket.push(notice);
+    }
+    return { drafts: draftBucket, published: publishedBucket };
+  }, [notices]);
+
+  // Single pass: filter + partition into visibleDrafts / visiblePublished.
+  const { filteredNotices, visibleDrafts, visiblePublished } = React.useMemo(() => {
+    const needle = listSearch.trim().toLowerCase();
+    const filtered: typeof notices = [];
+    const draftBucket: typeof notices = [];
+    const publishedBucket: typeof notices = [];
+    for (const notice of notices) {
+      if (stateFilter === "draft" && notice.isPublished) continue;
+      if (stateFilter === "published" && !notice.isPublished) continue;
+      if (needle) {
+        const title = notice.title.toLowerCase();
+        const body = notice.body.toLowerCase();
+        if (!title.includes(needle) && !body.includes(needle)) continue;
+      }
+      filtered.push(notice);
+      if (notice.isPublished) publishedBucket.push(notice);
+      else draftBucket.push(notice);
+    }
+    return {
+      filteredNotices: filtered,
+      visibleDrafts: draftBucket,
+      visiblePublished: publishedBucket,
+    };
+  }, [listSearch, notices, stateFilter]);
+
+  const isListFiltering = stateFilter !== "all" || !!listSearch.trim();
 
   return (
     <PageShell>
@@ -384,14 +447,7 @@ export default function AdminNoticesPage(): React.ReactElement {
         description="Draft, attach, and publish announcements with clear audience targeting."
         icon={<Bell className="h-6 w-6" aria-hidden="true" />}
         actions={(
-          <Button
-            onClick={() => {
-              setShowCreateForm((current) => !current);
-              setCreateError("");
-              setSuccessMessage("");
-            }}
-            size="sm"
-          >
+          <Button onClick={openCreateDialog} size="sm">
             <Plus className="h-4 w-4" />
             New Notice
           </Button>
@@ -404,273 +460,6 @@ export default function AdminNoticesPage(): React.ReactElement {
 
       {successMessage && (
         <StatusBanner variant="success">{successMessage}</StatusBanner>
-      )}
-
-      {newNoticeId && (
-        <PageSection className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold">Attach Files to Notice</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Optionally attach images or PDFs to the draft notice before publishing.
-            </p>
-          </div>
-          <AttachmentUploader
-            entityId={newNoticeId}
-            entityType="notice"
-            existingAttachments={newNoticeAttachments}
-            onAttachmentsChange={setNewNoticeAttachments}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setNewNoticeId(null);
-              setNewNoticeAttachments([]);
-              void fetchNotices();
-            }}
-          >
-            Done
-          </Button>
-        </PageSection>
-      )}
-
-      {showCreateForm && (
-        <PageSection>
-          <form onSubmit={handleCreate} className="space-y-5">
-            <h3 className="text-lg font-semibold">Create Notice</h3>
-
-            <Input
-              id="createTitle"
-              label="Title"
-              placeholder="Notice title"
-              value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)}
-              disabled={isCreating}
-            />
-
-            <Textarea
-              id="createBody"
-              label="Body"
-              placeholder="Notice content..."
-              value={createBody}
-              onChange={(e) => setCreateBody(e.target.value)}
-              disabled={isCreating}
-              rows={5}
-            />
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <Select
-                id="createTargetAudience"
-                label="Target Audience"
-                value={createTargetAudience}
-                onChange={(e) => {
-                  setCreateTargetAudience(e.target.value as NoticeTargetAudience);
-                  setCreateError("");
-                }}
-                disabled={isCreating}
-                hint="Choose whether this notice goes to everyone, one class across all sections, or only selected sections."
-              >
-                <option value="All">Whole School</option>
-                <option value="Class">Class (All Sections)</option>
-                <option value="Section">Specific Sections</option>
-              </Select>
-
-              <Input
-                id="createExpiresAt"
-                label="Expires At (optional)"
-                type="datetime-local"
-                value={createExpiresAt}
-                onChange={(e) => setCreateExpiresAt(e.target.value)}
-                disabled={isCreating}
-              />
-            </div>
-
-            {createTargetAudience !== "All" && (
-              <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">
-                    Class Targeting
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Start by choosing the class group, then either include every
-                    section or hand-pick the sections that should receive the notice.
-                  </p>
-                </div>
-
-                {classLoadError && (
-                  <StatusBanner variant="warning">{classLoadError}</StatusBanner>
-                )}
-
-                {!classLoadError && classes.length === 0 && (
-                  <StatusBanner variant="warning">
-                    No classes are available yet. Create classes first to send targeted notices.
-                  </StatusBanner>
-                )}
-
-                <Select
-                  id="createClassGroupKey"
-                  label="Class"
-                  value={createClassGroupKey}
-                  onChange={(e) => {
-                    setCreateClassGroupKey(e.target.value);
-                    setCreateError("");
-                  }}
-                  disabled={isCreating || !!classLoadError || classes.length === 0}
-                  hint={
-                    classLoadError
-                      ? "Reload the page to retry loading classes."
-                      : "This groups all sections from the same class and academic year."
-                  }
-                >
-                  <option value="" disabled>
-                    Select a class
-                  </option>
-                  {classGroups.map((group) => (
-                    <option key={group.key} value={group.key}>
-                      {formatClassGroupLabel(group)}
-                    </option>
-                  ))}
-                </Select>
-
-                {selectedClassGroup && (
-                  <div className="rounded-[22px] border border-border/70 bg-card/60 px-4 py-3 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)]">
-                    <p className="text-sm font-medium text-foreground">
-                      {formatClassGroupLabel(selectedClassGroup)}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedClassGroup.sections.map((section) => {
-                        const isSelected =
-                          createTargetAudience === "Class" ||
-                          createTargetSectionIds.includes(section.id);
-
-                        return (
-                          <Badge
-                            key={section.id}
-                            variant={isSelected ? "default" : "outline"}
-                          >
-                            Section {section.section}
-                            {section.studentCount > 0
-                              ? ` • ${section.studentCount} students`
-                              : ""}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {createTargetAudience === "Class"
-                        ? `This notice will go to every section in ${formatClassGroupLabel(selectedClassGroup)}.`
-                        : selectedTargetClassIds.length > 0
-                          ? `${selectedTargetClassIds.length} section${selectedTargetClassIds.length === 1 ? "" : "s"} selected for this notice.`
-                          : "Pick the specific sections that should receive this notice."}
-                    </p>
-                  </div>
-                )}
-
-                {createTargetAudience === "Section" && selectedClassGroup && (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground">
-                        Sections
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            setCreateTargetSectionIds(
-                              selectedClassGroup.sections.map((section) => section.id)
-                            )
-                          }
-                          disabled={isCreating}
-                        >
-                          Select All
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setCreateTargetSectionIds([])}
-                          disabled={isCreating || createTargetSectionIds.length === 0}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {selectedClassGroup.sections.map((section) => {
-                        const isSelected = createTargetSectionIds.includes(section.id);
-
-                        return (
-                          <button
-                            key={section.id}
-                            type="button"
-                            onClick={() => toggleSection(section.id)}
-                            aria-pressed={isSelected}
-                            className={`flex items-center justify-between rounded-[22px] border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                              isSelected
-                                ? "border-primary bg-primary/6"
-                                : "border-border/70 bg-card/60 hover:border-primary/20 hover:bg-card"
-                            }`}
-                          >
-                            <div>
-                              <p className="font-medium text-foreground">
-                                Section {section.section}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {section.studentCount} student
-                                {section.studentCount === 1 ? "" : "s"}
-                              </p>
-                            </div>
-                            {isSelected && (
-                              <Check className="h-4 w-4 text-primary" aria-hidden="true" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-[24px] border border-dashed border-border/80 bg-muted/30 p-4">
-              <p className="text-sm font-medium text-foreground">
-                Audience Preview
-              </p>
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {audiencePreview.title}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {audiencePreview.detail}
-              </p>
-            </div>
-
-            {createError && (
-              <StatusBanner variant="error">{createError}</StatusBanner>
-            )}
-
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={isCreating}>
-                {isCreating ? <Spinner size="sm" /> : "Create Draft"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  setCreateError("");
-                }}
-                disabled={isCreating}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </PageSection>
       )}
 
       {isLoading ? (
@@ -686,15 +475,97 @@ export default function AdminNoticesPage(): React.ReactElement {
           icon={<Bell className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
           action={{
             label: "Create Notice",
-            onClick: () => setShowCreateForm(true),
+            onClick: openCreateDialog,
           }}
         />
       ) : (
         <PageSection className="space-y-6">
-          {drafts.length > 0 && (
+          {/* Toolbar: search + state chips */}
+          <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-md">
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  type="search"
+                  value={listSearch}
+                  onChange={(e) => setListSearch(e.target.value)}
+                  placeholder="Search notices by title or body"
+                  aria-label="Search notices"
+                  className="focus-ring h-11 w-full rounded-[18px] border border-border/70 bg-card/80 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground shadow-[0_12px_36px_-30px_rgba(15,40,69,0.4)] dark:bg-card/90"
+                />
+                {listSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setListSearch("")}
+                    aria-label="Clear search"
+                    className="focus-ring absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  { key: "all", label: `All (${notices.length})` },
+                  { key: "draft", label: `Drafts (${drafts.length})` },
+                  { key: "published", label: `Published (${published.length})` },
+                ] as const).map((option) => {
+                  const isActive = stateFilter === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setStateFilter(option.key)}
+                      aria-pressed={isActive}
+                      className={cn(
+                        "focus-ring inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                        isActive
+                          ? "rainbow-bg border-transparent text-white shadow-[0_10px_24px_-16px_rgba(15,40,69,0.55)]"
+                          : "border-border/70 bg-card/70 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredNotices.length} of {notices.length} notice
+              {notices.length !== 1 ? "s" : ""}
+              {isListFiltering ? " (filtered)" : ""}.
+            </p>
+          </div>
+
+          {filteredNotices.length === 0 && (
+            <div className="rounded-[24px] border border-dashed border-border/70 bg-card/60 p-8 text-center shadow-[0_18px_46px_-34px_rgba(15,40,69,0.3)] dark:bg-card/80">
+              <p className="text-sm font-medium text-foreground">
+                No notices match your filters.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try a different search term or change the state filter.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setListSearch("");
+                  setStateFilter("all");
+                }}
+                className="mt-4"
+              >
+                Reset filters
+              </Button>
+            </div>
+          )}
+
+          {visibleDrafts.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Drafts</h2>
-              {drafts.map((notice) => (
+              {visibleDrafts.map((notice) => (
                 <Card
                   key={notice.noticeId}
                   className="border-l-4 border-l-[rgb(var(--primary)/0.5)] transition-[box-shadow,border-color] hover:border-l-[rgb(var(--primary-strong))] hover:shadow-[0_8px_30px_-8px_rgb(var(--primary)/0.25)]"
@@ -715,6 +586,20 @@ export default function AdminNoticesPage(): React.ReactElement {
                         >
                           {formatNoticeAudienceLabel(notice)}
                         </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSuccessMessage("");
+                            setNewNoticeId(notice.noticeId);
+                            setNewNoticeAttachments([]);
+                            setAttachDialogOpen(true);
+                          }}
+                          aria-label={`Attach files to ${notice.title}`}
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          Attach
+                        </Button>
                         <Button
                           size="sm"
                           onClick={() => void handlePublish(notice.noticeId)}
@@ -751,10 +636,10 @@ export default function AdminNoticesPage(): React.ReactElement {
             </div>
           )}
 
-          {published.length > 0 && (
+          {visiblePublished.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Published</h2>
-              {published.map((notice) => (
+              {visiblePublished.map((notice) => (
                 <Card
                   key={notice.noticeId}
                   className="border-l-4 border-l-[rgb(var(--primary))] transition-[box-shadow,border-color] hover:border-l-[rgb(var(--primary-strong))] hover:shadow-[0_8px_30px_-8px_rgb(var(--primary)/0.25)]"
@@ -802,6 +687,274 @@ export default function AdminNoticesPage(): React.ReactElement {
           )}
         </PageSection>
       )}
+
+      {/* Create Notice dialog */}
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(next) => {
+          if (!next) closeCreateDialog();
+          else setCreateDialogOpen(true);
+        }}
+        title="New notice"
+        description="Draft the announcement, choose an audience, and save. Files can be attached after the draft is created."
+        size="lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeCreateDialog}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="notice-form" disabled={isCreating}>
+              {isCreating ? <Spinner size="sm" /> : "Create draft"}
+            </Button>
+          </>
+        }
+      >
+        <form id="notice-form" onSubmit={handleCreate} className="space-y-5">
+          <Input
+            id="createTitle"
+            label="Title"
+            placeholder="Notice title"
+            value={createTitle}
+            onChange={(e) => setCreateTitle(e.target.value)}
+            disabled={isCreating}
+            data-autofocus
+          />
+
+          <Textarea
+            id="createBody"
+            label="Body"
+            placeholder="Notice content..."
+            value={createBody}
+            onChange={(e) => setCreateBody(e.target.value)}
+            disabled={isCreating}
+            rows={5}
+          />
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <Select
+              id="createTargetAudience"
+              label="Target Audience"
+              value={createTargetAudience}
+              onChange={(e) => {
+                setCreateTargetAudience(e.target.value as NoticeTargetAudience);
+                setCreateError("");
+              }}
+              disabled={isCreating}
+              hint="Choose whether this notice goes to everyone, one class across all sections, or only selected sections."
+            >
+              <option value="All">Whole School</option>
+              <option value="Class">Class (All Sections)</option>
+              <option value="Section">Specific Sections</option>
+            </Select>
+
+            <Input
+              id="createExpiresAt"
+              label="Expires At (optional)"
+              type="datetime-local"
+              value={createExpiresAt}
+              onChange={(e) => setCreateExpiresAt(e.target.value)}
+              disabled={isCreating}
+            />
+          </div>
+
+          {createTargetAudience !== "All" && (
+            <div className="space-y-4 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_20px_50px_-40px_rgba(15,40,69,0.42)] dark:bg-card/88">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Class Targeting
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Start by choosing the class group, then either include every
+                  section or hand-pick the sections that should receive the notice.
+                </p>
+              </div>
+
+              {classLoadError && (
+                <StatusBanner variant="warning">{classLoadError}</StatusBanner>
+              )}
+
+              {!classLoadError && classes.length === 0 && (
+                <StatusBanner variant="warning">
+                  No classes are available yet. Create classes first to send targeted notices.
+                </StatusBanner>
+              )}
+
+              <Select
+                id="createClassGroupKey"
+                label="Class"
+                value={createClassGroupKey}
+                onChange={(e) => {
+                  setCreateClassGroupKey(e.target.value);
+                  setCreateError("");
+                }}
+                disabled={isCreating || !!classLoadError || classes.length === 0}
+                hint={
+                  classLoadError
+                    ? "Reload the page to retry loading classes."
+                    : "This groups all sections from the same class and academic year."
+                }
+              >
+                <option value="" disabled>
+                  Select a class
+                </option>
+                {classGroups.map((group) => (
+                  <option key={group.key} value={group.key}>
+                    {formatClassGroupLabel(group)}
+                  </option>
+                ))}
+              </Select>
+
+              {selectedClassGroup && (
+                <div className="rounded-[22px] border border-border/70 bg-card/60 px-4 py-3 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)]">
+                  <p className="text-sm font-medium text-foreground">
+                    {formatClassGroupLabel(selectedClassGroup)}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedClassGroup.sections.map((section) => {
+                      const isSelected =
+                        createTargetAudience === "Class" ||
+                        createTargetSectionIds.includes(section.id);
+
+                      return (
+                        <Badge
+                          key={section.id}
+                          variant={isSelected ? "default" : "outline"}
+                        >
+                          Section {section.section}
+                          {section.studentCount > 0
+                            ? ` • ${section.studentCount} students`
+                            : ""}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {createTargetAudience === "Class"
+                      ? `This notice will go to every section in ${formatClassGroupLabel(selectedClassGroup)}.`
+                      : selectedTargetClassIds.length > 0
+                        ? `${selectedTargetClassIds.length} section${selectedTargetClassIds.length === 1 ? "" : "s"} selected for this notice.`
+                        : "Pick the specific sections that should receive this notice."}
+                  </p>
+                </div>
+              )}
+
+              {createTargetAudience === "Section" && selectedClassGroup && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      Sections
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setCreateTargetSectionIds(
+                            selectedClassGroup.sections.map((section) => section.id)
+                          )
+                        }
+                        disabled={isCreating}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCreateTargetSectionIds([])}
+                        disabled={isCreating || createTargetSectionIds.length === 0}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {selectedClassGroup.sections.map((section) => {
+                      const isSelected = createTargetSectionIds.includes(section.id);
+
+                      return (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => toggleSection(section.id)}
+                          aria-pressed={isSelected}
+                          className={`flex items-center justify-between rounded-[22px] border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            isSelected
+                              ? "border-primary bg-primary/6"
+                              : "border-border/70 bg-card/60 hover:border-primary/20 hover:bg-card"
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium text-foreground">
+                              Section {section.section}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {section.studentCount} student
+                              {section.studentCount === 1 ? "" : "s"}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-[24px] border border-dashed border-border/80 bg-muted/30 p-4">
+            <p className="text-sm font-medium text-foreground">
+              Audience Preview
+            </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">
+              {audiencePreview.title}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {audiencePreview.detail}
+            </p>
+          </div>
+
+          {createError && (
+            <StatusBanner variant="error">{createError}</StatusBanner>
+          )}
+        </form>
+      </Dialog>
+
+      {/* Attach files dialog */}
+      <Dialog
+        open={attachDialogOpen}
+        onOpenChange={(next) => {
+          if (!next) closeAttachDialog();
+          else setAttachDialogOpen(true);
+        }}
+        title="Attach files"
+        description="Optionally attach images or PDFs to the draft notice before publishing."
+        size="lg"
+        footer={
+          <Button type="button" onClick={closeAttachDialog}>
+            Done
+          </Button>
+        }
+      >
+        {newNoticeId && (
+          <AttachmentUploader
+            entityId={newNoticeId}
+            entityType="notice"
+            existingAttachments={newNoticeAttachments}
+            onAttachmentsChange={setNewNoticeAttachments}
+          />
+        )}
+      </Dialog>
     </PageShell>
   );
 }
