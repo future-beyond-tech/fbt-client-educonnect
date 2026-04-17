@@ -1,6 +1,6 @@
 ═══════════════════════════════════════════════════
 EDUCONNECT — FULL FEATURE AUDIT REPORT
-Generated: 2026-04-15
+Generated: 2026-04-17
 Audited by: FBT Engineering / Claude Cowork
 ═══════════════════════════════════════════════════
 
@@ -10,9 +10,9 @@ Repo type:         Monorepo (pnpm workspaces + Turborepo)
 Backend project:   EduConnect.Api  →  apps/api/src/EduConnect.Api/
 Frontend project:  @educonnect/web →  apps/web/
 Shared packages:   packages/api-client, packages/ui, packages/config
-Total .cs files:   261
-Total .tsx files:  69
-Total migrations:  11 schema + 3 seed = 14 SQL migration files (raw SQL runner, not EF migrations)
+Total .cs files:   322
+Total .tsx files:  77
+Total migrations:  4 EF schema migrations (+ designers/snapshot) + 4 seed SQL files
 DB tables:         schools, users, classes, teacher_class_assignments, students,
                    parent_student_links, attendance_records, homework, notices,
                    refresh_tokens, auth_reset_tokens, subjects, notifications,
@@ -31,7 +31,7 @@ FEATURE: Authentication & Login
   Backend:   Complete
   Frontend:  Complete
   Overall:   ✅ LIVE
-  Notes:     Custom JWT auth (NOT Zentra). Staff login via email+password, parent login via phone+PIN.
+  Notes:     Custom JWT auth (NOT Zentra). Staff login via phone+password, parent login via phone+PIN.
              Refresh token stored as HttpOnly cookie. Automatic silent refresh 2 minutes before expiry.
              ForgotPassword, ResetPassword, ForgotPin, ResetPin flows all backed by Resend transactional email.
   Key files: apps/api/src/.../Features/Auth/Login/LoginCommandHandler.cs
@@ -348,10 +348,11 @@ NOT STARTED (roadmap only)
    - No Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, or HSTS headers
      configured in the backend middleware, Next.js config, or Dockerfiles.
 
-❌ Shared API Client Package (packages/api-client)
-   - The monorepo has a packages/api-client workspace but its src/generated/ folder contains
-     only a .gitkeep. The frontend uses its own lib/api-client.ts directly. The shared package
-     was scaffolded but never populated.
+❌ Shared API Client Adoption
+   - The monorepo now generates `packages/api-client/src/generated/openapi.json` and
+     `schema.ts` from the development API, but the frontend still uses its own
+     `apps/web/lib/api-client.ts` wrapper and local type modules instead of consuming
+     the shared package directly.
 
 ────────────────
 NOTABLE ISSUES FOUND
@@ -384,10 +385,10 @@ NOTABLE ISSUES FOUND
      attendance). There is no summary/overview dashboard page for any role. Users land directly
      on a feature list page.
 
-[P2] packages/api-client Is Empty / Unused
-   - A shared typed API client was scaffolded in packages/api-client but never implemented.
-     The frontend duplicates type definitions across lib/types/. This is manageable now but
-     will become a drift risk as the API grows.
+[P2] packages/api-client Is Generated But Still Unused By The Web App
+   - A shared typed API schema package now exists in packages/api-client, but the frontend
+     still duplicates request/response typing across apps/web/lib/types/ and uses its own
+     fetch wrapper. This is manageable now but remains a drift risk as the API grows.
 
 [P3] No Teacher Notices Capability
    - Teachers have no route or endpoint to post notices. Only Admins can create/publish notices.
@@ -395,6 +396,6 @@ NOTABLE ISSUES FOUND
 
 ═══════════════════════════════════════════════════
 END OF AUDIT REPORT
-Generated: 2026-04-15
+Generated: 2026-04-17
 Auditor: FBT Engineering
 ═══════════════════════════════════════════════════

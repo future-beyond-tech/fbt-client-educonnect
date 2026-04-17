@@ -1,6 +1,6 @@
 # EduConnect
 
-School communication platform — attendance, homework, notices.
+School communication platform for attendance, homework, notices, leave workflows, parent/student linking, notifications, and attachments.
 
 ## Prerequisites
 
@@ -117,6 +117,12 @@ pnpm test
 pnpm build
 ```
 
+- **Regenerate the shared OpenAPI artifacts**:
+
+```bash
+pnpm openapi:generate
+```
+
 ## E2E tests (web)
 
 ```bash
@@ -127,4 +133,10 @@ pnpm test:e2e:web
 
 - `apps/web`: Next.js app
 - `apps/api`: .NET API
-- `packages/*`: shared packages (UI, API client, config, etc.)
+- `packages/*`: shared packages (UI tokens, generated API schema exports, config, etc.)
+
+## Docs
+
+- `docs/SETUP.md`: local development setup and seed credentials
+- `docs/RAILWAY_DEPLOYMENT.md`: current Railway deployment contract
+- `EDUCONNECT_CAPABILITIES_BY_ROLE.md`: current user-visible capabilities by role

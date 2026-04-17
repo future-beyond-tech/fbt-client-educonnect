@@ -527,6 +527,13 @@ pnpm local:backend:test
 dotnet test apps/api/tests/EduConnect.Api.Tests/EduConnect.Api.Tests.csproj -c Release
 ```
 
+### OpenAPI / generated schema refresh
+
+```bash
+# API must be bootable locally; in Development it serves /openapi/v1.json
+pnpm openapi:generate
+```
+
 ### Database Migration Check (same direction as CI and deploy)
 
 ```bash

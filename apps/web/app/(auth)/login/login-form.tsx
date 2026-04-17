@@ -16,7 +16,6 @@ import {
   normalizeJapanPhoneInput,
 } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBanner } from "@/components/shared/status-banner";
 
@@ -31,13 +30,12 @@ export function LoginForm(): React.ReactElement {
   const { login, user, isLoading: isAuthLoading } = useAuth();
   const [mode, setMode] = React.useState<LoginMode>("parent");
   const [phone, setPhone] = React.useState<string>("");
-  const [rollNumber, setRollNumber] = React.useState<string>("");
   const [pin, setPin] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
   const [error, setError] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
-  const staffPhoneRef = React.useRef<HTMLInputElement | null>(null);
+  const phoneRef = React.useRef<HTMLInputElement | null>(null);
   const secureFieldClassName =
     "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -65,15 +63,9 @@ export function LoginForm(): React.ReactElement {
     setError("");
   };
 
-  const handleRollNumberChange = (value: string): void => {
-    setRollNumber(value.trim());
-    setError("");
-  };
-
   const handleModeSwitch = (newMode: LoginMode): void => {
     setMode(newMode);
     setPhone("");
-    setRollNumber("");
     setPin("");
     setPassword("");
     setError("");
@@ -84,8 +76,8 @@ export function LoginForm(): React.ReactElement {
     setError("");
 
     if (mode === "parent") {
-      if (!rollNumber) {
-        setError("Please enter your child's roll number");
+      if (!isValidJapanPhone(phone)) {
+        setError(JAPAN_PHONE_VALIDATION_MESSAGE);
         return;
       }
       if (pin.length < 4 || pin.length > 6) {
@@ -110,7 +102,7 @@ export function LoginForm(): React.ReactElement {
         mode === "parent" ? API_ENDPOINTS.loginParent : API_ENDPOINTS.login;
       const payload =
         mode === "parent"
-          ? { rollNumber, pin }
+          ? { phone, pin }
           : { phone, password };
 
       const response = await apiPost<LoginResponse>(endpoint, payload);
@@ -177,65 +169,54 @@ export function LoginForm(): React.ReactElement {
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
           {mode === "parent"
-            ? "Use your child’s roll number and parent PIN."
+            ? "Use your phone number and parent PIN."
             : "Use your phone number and password."}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {mode === "parent" ? (
-          <Input
-            id="rollNumber"
-            label="Roll number"
-            type="text"
-            placeholder="e.g. 2024001"
-            value={rollNumber}
-            onChange={(e): void => handleRollNumberChange(e.target.value)}
-            disabled={isLoading || isAuthLoading}
-            aria-invalid={!!error}
-            aria-describedby={error ? "form-error" : undefined}
-            autoComplete="username"
-            hint="As provided by the school."
-          />
-        ) : (
-          <div className="space-y-2">
-            <label htmlFor="phone" className="block text-sm font-medium text-foreground">
-              Phone number
-            </label>
-            <div
-              className="focus-within:ring-ring focus-within:ring-offset-background flex min-h-12 items-center gap-3 rounded-[20px] border border-input/90 bg-card/85 px-4 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-offset-2"
-              onClick={() => staffPhoneRef.current?.focus()}
-              role="group"
-              aria-labelledby="phone"
-            >
-              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1 text-sm font-semibold text-foreground/90">
-                <span className="text-muted-foreground">{JAPAN_PHONE_COUNTRY_LABEL}</span>
-                <span className="h-4 w-px bg-border/70" aria-hidden="true" />
-                {JAPAN_PHONE_COUNTRY_CODE}
-              </span>
-              <input
-                id="phone"
-                type="tel"
-                placeholder="Enter 11-digit number"
-                value={phone}
-                onChange={(e): void => handlePhoneChange(e.target.value)}
-                disabled={isLoading || isAuthLoading}
-                aria-invalid={!!error}
-                aria-describedby={error ? "form-error" : "staff-phone-hint"}
-                maxLength={JAPAN_PHONE_LOCAL_DIGITS}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                autoComplete="tel-national"
-                enterKeyHint="done"
-                ref={staffPhoneRef}
-                className="w-full flex-1 bg-transparent py-3 text-sm font-semibold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/90"
-              />
-            </div>
-            <p id="staff-phone-hint" className="text-xs text-muted-foreground">
-              Use the 11-digit number registered with the school.
-            </p>
+        <div className="space-y-2">
+          <label htmlFor="phone" className="block text-sm font-medium text-foreground">
+            Phone number
+          </label>
+          <div
+            className="focus-within:ring-ring focus-within:ring-offset-background flex min-h-12 items-center gap-3 rounded-[20px] border border-input/90 bg-card/85 px-4 shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-offset-2"
+            onClick={() => phoneRef.current?.focus()}
+            role="group"
+            aria-labelledby="phone"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1 text-sm font-semibold text-foreground/90">
+              <span className="text-muted-foreground">{JAPAN_PHONE_COUNTRY_LABEL}</span>
+              <span className="h-4 w-px bg-border/70" aria-hidden="true" />
+              {JAPAN_PHONE_COUNTRY_CODE}
+            </span>
+            <input
+              id="phone"
+              type="tel"
+              placeholder="Enter 11-digit number"
+              value={phone}
+              onChange={(e): void => handlePhoneChange(e.target.value)}
+              disabled={isLoading || isAuthLoading}
+              aria-invalid={!!error}
+              aria-describedby={error ? "form-error" : mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
+              maxLength={JAPAN_PHONE_LOCAL_DIGITS}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="tel-national"
+              enterKeyHint="done"
+              ref={phoneRef}
+              className="w-full flex-1 bg-transparent py-3 text-sm font-semibold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/90"
+            />
           </div>
-        )}
+          <p
+            id={mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
+            className="text-xs text-muted-foreground"
+          >
+            {mode === "parent"
+              ? "Use the phone number linked to your parent account."
+              : "Use the 11-digit number registered with the school."}
+          </p>
+        </div>
 
         {mode === "parent" ? (
           <div className="space-y-2">

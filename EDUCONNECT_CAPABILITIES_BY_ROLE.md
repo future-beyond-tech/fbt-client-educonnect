@@ -62,10 +62,11 @@ Source-of-truth references:
 
 ### Login
 
-- **Parent login (roll number + PIN)**
-  - **How**: `/login` → “I’m a Parent” → enter *Child’s Roll Number* and *PIN* → Login.
+- **Parent login (phone + PIN)**
+  - **How**: `/login` → “I’m a Parent” → enter *Phone* and *PIN* → Login.
   - **Web**: `apps/web/app/(auth)/login/login-form.tsx`
   - **API**: `POST /api/auth/login-parent`
+  - **After login**: the parent session can load every linked child through `GET /api/students/my-children`
 
 - **Staff login (phone + password)**
   - **How**: `/login` → “I’m Staff” → enter *Phone* and *Password* → Login.
@@ -151,7 +152,7 @@ Source: `apps/web/lib/constants.ts`
     - `GET /api/classes` (class filter options)
 
 - **Enroll new student**
-  - **How**: `/admin/students/new` → enter name, roll number, class, optional DOB → Enroll.
+  - **How**: `/admin/students/new` → enter name, roll number, class, optional DOB, and optionally skip parent setup, link an existing parent account, or create a new parent account during enrollment.
   - **Web route**: `apps/web/app/(dashboard)/admin/students/new/page.tsx`
   - **API**:
     - `GET /api/classes`
@@ -421,4 +422,3 @@ This is the full list of mapped endpoints in the current API application.
 - `POST /api/attachments/attach` (authorized)
 - `GET /api/attachments` (authorized)
 - `DELETE /api/attachments/{id}` (authorized)
-

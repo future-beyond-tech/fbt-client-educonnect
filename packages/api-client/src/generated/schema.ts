@@ -845,7 +845,7 @@ export interface components {
             password?: string | null;
         };
         LoginParentCommand: {
-            rollNumber?: string | null;
+            phone?: string | null;
             pin?: string | null;
         };
         MarkAbsenceCommand: {

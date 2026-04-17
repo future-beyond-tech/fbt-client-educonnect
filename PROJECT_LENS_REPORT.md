@@ -2,7 +2,7 @@
 
 > Forensic codebase reconnaissance across 9 lenses.
 > Target: EduConnect (a school communication platform for attendance, homework, and notices).
-> Report date: 2026-04-09.
+> Report date: 2026-04-17.
 > Scope root (as delivered to this session): `apps/`, `packages/`, `docs/`, `scripts/`, config at repo root. Excluded: `node_modules`, `.next`, `.turbo`, `dist`, `build`, `coverage`, `.git`, `apps/api/src/**/bin`, `apps/api/src/**/obj`.
 > Branch read: whatever is checked out in the working copy (most recent commit observed: `1e06d1a Local and Docker Setup`).
 
@@ -12,9 +12,9 @@
 2. "main" is the primary branch, but git history in the working copy shows only four commits (`1e06d1a`, `d657073`, `c18e46c`, `7f6367e`). Findings are drawn from the current working tree, not from branch diffs.
 3. `apps/api/src/EduConnect.Api/bin/**` and `.../obj/**` contain build artefacts (compiled DLL metadata, cached migrations copies, `logs/educonnect-*.json`). They are treated as generated and not as source of truth.
 4. The mobile app referenced in `docs/PRODUCT-GENESIS.md` ("Next.js 15 + Expo") is **not present** in this tree — only `apps/web` (Next.js) and `apps/api` (.NET) exist. The report scopes to what is on disk.
-5. `packages/api-client` is described in `package.json` as generated from OpenAPI (`openapi:generate`), but `src/index.ts` is a thin hand-written placeholder; it is treated as a stub, not a real client.
+5. `packages/api-client` is generated from the development API's OpenAPI document via `openapi:generate`; it now exports committed artifacts from `src/generated/`, even though the web app does not consume the package directly yet.
 6. A subset of feature handler logic (~50 of ~150 `.cs` files under `Features/**`) was read via a dedicated exploration pass; the remaining handlers follow the same Vertical-Slice + MediatR convention and were sampled but not exhaustively line-by-line. Where a finding depends on a handler that was not fully read, it is flagged "presumed" or "needs verification".
-7. `apps/web/tests/` does not exist; the absence of any frontend test files is treated as a finding, not as "tests not yet discovered".
+7. `apps/web/tests/` does not exist, but there is a minimal Playwright suite under `apps/web/e2e/`; the absence of frontend unit/component tests is still treated as a finding.
 8. `.env`, `.env.local`, `.env.docker` are present on disk but are ignored by `.gitignore` and are **not** tracked in git (verified with `git ls-files`). The committed secret finding applies only to literals baked into `docker-compose.yml`.
 
 ---
@@ -23,9 +23,9 @@
 
 - **What it is.** EduConnect is a modular-monolith school communication platform: a .NET 8 minimal-API backend (`apps/api`) and a Next.js 15 / React 19 PWA (`apps/web`) in a pnpm + Turbo monorepo, persisted in PostgreSQL 16 and deployed to Railway. It covers attendance, homework, notices, students/teachers/subjects, notifications, and file attachments.
 - **Architecture is sound and opinionated.** Vertical-slice + CQRS via MediatR, FluentValidation pipeline behavior, EF Core migrations auto-applied on startup, and multi-tenancy enforced by EF Core global query filters keyed to a scoped `CurrentUserService`. The separation between pipeline behaviors, middleware, and features is clean.
-- **Biggest risks cluster in operational hygiene, not design.** Test coverage is effectively zero for business logic (5 test methods total, all infrastructural), the CI `migrations` job globs the wrong path and the CI `api` test job has a `--no-build` / build-scope mismatch, `docker-compose.yml` hard-codes a literal JWT secret, and there is no failed-login throttling specific to auth endpoints despite a 4-digit parent PIN.
+- **Biggest risks cluster in operational hygiene, not design.** Test coverage is now meaningful but still selective (34 backend tests and 2 Playwright accessibility checks), the CI `api` test job still has a `--no-build` / build-scope mismatch, `docker-compose.yml` hard-codes a literal JWT secret, and there is no failed-login throttling specific to auth endpoints despite a 4-digit parent PIN.
 - **Security posture is above-average for an MVP.** BCrypt (work factor 12) for passwords and PINs, HttpOnly + Secure + SameSite=Strict refresh cookies, SHA-256-hashed reset tokens, strict JWT validation (ClockSkew=Zero), Serilog destructuring redacts sensitive fields, Sentry configs strip auth headers, and row-level tenant filters are enforced globally at the DbContext level. The main gaps are auth-endpoint rate limiting, some unverified authZ paths, and XSS-adjacent surfaces where free-text fields propagate into notifications.
-- **Frontend is lean and mobile-first.** Next.js 15 App Router with grouped routes `(auth)` and `(dashboard)`, Tailwind v4, lucide-react, framer-motion, Sentry, a service worker + manifest for PWA install, and an in-memory access-token session (no `localStorage`). Accessibility has a few specific WCAG Level A misses (unlabeled `<select>` controls in attendance pages) but color tokens meet AAA contrast.
+- **Frontend is lean and mobile-first.** Next.js 15 App Router with grouped routes `(auth)` and `(dashboard)`, Tailwind v4, lucide-react, framer-motion, Sentry, a service worker + manifest for PWA install, and a localStorage-backed access-token restore flow paired with HttpOnly refresh cookies. Accessibility has a few specific WCAG Level A misses (unlabeled `<select>` controls in attendance pages) but color tokens meet AAA contrast.
 
 ---
 
@@ -44,7 +44,7 @@ educonnect/                                      — pnpm + Turbo monorepo root 
 ├── turbo.json                                   — build / dev / lint / type-check pipeline
 ├── pnpm-workspace.yaml                          — workspace = apps/web + packages/*  (note: apps/api is NOT a pnpm workspace, it is dotnet)
 ├── docs/
-│   ├── ADR/001-architecture-decisions.md        — 7 ADRs (modular monolith, VSA+CQRS, Postgres, row-level tenancy, JWT, PPR, extend-only versioning)
+│   ├── ADR/001-architecture-decisions.md        — 7 ADRs (modular monolith, VSA+CQRS, Postgres, row-level tenancy, JWT, App Router rendering, extend-only versioning)
 │   ├── PRODUCT-GENESIS.md                       — product scope, bounded contexts, team assumptions
 │   └── SETUP.md                                 — env setup, DB profiles, migration model, seed credentials
 ├── scripts/                                     — bash + powershell helpers for local/docker DB and run/test loops
@@ -78,13 +78,13 @@ educonnect/                                      — pnpm + Turbo monorepo root 
 │   │   │       │   └── Migrations/
 │   │   │       │       └── seed/002, 004, 005, 007 — dev seed data
 │   │   │       └── Services/                    — DateTimeProvider, ResendEmailService, S3StorageService, NotificationService
-│   │   └── tests/EduConnect.Api.Tests/          — xUnit project with 3 test files, 5 test methods total
+│   │   └── tests/EduConnect.Api.Tests/          — xUnit project with 7 test files and 34 backend tests
 │   └── web/                                     — Next.js 15 App Router PWA
 │       ├── Dockerfile                           — standalone build
 │       ├── next.config.ts                       — standalone output + Sentry wiring
 │       ├── tailwind.config.ts
 │       ├── sentry.{client,server,edge}.config.ts — Sentry with header/cookie stripping
-│       ├── package.json                         — next 15.0.0, react 19.0.0, tailwind 4, sentry 8
+│       ├── package.json                         — next 15.0.7, react 19.0.0, tailwind 4, sentry 8
 │       ├── public/
 │       │   ├── manifest.json                    — PWA manifest
 │       │   └── sw.js                            — service worker: network-first nav, cache-first static, skips /api
@@ -95,9 +95,10 @@ educonnect/                                      — pnpm + Turbo monorepo root 
 │       ├── components/                          — auth-guard, layout (header/sidebar/bottom-nav), pwa (install-prompt, sw-registrar), shared, ui (button/card/input/label/badge/skeleton/spinner)
 │       ├── hooks/                               — use-auth, use-media-query, use-notifications, use-student-list
 │       ├── lib/                                  — api-client, auth/{jwt,session}, types, constants, utils, validate-env
+│       ├── e2e/                                 — Playwright accessibility smoke tests
 │       └── providers/auth-provider.tsx          — token refresh loop + auth context
 └── packages/
-    ├── api-client/                              — stub OpenAPI client (hand-written placeholder)
+    ├── api-client/                              — generated OpenAPI JSON + TypeScript schema exports
     ├── config/                                  — shared eslint / tailwind preset / tsconfig base
     └── ui/tokens/                               — design tokens (colors, spacing, typography)
 ```
@@ -161,7 +162,7 @@ graph TD
 | Monorepo | pnpm | 9.15.0 (pinned via `packageManager`) | Workspace & install | `pnpm-workspace.yaml` lists only `apps/web` + `packages/*`; `apps/api` is managed by dotnet, not pnpm |
 | Build orchestrator | Turbo | ^2.4.0 | Task pipeline | Only wires frontend tasks; api is invoked via plain `dotnet` |
 | Runtime (web) | Node | >=20 | `engines.node` in root `package.json` | |
-| Web framework | Next.js | 15.0.0 | App Router, PPR-capable | |
+| Web framework | Next.js | 15.0.7 | App Router | |
 | UI | React / React-DOM | 19.0.0 | | |
 | Styling | Tailwind CSS | ^4.0.0 + `@tailwindcss/postcss` ^4 | | v4 is a significant departure from v3; `tailwind.config.ts` still present |
 | UI deps | framer-motion ^11, lucide-react ^0.408, class-variance-authority ^0.7, clsx ^2.1, tailwind-merge ^2.3 | — | primitives | |
@@ -181,7 +182,7 @@ graph TD
 | Object storage | AWSSDK.S3 | 3.7.402.7 | S3 / R2 / MinIO via `S3_SERVICE_URL` | `ForcePathStyle = true` when service URL set |
 | Email | Resend (via `HttpClient`) | n/a (HttpClient) | forgot/reset password + PIN flows | `client.Timeout = 10s` |
 | Database | PostgreSQL | 16-alpine (docker-compose) | | Schema auto-applied on startup |
-| Test fw (api) | xUnit (implied by `dotnet test` + test file naming) | — | | Only 3 files, 5 methods |
+| Test fw (api) | xUnit | — | backend tests | 7 files, 34 tests currently checked in |
 | CI | GitHub Actions | — | `ci.yml`, `deploy.yml` | See §Risk and §Findings |
 | Deploy | Railway CLI | latest (`npm i -g @railway/cli`) | via `deploy.yml` | API and web deployed as separate services |
 
@@ -197,7 +198,7 @@ Ordered by severity × likelihood. S = high, M = medium, L = low.
 |---|---|---|---|---|---|
 | 1 | **No auth-endpoint rate limiting / lockout.** Global rate limiter keys on userId-or-IP at 60/min, but parent PINs are 4 digits (10k space). Login / forgot-pin / reset-pin inherit only the global IP bucket, which is too loose for credential stuffing. | S | M | M | `Program.cs:165-190` (single partitioned limiter); `Common/Auth/PinService.cs:25-31` (4-6 digit PIN allowed); no login-attempt counter seen in `Features/Auth/Login*` |
 | 2 | **CI `api` test step has a build-scope / `--no-build` mismatch.** The build step runs `dotnet build src/EduConnect.Api/EduConnect.Api.csproj` (API project only), then the test step runs `dotnet test tests/ -c Release --no-build`. The test project is never built, so either `--no-build` fails or the test binary is stale. | S | H | L | `.github/workflows/ci.yml:75-91` |
-| 3 | **Near-zero business-logic test coverage.** Exactly 5 test methods across 3 files (`DatabaseConnectionStringResolverTests`, `DatabaseSchemaMappingTests`, `TenantIsolationTests`). No handler tests, no endpoint tests, no validator tests, no frontend tests at all. Combined with risk #2, CI green signals very little. | S | H | L-M | `apps/api/tests/EduConnect.Api.Tests/Common/*.cs`; `apps/web` has no `tests/` dir |
+| 3 | **Backend coverage is improving, but HTTP and frontend coverage remain thin.** There are now 34 backend tests across 7 files plus 2 Playwright accessibility checks, but no `WebApplicationFactory`/container-backed API tests and no frontend unit/component suite. Combined with risk #2, CI still leaves meaningful behavior gaps. | S | M | M | `apps/api/tests/EduConnect.Api.Tests/**/*.cs`; `apps/web/e2e/a11y.spec.ts` |
 | 5 | **Committed dev JWT secret in `docker-compose.yml`.** A literal `dev-secret-key-minimum-64-characters-long-for-hmac-sha256-signing-requirement` is checked into source. Any developer who copy-pastes compose env into a real environment inherits it. | M | M | L | `docker-compose.yml:44` |
 | 6 | **Tenant query filter has a footgun for anonymous paths.** `AppDbContext` filters use `!_currentUserService.IsAuthenticated || SchoolId == …`, which means when `CurrentUserService` is unset (login, refresh, forgot-password) the filter returns **all rows**. Login handlers must manually constrain by phone-and-school, and a single forgotten `.Where(u => u.SchoolId == …)` on an anonymous path becomes a cross-tenant leak. | M | M | M | `Infrastructure/Database/AppDbContext.cs:44-73`; `Common/Middleware/TenantIsolationMiddleware.cs:15-22` (exempts `/api/auth/login`, `/login-parent`, `/refresh`) |
 | 7 | **Middleware ordering has `UseCors` after `UseAuthorization` and after rate limiter.** Per ASP.NET Core guidance, `UseCors` should sit between `UseRouting` and `UseAuthentication`. Preflight OPTIONS requests can be blocked or mis-charged against the rate limiter. | M | M | L | `Program.cs:202-219` |
@@ -208,7 +209,7 @@ Ordered by severity × likelihood. S = high, M = medium, L = low.
 | 12 | **Missing validator for `DeactivateStudentCommand`.** Every other mutation has a FluentValidation sibling; this one does not, so the MediatR `ValidationBehavior` is a no-op for it. | L | M | L | `Features/Students/DeactivateStudent/` directory (no `*Validator.cs`) |
 | 13 | **Missing index on `refresh_tokens.expires_at` for cleanup.** A scheduled or startup cleanup of expired tokens would full-scan. Low blast radius today (few rows), grows linearly. | L | M | L | `apps/api/src/EduConnect.Api/Migrations/AppDbContextModelSnapshot.cs` (no `idx_refresh_tokens_expires_at`) |
 | 14 | **Per-attachment presigned-URL generation without caching.** Even if in-process, the signing cost compounds on large lists. | L | M | L | same as #8 |
-| 15 | **`pnpm-workspace.yaml` does not include `packages/api-client`, but root `package.json` references it via `pnpm --dir packages/api-client run generate`.** Either the script is dead or the workspace file is incomplete. | L | L | L | `pnpm-workspace.yaml` only lists `apps/web` + `packages/*` — actually `packages/*` globs it, so this is resolved; however `packages/api-client/src/index.ts` is still a stub. Demoted to L. |
+| 15 | **`packages/api-client` is generated but not yet adopted by the web app.** The workspace wiring is fine and `openapi:generate` works, but the frontend still relies on `apps/web/lib/api-client.ts` plus local type modules instead of importing the shared package. | L | M | L | `packages/api-client/src/index.ts`; `apps/web/lib/api-client.ts`; `apps/web/lib/types/*.ts` |
 | 16 | **`.env`, `.env.local`, `.env.docker` contain a real-looking JWT secret literal on disk.** Gitignored, so not a source-control leak, but any developer machine backup or shared screenshare exposes it; rotation when a developer leaves is not guaranteed. | L | M | L | `.env:14`, `.env.local:22`, `.env.docker:22` |
 
 ---
@@ -219,11 +220,11 @@ Most important observations across all lenses.
 
 1. **Architecture is genuinely clean.** Vertical-slice features (`Features/<Area>/<UseCase>/{Command|Query,Handler,Validator,Endpoint}.cs`), MediatR pipeline behaviors for validation and logging, global EF query filters for tenancy, and a composition root (`Program.cs`) that reads as a checklist. Layering violations were not observed. Entry points are confined to minimal-API endpoints plus the startup migration runner. This is the report's strongest positive, and it is what makes the rest of the risks cheap to fix.
 
-2. **Tenant isolation is centralized but has an anonymous-path blind spot.** Global query filters on every tenant-scoped entity key off `CurrentUserService.IsAuthenticated`. On anonymous endpoints (`/api/auth/login`, `/refresh`) the filter returns *all* rows. The login handler must filter by phone + school explicitly; any future anonymous endpoint that queries a scoped table inherits a latent cross-tenant read. Combined with `uix_users_school_phone` (unique on `school_id, phone`, not globally), a phone number can legitimately exist in two schools — so login by phone is ambiguous unless the client is forced to pick a school first. `Infrastructure/Database/AppDbContext.cs:44-73`.
+2. **Tenant isolation is centralized but has an anonymous-path blind spot.** Global query filters on every tenant-scoped entity key off `CurrentUserService.IsAuthenticated`. On anonymous endpoints (`/api/auth/login`, `/refresh`) the filter returns *all* rows. Login handlers compensate manually, but any future anonymous endpoint that queries a scoped table inherits a latent cross-tenant read. Because phone numbers are unique only within a school, parent phone login remains potentially ambiguous if the same phone and PIN are reused across multiple schools. `Infrastructure/Database/AppDbContext.cs:44-73`.
 
-3. **CI is green-by-accident.** Two independent CI problems both mask failure: (a) the `migrations` lint job globs `Migrations/*.sql` instead of `Migrations/{schema,seed}/*.sql` and matches nothing (`.github/workflows/ci.yml:125-137`), and (b) the `api` job builds `src/EduConnect.Api` only, then runs `dotnet test tests/ --no-build`, which either fails on a missing binary or silently uses stale output (`.github/workflows/ci.yml:75-91`). Together with the near-empty test project this means "CI passed" conveys almost nothing about correctness.
+3. **CI still has a meaningful blind spot.** The migrations startup smoke test is now aligned with the real boot path, but the `api` job still builds `src/EduConnect.Api` only and then runs `dotnet test tests/ --no-build`, which can miss a fresh test-project build (`.github/workflows/ci.yml:75-91`). CI is better than before, but the backend test execution path still needs tightening.
 
-4. **The test pyramid is nearly flat.** `apps/api/tests/EduConnect.Api.Tests` has three files and five test methods total — one proves tenant isolation works in-memory, two prove `DatabaseConnectionStringResolver` parses URLs, two prove EF maps two entities to snake-case tables. No handler, no validator, no authorization, and no frontend tests exist. This is the single highest-leverage gap: the architecture is easy to test, and nothing is being tested.
+4. **The test pyramid is still backend-heavy and frontend-light.** `apps/api/tests/EduConnect.Api.Tests` now covers onboarding, auth login, notice targeting, homework attachments, and common infrastructure with 34 tests across 7 files. That is solid progress, but there are still no HTTP-level integration tests and only 2 Playwright accessibility smoke tests on the frontend. The next leverage step is end-to-end coverage, not starting from zero.
 
 5. **Auth-endpoint rate limiting is missing.** `Program.cs:165-190` installs a single global partitioned limiter at 60 req/min keyed on user-or-IP. It applies equally to `/api/attendance` and `/api/auth/login-parent`, which means a 4-digit PIN (10,000 combinations) can be walked from a single IP in under three hours ignoring only the global bucket; distributed across IPs, much faster. There is no per-account lockout, no failed-attempt counter, and no CAPTCHA. Parent PINs in particular are the weakest credential in the system.
 
@@ -231,7 +232,7 @@ Most important observations across all lenses.
 
 7. **Free-text user input flows into notifications and notices unescaped.** `MarkAbsenceCommandHandler` interpolates the parent-supplied reason into a notification body, and `CreateNoticeCommandHandler` stores notice bodies raw. The only thing keeping this from becoming XSS is that the web client does not currently render either field through `dangerouslySetInnerHTML`. That is a convention, not a guarantee, and future work on "rich notices" is the obvious regression path. Sanitize on write or render as plain text on read, consistently.
 
-8. **Frontend auth model is well-chosen but the session layer is fragile.** `apps/web/lib/auth/session.ts` keeps the access token in an in-memory variable — XSS-resistant, no `localStorage`. The refresh token is an HttpOnly + Secure + SameSite=Strict cookie with `Path="/"` (`RefreshTokenCookieOptions.cs`). `providers/auth-provider.tsx` refreshes ~2 minutes before expiry and forces re-login on 401. The weakness is that any full page refresh starts with no access token and has to hit `/api/auth/refresh` to rehydrate — that path needs to be bulletproof, and right now there is no test for it.
+8. **Frontend auth trades convenience for a broader XSS blast radius.** `apps/web/lib/auth/session.ts` keeps the access token in module state and mirrors it to `localStorage` for session restore. The refresh token remains an HttpOnly + Secure + SameSite=Strict cookie with `Path="/"` (`RefreshTokenCookieOptions.cs`). `providers/auth-provider.tsx` refreshes ~2 minutes before expiry and restores auth on boot, which improves UX, but any future XSS issue would now expose the access token as well.
 
 9. **Specific WCAG misses but a healthy design-token baseline.** The attendance pages render month/year `<select>` controls without `<label htmlFor>` — Level A failure on 1.3.1 Info and Relationships / 3.3.2 Labels. Counter-weight: decorative icons correctly use `aria-hidden`, input forms on auth pages have labels, and `packages/ui/tokens/colors.ts` ships a primary (`#2563EB`) on dark text that measures ~7.5:1 contrast (AAA). The a11y gap is implementation drift, not a framework choice.
 
@@ -260,7 +261,7 @@ Enumerated in the §Tech stack table above. Additional notes:
 - **Sentry .NET (4.12.1) is older than Sentry JS (8.40.x)** — not a conflict, but two SDK major versions across client/server makes sourcemap + event correlation a small ongoing maintenance item.
 - **Tailwind v4 is used with the `@tailwindcss/postcss` plugin.** v4 prefers CSS-first config; `tailwind.config.ts` is present but its role under v4 should be reviewed (v4 introduced `@theme` and a different plugin pipeline).
 - **pnpm lockfile** (`pnpm-lock.yaml`) is committed, `node_modules` is not.
-- **`packages/api-client`** declares `"generate"` script indirectly via root, but `src/index.ts` is a hand-written stub. Either wire the OpenAPI generator (e.g. `@hey-api/openapi-ts`) or delete the package.
+- **`packages/api-client`** now exports generated schema artifacts committed under `src/generated/`. The open question is adoption: the web app still uses its local fetch/types layer instead of importing the shared package.
 - **No version drift** detected across workspace packages (`packages/config`, `packages/ui` declare only structural files; no runtime deps).
 
 ### Lens 3 — Feature Inventory
@@ -289,7 +290,7 @@ Features mapped to primary files. Tag = `shipped` unless otherwise noted. Derive
 | Attachments | `POST /api/attachments/request-upload-url`, `POST /api/attachments/attach`, `GET /api/attachments`, `DELETE /api/attachments/{id}` | `Features/Attachments/**`, `Infrastructure/Services/S3StorageService.cs`; `components/shared/attachment-uploader.tsx`, `attachment-list.tsx` | shipped |
 | Health | `GET /health` | `Features/Health/HealthEndpoint.cs` | shipped |
 | PWA install + offline | `public/sw.js`, `manifest.json`, `components/pwa/{install-prompt,sw-registrar}.tsx`, `app/offline/page.tsx` | — | shipped |
-| OpenAPI client | root script `openapi:generate` → `packages/api-client` | `packages/api-client/src/index.ts` (stub) | **WIP / unwired** |
+| OpenAPI client | root script `openapi:generate` → `packages/api-client` | `packages/api-client/src/index.ts`, `src/generated/{openapi.json,schema.ts}` | shipped (generation); not yet adopted by web |
 | Mobile (Expo) app | referenced in `docs/PRODUCT-GENESIS.md` | — | **not present in tree** |
 
 ### Lens 4 — Security Posture
@@ -339,7 +340,7 @@ Features mapped to primary files. Tag = `shipped` unless otherwise noted. Derive
 - **Caching:** no HTTP cache headers or ETags set; no in-process caching on hot reads (classes, subjects, roster). For the described workload (a single school per API request) this is acceptable; add caching only after measuring.
 - **Startup cost:** `Database.MigrateAsync()` is awaited before the app serves traffic. This intentionally fails closed on schema errors but also means every cold start incurs migration discovery and application work before the API becomes healthy.
 - **Bundle bloat:** `apps/web` dependencies are narrow (Next 15, React 19, Tailwind 4, lucide-react, framer-motion, CVA + tailwind-merge, Sentry). `framer-motion` is the heaviest; worth a code-split review if Lighthouse regresses.
-- **Server Components opportunity:** ADR-006 declares PPR as a goal, but every page file in the sampled list uses the client-side `auth-provider` context, which forces client rendering for authenticated content. Revisit which dashboard pages can render the shell on the server.
+- **Server Components opportunity:** the checked-in web app leans heavily on the client-side `auth-provider` context, which forces client rendering for authenticated content. Revisit which dashboard pages can render more of the shell on the server without breaking the current session model.
 
 Quick wins: batch presigned URLs; add `idx_refresh_tokens_expires_at` for cleanup; cache the subjects + classes lookups; wire CDN caching headers on static assets via `next.config.ts`.
 
@@ -405,7 +406,7 @@ All endpoints map to exactly one handler. "Auth posture" column: `anon` = `Allow
 | GET | /api/attachments | `GetAttachmentsForEntityQueryHandler` | session | — | N+1 on presigned URL signing |
 | DELETE | /api/attachments/{id} | `DeleteAttachmentCommandHandler` | admin/teacher (handler, ownership) | — | |
 
-No OpenAPI schema file was found in the tree; `packages/api-client` is stubbed. The `openapi:generate` script is not wired end-to-end.
+The repo now includes generated OpenAPI artifacts under `packages/api-client/src/generated/`. The source document is the development API route `/openapi/v1.json`, not a hand-maintained spec file in `docs/`.
 
 ### Lens 8 — Data Flow Trace
 
@@ -457,17 +458,14 @@ Source → sink summary:
 
 | Tier | Count | Files | Notes |
 |---|---|---|---|
-| Unit (infra) | 4 | `apps/api/tests/EduConnect.Api.Tests/Common/DatabaseConnectionStringResolverTests.cs`, `DatabaseSchemaMappingTests.cs` | URL parsing + EF mapping |
-| Integration-ish | 1 | `TenantIsolationTests.cs` | In-memory `UseInMemoryDatabase` verifying the school_id filter |
-| Handler tests | 0 | — | None |
-| Validator tests | 0 | — | None |
-| Endpoint / HTTP tests | 0 | — | No `WebApplicationFactory` use found |
-| Frontend unit / component | 0 | — | No `tests/` dir in `apps/web` |
-| e2e | 0 | — | No Playwright / Cypress config found |
+| Backend tests (all xUnit) | 34 | `AdminOnboardingFlowTests`, `AuthLoginFlowTests`, `HomeworkAttachmentFlowTests`, `NoticeTargetingFlowTests`, plus `Common/*Tests` | Mix of onboarding/auth/homework/notice coverage and infrastructure smoke checks |
+| Endpoint / HTTP tests | 0 | — | No `WebApplicationFactory` or container-backed API suite yet |
+| Frontend unit / component | 0 | — | No Vitest/Jest/component-test setup present |
+| Frontend e2e | 2 | `apps/web/e2e/a11y.spec.ts` | Playwright accessibility smoke tests for login and offline pages |
 
-CI runs `dotnet test apps/api/tests/... -c Release` (root `package.json` `test:api`) but, as noted in the risk register, the GH Actions `api` job uses `dotnet test tests/ --no-build` against a build scoped to the API project only — so even the few tests that exist may not be executed reliably by CI.
+CI runs `dotnet test apps/api/tests/... -c Release` (root `package.json` `test:api`) locally, but the GH Actions `api` job still uses `dotnet test tests/ --no-build` against a build scoped to the API project only — so backend CI execution remains less trustworthy than the local command path.
 
-No skipped / xit / `.only` usage was found in the 3 test files. The in-memory database in `TenantIsolationTests` is an acceptable smoke test for the query filter but does not cover Npgsql-specific behavior (e.g., snake_case + case sensitivity in queries).
+No skipped / xit / `.only` usage was found in the checked-in API tests or Playwright suite. The in-memory database coverage remains a useful smoke test, but it still does not replace an Npgsql-backed HTTP/integration layer.
 
 ---
 
@@ -493,7 +491,7 @@ No skipped / xit / `.only` usage was found in the 3 test files. The in-memory da
 | 9 | Add a minimal Playwright smoke suite for `/login`, dashboard-after-login, mark-absence, view-homework. Wire into CI. | Frontend | 1 day |
 | 10 | Sanitize notice body and absence reason on write (or plain-text render on read) and document the policy; add a test that round-trips `<script>` payload. | Fullstack | 0.5 day |
 | 11 | Add `idx_refresh_tokens_expires_at` and schedule a nightly cleanup job. Track in a new migration `010_*.sql`. | Backend | 30 min |
-| 12 | Wire `openapi:generate` for real (or remove `packages/api-client`). Export a Swagger/OpenAPI document from the API with `Microsoft.AspNetCore.OpenApi` and generate the TS client. | Fullstack | 1 day |
+| 12 | Decide whether the generated `packages/api-client` should become the web app's shared source of truth. If yes, replace duplicate `apps/web/lib/types/*` definitions incrementally and keep `openapi:generate` in the workflow. | Fullstack | 1 day |
 | 13 | Replace the in-memory `TenantIsolationTests` with a Npgsql-backed integration test; keep the in-memory version as a smoke check. | Backend | 0.5 day |
 | 14 | Add a Dependabot (or Renovate) config for `.github`, `pnpm`, and `nuget`. | DevOps | 15 min |
 
@@ -503,7 +501,7 @@ No skipped / xit / `.only` usage was found in the 3 test files. The in-memory da
 |---|---|---|---|
 | 15 | Harden CSP: ship a strict Content-Security-Policy header from `next.config.ts` (and the API's error responses) with nonces for inline scripts. | Frontend | 1–2 days |
 | 16 | Introduce an audit-log table for admin mutations (enroll, deactivate, link/unlink parent, assign teacher, publish notice). Feed from a MediatR `INotificationHandler` after `SaveChangesAsync`. | Backend | 2 days |
-| 17 | Revisit PPR: identify dashboard pages whose shell can render on the server; move `AuthProvider` state into route handlers where feasible. | Frontend | 2–3 days |
+| 17 | Revisit the rendering/session split: identify dashboard surfaces that could move more work server-side without breaking the current auth-provider model. | Frontend | 2–3 days |
 | 18 | Add a real notification delivery channel (web push or email digest via Resend) now that in-app notifications are in place. | Fullstack | 1 week |
 | 19 | Rotate JWT signing to a key ring (RS256 with JWKS) to enable non-disruptive key rotation. | Backend | 3 days |
 | 20 | Build out the Expo mobile app referenced in `docs/PRODUCT-GENESIS.md` or remove the reference. | Product | — |

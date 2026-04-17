@@ -11,7 +11,7 @@
 
 EduConnect is a school communication platform replacing WhatsApp groups, paper circulars, and verbal messages with a single trusted digital system for attendance, homework, and notices. This ADR captures all foundational architecture decisions made during Product Genesis.
 
-Implementation status note: the checked-in repo currently contains the Next.js web app and the .NET API only. The earlier Expo/mobile track remains deferred, and current setup/deployment details now live in `docs/SETUP.md` and `docs/RAILWAY_DEPLOYMENT.md`.
+Implementation status note: the checked-in repo currently contains the Next.js web app and the .NET API only. The earlier Expo/mobile track remains deferred, the generated TypeScript API schema now lives under `packages/api-client/src/generated/`, and current setup/deployment details live in `docs/SETUP.md` and `docs/RAILWAY_DEPLOYMENT.md`.
 
 **Stack:** Next.js 15 web app | .NET 8 (Minimal API) | PostgreSQL (Railway)
 **Team:** Solo developer
@@ -51,14 +51,14 @@ Implementation status note: the checked-in repo currently contains the Next.js w
 
 **Decision:** Custom JWT (inline in .NET 8 API)
 **Options Considered:** Zentra (FBT), NextAuth.js v5, Clerk, Custom JWT
-**Reason:** Parents authenticate via Phone + PIN (4-6 digit). Teachers/Admins authenticate via Phone + Password. This doesn't fit standard providers. Custom JWT gives full control over PIN verification, role claims, and strict token rules (access ≤ 15min, refresh in HttpOnly Secure cookie, rotation on refresh).
+**Reason:** Parents authenticate via Phone + PIN (4-6 digit). Teachers/Admins authenticate via Phone + Password. This doesn't fit standard providers. Custom JWT gives full control over PIN verification, role claims, and strict token rules (short-lived access token, refresh in HttpOnly Secure cookie with rotation). The current frontend restores access-token state from `localStorage` on page refresh while relying on the refresh cookie for renewal.
 **Reversal Cost:** HIGH — auth migration forces all users to re-authenticate.
 
 ## ADR-06: Frontend Rendering Strategy
 
-**Decision:** PPR (Partial Prerendering, Next.js 15)
+**Decision:** Next.js 15 App Router with client-rendered authenticated views
 **Options Considered:** SSR, SSG + ISR, CSR, PPR
-**Reason:** Static shell renders instantly (FCP < 1.5s), dynamic islands hydrate with authenticated data. The static shell IS the skeleton screen — eliminates CLS and hits Doherty Threshold without extra work.
+**Reason:** The current checked-in app uses App Router layouts plus a client-side auth provider to hydrate role-based dashboard routes after session restore. Public/auth routes stay build-friendly, while authenticated routes favor straightforward client data fetching over explicit PPR configuration.
 **Reversal Cost:** Low — rendering strategy can change per-route.
 
 ## ADR-07: API Contract Versioning
@@ -79,5 +79,5 @@ Implementation status note: the checked-in repo currently contains the Next.js w
 | 03 Database | PostgreSQL (Railway) | Very High |
 | 04 Multi-Tenancy | Row-level (school_id) | Very High |
 | 05 Auth | Custom JWT (inline) | High |
-| 06 Rendering | PPR (Next.js 15) | Low |
+| 06 Rendering | Next.js App Router + client auth context | Low |
 | 07 API Versioning | Extend-only for MVP | Low |

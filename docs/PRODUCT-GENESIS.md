@@ -4,14 +4,15 @@
 >
 > Current implementation differences from this blueprint:
 > - the checked-in repo currently ships `apps/web` and `apps/api` only; there is no `apps/mobile` app yet
-> - the API uses additive SQL files under `Infrastructure/Database/Migrations/` with auto-apply on startup, not EF migration scaffolding as the primary workflow
+> - the API uses EF Core migrations under `apps/api/src/EduConnect.Api/Migrations/`, with development seed SQL under `Infrastructure/Database/Migrations/seed/`
+> - the shared `packages/api-client` package is now generated from the development API's `/openapi/v1.json` route
 > - features added after genesis now exist in code, including subjects, teacher management, student management, notifications, attachments, and password/PIN reset flows
 
 **Date:** 2026-04-03
 **Phase:** Idea → Sprint Zero
-**Initial Target Stack:** Next.js 15 (PPR) + Expo | .NET 8 Minimal API (VSA + CQRS + MediatR) | PostgreSQL (Railway)
+**Initial Target Stack:** Next.js 15 web app + planned Expo mobile app | .NET 8 Minimal API (VSA + CQRS + MediatR) | PostgreSQL (Railway)
 
-## Current Repository Snapshot (2026-04-13)
+## Current Repository Snapshot (2026-04-17)
 
 ```text
 fbt-client-educonnect/
@@ -19,7 +20,7 @@ fbt-client-educonnect/
 │   ├── web/            # checked-in Next.js 15 frontend
 │   └── api/            # checked-in ASP.NET Core 8 API
 ├── packages/
-│   ├── api-client/     # placeholder package; client generation not wired yet
+│   ├── api-client/     # generated OpenAPI JSON + TypeScript schema exports
 │   ├── ui/
 │   └── config/
 ├── docs/
@@ -38,13 +39,13 @@ fbt-client-educonnect/
 ```
 educonnect/
 ├── apps/
-│   ├── web/                              # Next.js 15 — PPR frontend
+│   ├── web/                              # Next.js 15 App Router frontend / PWA
 │   │   ├── app/
 │   │   │   ├── (auth)/
 │   │   │   │   └── login/
 │   │   │   │       └── page.tsx
 │   │   │   ├── (dashboard)/
-│   │   │   │   ├── layout.tsx            # Authenticated shell (static via PPR)
+│   │   │   │   ├── layout.tsx            # Authenticated shell via App Router layout + client auth context
 │   │   │   │   ├── parent/
 │   │   │   │   │   ├── attendance/
 │   │   │   │   │   │   └── page.tsx
@@ -89,7 +90,7 @@ educonnect/
 │   │   ├── tsconfig.json
 │   │   └── package.json
 │   │
-│   ├── mobile/                           # Expo (React Native)
+│   ├── mobile/                           # Planned Expo (React Native) app — not checked in today
 │   │   ├── app/                          # Expo Router (file-based)
 │   │   │   ├── (auth)/
 │   │   │   ├── (tabs)/
@@ -579,8 +580,8 @@ Each layer must be complete before the next. Implementation order matters.
 [x] Custom JWT generation with role claim, school_id claim, user_id claim
 [x] PIN flow: validate phone + PIN → issue JWT pair (parents)
 [x] Credentials flow: validate phone + password → issue JWT pair (teachers/admins)
-[x] Access token: ≤ 15 minutes, in response body (frontend stores in memory only)
-[x] Refresh token: HttpOnly, Secure, SameSite=Lax cookie — NEVER localStorage
+[x] Access token: ≤ 15 minutes, in response body (frontend restores session state from localStorage)
+[x] Refresh token: HttpOnly, Secure, SameSite=Strict cookie — NEVER stored in localStorage
 [x] Refresh token rotation: new refresh token on every refresh, old one revoked
 [x] Session invalidation: revoke all refresh tokens for user (immediate effect)
 [x] Protected route middleware: rejects unauthenticated requests with 401
@@ -629,7 +630,7 @@ Each layer must be complete before the next. Implementation order matters.
 ### Layer 6: API Skeleton
 
 ```
-[x] OpenAPI spec: docs/API/openapi.yaml — all MVP endpoints defined
+[x] Development OpenAPI document: `/openapi/v1.json` → generated into `packages/api-client/src/generated/*`
 [x] Endpoints: Auth (4), Attendance (3), Homework (3), Notices (3), Health (1) = 14 endpoints
 [x] TypeScript client generation script: pnpm openapi:generate
 [x] CORS: explicit allowed origins from CORS_ALLOWED_ORIGINS env var (never wildcard in prod)
@@ -649,9 +650,9 @@ Timeline: 7 working days
 
 ─── MILESTONE 1: REPO + ENVIRONMENT (Day 1)
   [ ] M1.1 — Create monorepo: pnpm init, pnpm-workspace.yaml, turbo.json
-  [ ] M1.2 — Scaffold apps/web (Next.js 15 with PPR enabled)
+  [ ] M1.2 — Scaffold apps/web (Next.js 15 App Router)
   [ ] M1.3 — Scaffold apps/api (.NET 8 Minimal API with EduConnect.Api.csproj)
-  [ ] M1.4 — Scaffold apps/mobile (Expo with Expo Router)
+  [ ] M1.4 — Scaffold apps/mobile (Expo with Expo Router, still deferred in the checked-in repo)
   [ ] M1.5 — Configure packages/config (ESLint, TypeScript strict, Tailwind preset)
   [ ] M1.6 — Create .env.example with all required variables
   [ ] M1.7 — Configure .gitignore (node_modules, .env, bin, obj, .next)
