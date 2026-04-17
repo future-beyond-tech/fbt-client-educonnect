@@ -22,6 +22,11 @@ public record TakeLeaveDto(
 public record GetAttendanceTakeContextResponse(
     Guid ClassId,
     DateOnly Date,
+    // True when the caller is the assigned class teacher for this class and may
+    // submit attendance. False when the caller is a subject teacher (or other
+    // staff) with a read-only view. Authoritative source for the client — do
+    // not rely on client-side role flags alone.
+    bool CanEdit,
     List<TakeStudentDto> Students,
     List<TakeExceptionDto> Exceptions,
     List<TakeLeaveDto> ApprovedLeaves,

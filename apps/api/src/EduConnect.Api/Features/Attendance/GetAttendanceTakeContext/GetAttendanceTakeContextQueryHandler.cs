@@ -23,21 +23,27 @@ public class GetAttendanceTakeContextQueryHandler
     {
         if (_currentUserService.Role != "Teacher")
         {
-            throw new ForbiddenException("Only teachers can take attendance.");
+            throw new ForbiddenException("Only teachers can view class attendance.");
         }
 
-        var isClassTeacher = await _context.TeacherClassAssignments
-            .AnyAsync(tca =>
+        // Any teacher assigned to the class (class teacher OR subject teacher)
+        // may VIEW attendance. Only class teachers may edit — that check stays
+        // in SubmitAttendanceTakeCommandHandler, and is surfaced to the client
+        // via the CanEdit flag on the response.
+        var assignments = await _context.TeacherClassAssignments
+            .Where(tca =>
                 tca.SchoolId == _currentUserService.SchoolId &&
                 tca.TeacherId == _currentUserService.UserId &&
-                tca.ClassId == request.ClassId &&
-                tca.IsClassTeacher,
-                cancellationToken);
+                tca.ClassId == request.ClassId)
+            .Select(tca => new { tca.IsClassTeacher })
+            .ToListAsync(cancellationToken);
 
-        if (!isClassTeacher)
+        if (assignments.Count == 0)
         {
-            throw new ForbiddenException("Only the class teacher can take attendance for this class.");
+            throw new ForbiddenException("You are not assigned to this class.");
         }
+
+        var canEdit = assignments.Any(a => a.IsClassTeacher);
 
         var students = await _context.Students
             .Where(s =>
@@ -85,6 +91,7 @@ public class GetAttendanceTakeContextQueryHandler
         return new GetAttendanceTakeContextResponse(
             request.ClassId,
             request.Date,
+            canEdit,
             students,
             exceptions,
             approved,

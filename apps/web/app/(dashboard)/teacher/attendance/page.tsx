@@ -45,6 +45,9 @@ interface TakeLeave {
 interface TakeContextResponse {
   classId: string;
   date: string;
+  // Server-side authority: true when the caller is the class teacher, false
+  // when they're a subject teacher viewing attendance read-only.
+  canEdit: boolean;
   students: TakeStudent[];
   exceptions: TakeException[];
   approvedLeaves: TakeLeave[];
@@ -88,34 +91,34 @@ export default function TeacherAttendancePage(): React.ReactElement {
   const [isSaving, setIsSaving] = React.useState(false);
   const [leaveActionId, setLeaveActionId] = React.useState<string | null>(null);
 
-  // The /api/attendance/take endpoint requires IsClassTeacher=true on the
-  // teacher's assignment for the selected class — subject-teacher assignments
-  // get a 403 "Only the class teacher can take attendance for this class."
-  // Keep this list in lockstep with the backend rule so we never offer (or
-  // auto-select) a class the server will reject.
+  // Show every class the teacher is assigned to. Class-teacher classes are
+  // editable; subject-teacher classes render the same screen read-only.
+  // The server decides editability via response.canEdit — this flag is just
+  // for ordering/labeling the dropdown.
   const classesForTeacher = React.useMemo(() => {
     const map = new Map<string, { classId: string; className: string; section: string; isClassTeacher: boolean }>();
     for (const a of assignments) {
-      if (!a.isClassTeacher) continue;
       const existing = map.get(a.classId);
       if (existing) {
-        existing.isClassTeacher = true;
+        existing.isClassTeacher = existing.isClassTeacher || a.isClassTeacher;
       } else {
         map.set(a.classId, {
           classId: a.classId,
           className: a.className,
           section: a.section,
-          isClassTeacher: true,
+          isClassTeacher: a.isClassTeacher,
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) =>
-      (a.className + a.section).localeCompare(b.className + b.section)
-    );
+    return Array.from(map.values()).sort((a, b) => {
+      // Surface class-teacher classes first so the default auto-select lands
+      // on an editable class whenever one exists.
+      if (a.isClassTeacher !== b.isClassTeacher) return a.isClassTeacher ? -1 : 1;
+      return (a.className + a.section).localeCompare(b.className + b.section);
+    });
   }, [assignments]);
 
-  const hasAnyAssignments = assignments.length > 0;
-  const hasClassTeacherAssignment = classesForTeacher.length > 0;
+  const canEdit = context?.canEdit ?? false;
 
   const fetchAssignments = React.useCallback(async () => {
     setIsLoadingAssignments(true);
@@ -152,10 +155,12 @@ export default function TeacherAttendancePage(): React.ReactElement {
 
     setStatusByStudentId(nextStatus);
     setReasonByStudentId(nextReason);
-    // If the backend already has exception records for this class+date, the
-    // teacher has previously saved attendance — lock the rows and surface an
-    // Edit affordance. Fresh (never-saved) contexts stay fully editable.
-    setHasSaved(ctx.exceptions.length > 0);
+    // For editable (class-teacher) contexts: if the backend already has
+    // exception records, the teacher has previously saved attendance — lock
+    // the rows and surface an Edit affordance.
+    // For read-only (subject-teacher) contexts: the saved/editing machinery
+    // doesn't apply, so keep it reset.
+    setHasSaved(ctx.canEdit && ctx.exceptions.length > 0);
     setEditingStudentIds(new Set());
   }, []);
 
@@ -206,6 +211,13 @@ export default function TeacherAttendancePage(): React.ReactElement {
 
   const saveAttendance = async (): Promise<void> => {
     if (!context) return;
+    if (!context.canEdit) {
+      // Defensive guard — the UI should hide the Save button when !canEdit,
+      // but never send a POST the backend will 403. Keep the check local so
+      // the user gets an immediate, readable message if something slips.
+      setActionError("You don't have permission to edit attendance for this class.");
+      return;
+    }
     setIsSaving(true);
     setActionError("");
     setActionSuccess("");
@@ -320,11 +332,10 @@ export default function TeacherAttendancePage(): React.ReactElement {
       {assignmentError ? <StatusBanner variant="error">{assignmentError}</StatusBanner> : null}
       {actionError ? <StatusBanner variant="error">{actionError}</StatusBanner> : null}
       {actionSuccess ? <StatusBanner variant="success">{actionSuccess}</StatusBanner> : null}
-      {!isLoadingAssignments && hasAnyAssignments && !hasClassTeacherAssignment ? (
-        <StatusBanner variant="info" title="You&apos;re not the class teacher for any class">
-          Attendance can only be taken by the assigned class teacher. You still have
-          subject-teacher assignments, but they don&apos;t allow marking attendance. Ask
-          your school admin if this looks wrong.
+      {context && !canEdit ? (
+        <StatusBanner variant="info" title="Read-only view">
+          You&apos;re viewing attendance for this class as a subject teacher. Only the
+          assigned class teacher can mark, edit, or approve leave requests.
         </StatusBanner>
       ) : null}
 
@@ -390,33 +401,35 @@ export default function TeacherAttendancePage(): React.ReactElement {
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground">{leave.reason}</div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => approveLeave(leave.leaveId)}
-                          disabled={leaveActionId === leave.leaveId}
-                        >
-                          {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
-                            <>
-                              <CheckCircle2 className="h-4 w-4" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => rejectLeave(leave.leaveId)}
-                          disabled={leaveActionId === leave.leaveId}
-                        >
-                          {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
-                            <>
-                              <XCircle className="h-4 w-4" />
-                              Reject
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      {canEdit ? (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approveLeave(leave.leaveId)}
+                            disabled={leaveActionId === leave.leaveId}
+                          >
+                            {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
+                              <>
+                                <CheckCircle2 className="h-4 w-4" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => rejectLeave(leave.leaveId)}
+                            disabled={leaveActionId === leave.leaveId}
+                          >
+                            {leaveActionId === leave.leaveId ? <Spinner size="sm" /> : (
+                              <>
+                                <XCircle className="h-4 w-4" />
+                                Reject
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </CardContent>
@@ -427,38 +440,49 @@ export default function TeacherAttendancePage(): React.ReactElement {
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">Take attendance</CardTitle>
-                    {hasSaved && editingStudentIds.size === 0 ? (
+                    <CardTitle className="text-lg">
+                      {canEdit ? "Take attendance" : "Attendance"}
+                    </CardTitle>
+                    {!canEdit ? (
+                      <Badge variant="outline" aria-label="Read-only">
+                        Read-only
+                      </Badge>
+                    ) : null}
+                    {canEdit && hasSaved && editingStudentIds.size === 0 ? (
                       <Badge variant="default" aria-label="All attendance saved">
                         <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
                         Saved
                       </Badge>
                     ) : null}
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={saveAttendance}
-                    disabled={isSaving || (hasSaved && editingStudentIds.size === 0)}
-                    aria-live="polite"
-                  >
-                    {isSaving ? (
-                      <Spinner size="sm" />
-                    ) : hasSaved && editingStudentIds.size === 0 ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" />
-                        Saved
-                      </>
-                    ) : (
-                      "Save attendance"
-                    )}
-                  </Button>
+                  {canEdit ? (
+                    <Button
+                      size="sm"
+                      onClick={saveAttendance}
+                      disabled={isSaving || (hasSaved && editingStudentIds.size === 0)}
+                      aria-live="polite"
+                    >
+                      {isSaving ? (
+                        <Spinner size="sm" />
+                      ) : hasSaved && editingStudentIds.size === 0 ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Saved
+                        </>
+                      ) : (
+                        "Save attendance"
+                      )}
+                    </Button>
+                  ) : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {context.students.map((s) => {
                   const onLeave = isStudentOnApprovedLeave(s.id);
                   const savedAndLocked = isRowLocked(s.id);
-                  const disabled = onLeave || savedAndLocked;
+                  // Read-only viewers (non-class-teachers) never get edit
+                  // affordances regardless of save state.
+                  const disabled = !canEdit || onLeave || savedAndLocked;
                   const currentStatus = statusByStudentId[s.id] ?? "Present";
 
                   return (
@@ -471,7 +495,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
                           <span className="truncate font-medium">{s.name}</span>
                           <Badge variant="secondary">{s.rollNumber}</Badge>
                           {onLeave ? <Badge variant="outline">On leave</Badge> : null}
-                          {savedAndLocked && !onLeave ? (
+                          {canEdit && savedAndLocked && !onLeave ? (
                             <Badge variant="default" aria-label="Attendance saved">
                               Saved
                             </Badge>
@@ -511,7 +535,7 @@ export default function TeacherAttendancePage(): React.ReactElement {
                             <Clock className="h-4 w-4" />
                             Late
                           </Button>
-                          {savedAndLocked && !onLeave ? (
+                          {canEdit && savedAndLocked && !onLeave ? (
                             <Button
                               type="button"
                               size="sm"
