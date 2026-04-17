@@ -38,7 +38,7 @@ export function BottomNav(): React.ReactElement | null {
       role="navigation"
       aria-label="Bottom navigation"
     >
-      <div className="mx-auto flex max-w-xl items-center justify-around rounded-[28px] border border-border/70 bg-[rgb(var(--page-wash)/0.92)] px-2 py-2 shadow-[0_22px_70px_-34px_rgba(15,40,69,0.35)] backdrop-blur-xl dark:bg-card/92 dark:shadow-[0_24px_74px_-38px_rgba(10,14,24,0.86)]">
+      <div className="mx-auto flex max-w-xl items-center justify-around gap-1 overflow-hidden rounded-[28px] border border-border/70 bg-[rgb(var(--page-wash)/0.92)] px-1.5 py-2 shadow-[0_22px_70px_-34px_rgba(15,40,69,0.35)] backdrop-blur-xl dark:bg-card/92 dark:shadow-[0_24px_74px_-38px_rgba(10,14,24,0.86)]">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const IconComponent = iconMap[item.icon];
@@ -48,7 +48,7 @@ export function BottomNav(): React.ReactElement | null {
               key={item.href}
               href={item.href}
               className={cn(
-                "focus-ring flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 text-[11px] font-medium uppercase tracking-[0.14em] transition-all",
+                "focus-ring flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden rounded-[20px] px-1 py-2 text-[10px] font-medium uppercase tracking-[0.08em] transition-all",
                 isActive
                   ? "rainbow-bg text-white shadow-[0_16px_38px_-20px_rgba(15,40,69,0.55)]"
                   : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
@@ -58,12 +58,12 @@ export function BottomNav(): React.ReactElement | null {
               {IconComponent && (
                 <IconComponent
                   className={cn(
-                    "h-5 w-5",
+                    "h-5 w-5 shrink-0",
                     isActive ? "text-white" : "text-muted-foreground"
                   )}
                 />
               )}
-              <span>{item.label}</span>
+              <span className="w-full truncate text-center">{item.label}</span>
             </Link>
           );
         })}

@@ -58,6 +58,10 @@ export function PageHeader({
         className
       )}
     >
+      <div
+        aria-hidden="true"
+        className="rainbow-bg pointer-events-none absolute inset-x-0 top-0 h-1.5"
+      />
       <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgb(var(--glow-1)/0.22),transparent_65%)] [animation:float_8s_ease-in-out_infinite]" />
       <div className="pointer-events-none absolute -bottom-16 left-8 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgb(var(--glow-2)/0.18),transparent_65%)]" />
       <div className="pointer-events-none absolute left-1/2 top-10 h-56 w-56 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgb(var(--glow-3)/0.12),transparent_70%)]" />
