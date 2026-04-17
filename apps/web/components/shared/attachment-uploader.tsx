@@ -344,11 +344,10 @@ export function AttachmentUploader({
           tabIndex: disabled || !canAddMore ? -1 : 0,
           "aria-label": `Upload ${entityType} attachments`,
           onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+            if (disabled || !canAddMore) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              if (!disabled && canAddMore) {
-                open();
-              }
+              open();
             }
           },
         })}
@@ -433,7 +432,7 @@ export function AttachmentUploader({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0"
+                  className="h-11 w-11 shrink-0"
                   onClick={() => dismissProgressItem(file.id)}
                   aria-label={`Dismiss error for ${file.file.name}`}
                 >
@@ -494,7 +493,7 @@ export function AttachmentUploader({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => setConfirmingDeleteId(attachment.attachmentId)}
                   aria-label={`Delete ${attachment.fileName}`}
                 >

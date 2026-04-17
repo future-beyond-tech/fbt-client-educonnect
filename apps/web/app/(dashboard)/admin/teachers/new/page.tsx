@@ -18,7 +18,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { ClassSelector } from "@/components/shared/class-selector";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type {
   CreateTeacherRequest,
   SubjectItem,
@@ -32,7 +33,10 @@ export default function CreateTeacherPage(): React.ReactElement {
   const [phone, setPhone] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
   const [role, setRole] = React.useState<"Teacher" | "Admin">("Teacher");
+  const passwordFieldId = React.useId();
+  const passwordErrorId = `${passwordFieldId}-error`;
 
   const [classes, setClasses] = React.useState<ClassItem[]>([]);
   const [subjects, setSubjects] = React.useState<SubjectItem[]>([]);
@@ -213,15 +217,56 @@ export default function CreateTeacherPage(): React.ReactElement {
               error={fieldErrors.email}
               placeholder={role === "Admin" ? "admin@example.com" : "teacher@example.com"}
             />
-            <Input
-              label="Temporary Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isSubmitting}
-              error={fieldErrors.password}
-              placeholder="At least 8 characters"
-            />
+            <div className="space-y-2">
+              <label
+                htmlFor={passwordFieldId}
+                className="block text-sm font-medium text-foreground"
+              >
+                Temporary Password
+              </label>
+              <div className="relative">
+                <input
+                  id={passwordFieldId}
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  aria-invalid={!!fieldErrors.password}
+                  aria-describedby={fieldErrors.password ? passwordErrorId : undefined}
+                  className={cn(
+                    "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 pr-12 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
+                    fieldErrors.password &&
+                      "border-destructive focus-visible:ring-destructive"
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={isSubmitting}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  aria-controls={passwordFieldId}
+                  className="focus-ring absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-[20px] text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  tabIndex={isSubmitting ? -1 : 0}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              {fieldErrors.password && (
+                <p
+                  id={passwordErrorId}
+                  className="text-sm font-medium text-destructive"
+                >
+                  {fieldErrors.password}
+                </p>
+              )}
+            </div>
 
             {role === "Teacher" ? (
               <div className="space-y-3 rounded-[24px] border border-border/70 bg-card/72 p-4 shadow-[0_16px_40px_-30px_rgba(15,40,69,0.42)] dark:bg-card/88">

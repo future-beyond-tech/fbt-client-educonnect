@@ -71,20 +71,30 @@ export default function AdminTeachersPage(): React.ReactElement {
     fetchTeachers();
   }, [fetchTeachers]);
 
+  // Single-pass partition: compute counts and role buckets together.
+  const { teacherList, adminList, roleCounts } = React.useMemo(() => {
+    const teacherBucket: TeacherListItem[] = [];
+    const adminBucket: TeacherListItem[] = [];
+    for (const t of teachers) {
+      if (t.role === "Admin") adminBucket.push(t);
+      else if (t.role === "Teacher") teacherBucket.push(t);
+    }
+    return {
+      teacherList: teacherBucket,
+      adminList: adminBucket,
+      roleCounts: {
+        all: teachers.length,
+        teacher: teacherBucket.length,
+        admin: adminBucket.length,
+      },
+    };
+  }, [teachers]);
+
   const visibleTeachers = React.useMemo(() => {
     if (roleFilter === "all") return teachers;
-    if (roleFilter === "admin") return teachers.filter((t) => t.role === "Admin");
-    return teachers.filter((t) => t.role === "Teacher");
-  }, [roleFilter, teachers]);
-
-  const roleCounts = React.useMemo(
-    () => ({
-      all: teachers.length,
-      teacher: teachers.filter((t) => t.role === "Teacher").length,
-      admin: teachers.filter((t) => t.role === "Admin").length,
-    }),
-    [teachers]
-  );
+    if (roleFilter === "admin") return adminList;
+    return teacherList;
+  }, [roleFilter, teachers, teacherList, adminList]);
 
   return (
     <PageShell>

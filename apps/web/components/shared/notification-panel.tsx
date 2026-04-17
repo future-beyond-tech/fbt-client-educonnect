@@ -87,6 +87,7 @@ export function NotificationPanel({
 }: NotificationPanelProps): React.ReactElement {
   const router = useRouter();
   const hasLoaded = React.useRef(false);
+  const titleId = React.useId();
 
   // Load notifications on first open
   React.useEffect(() => {
@@ -131,11 +132,11 @@ export function NotificationPanel({
     <div
       className="fixed right-4 top-[5.25rem] z-50 min-h-[200px] w-[min(calc(100vw-2rem),25rem)] origin-top-right rounded-[28px] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,251,0.96))] shadow-[0_34px_90px_-38px_rgba(15,40,69,0.62)] backdrop-blur-2xl dark:bg-[linear-gradient(180deg,rgba(12,30,48,0.98),rgba(8,18,31,0.96))] dark:shadow-[0_38px_96px_-42px_rgba(10,14,24,0.92)] sm:absolute sm:right-0 sm:top-full sm:mt-3"
       role="dialog"
-      aria-label="Notifications"
+      aria-labelledby={titleId}
     >
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
+          <h2 id={titleId} className="text-sm font-semibold text-foreground">Notifications</h2>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             {unreadCount} unread
           </p>
@@ -155,7 +156,7 @@ export function NotificationPanel({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full bg-card/80"
+            className="h-11 w-11 rounded-full bg-card/80"
             onClick={onClose}
             aria-label="Close notifications"
           >

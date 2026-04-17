@@ -401,24 +401,42 @@ export default function AdminNoticesPage(): React.ReactElement {
     });
   };
 
-  const drafts = notices.filter((notice) => !notice.isPublished);
-  const published = notices.filter((notice) => notice.isPublished);
+  // Single-pass partition for total counts.
+  const { drafts, published } = React.useMemo(() => {
+    const draftBucket: typeof notices = [];
+    const publishedBucket: typeof notices = [];
+    for (const notice of notices) {
+      if (notice.isPublished) publishedBucket.push(notice);
+      else draftBucket.push(notice);
+    }
+    return { drafts: draftBucket, published: publishedBucket };
+  }, [notices]);
 
-  const filteredNotices = React.useMemo(() => {
+  // Single pass: filter + partition into visibleDrafts / visiblePublished.
+  const { filteredNotices, visibleDrafts, visiblePublished } = React.useMemo(() => {
     const needle = listSearch.trim().toLowerCase();
-    return notices.filter((notice) => {
-      if (stateFilter === "draft" && notice.isPublished) return false;
-      if (stateFilter === "published" && !notice.isPublished) return false;
-      if (!needle) return true;
-      return (
-        notice.title.toLowerCase().includes(needle) ||
-        notice.body.toLowerCase().includes(needle)
-      );
-    });
+    const filtered: typeof notices = [];
+    const draftBucket: typeof notices = [];
+    const publishedBucket: typeof notices = [];
+    for (const notice of notices) {
+      if (stateFilter === "draft" && notice.isPublished) continue;
+      if (stateFilter === "published" && !notice.isPublished) continue;
+      if (needle) {
+        const title = notice.title.toLowerCase();
+        const body = notice.body.toLowerCase();
+        if (!title.includes(needle) && !body.includes(needle)) continue;
+      }
+      filtered.push(notice);
+      if (notice.isPublished) publishedBucket.push(notice);
+      else draftBucket.push(notice);
+    }
+    return {
+      filteredNotices: filtered,
+      visibleDrafts: draftBucket,
+      visiblePublished: publishedBucket,
+    };
   }, [listSearch, notices, stateFilter]);
 
-  const visibleDrafts = filteredNotices.filter((notice) => !notice.isPublished);
-  const visiblePublished = filteredNotices.filter((notice) => notice.isPublished);
   const isListFiltering = stateFilter !== "all" || !!listSearch.trim();
 
   return (
