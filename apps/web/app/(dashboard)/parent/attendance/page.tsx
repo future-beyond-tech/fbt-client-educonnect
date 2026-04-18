@@ -364,10 +364,14 @@ export default function ParentAttendancePage(): React.ReactElement {
 
   // ── Leave applications state
   const [leaves, setLeaves] = React.useState<LeaveApplication[]>([]);
-  const [isLoadingLeaves, setIsLoadingLeaves] = React.useState(false);
+  const [leaveCount, setLeaveCount] = React.useState(0);
+  const [isLoadingLeaves, setIsLoadingLeaves] = React.useState(true);
+  const [hasLoadedLeaves, setHasLoadedLeaves] = React.useState(false);
   const [leavesError, setLeavesError] = React.useState("");
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
   const [editingLeave, setEditingLeave] = React.useState<LeaveApplication | null>(null);
+  const lastFetchedLeaveScopeRef = React.useRef<string | null>(null);
+  const previousActiveTabRef = React.useRef<TabId>("absences");
   const childById = React.useMemo(
     () => new Map(children.map((child) => [child.id, child])),
     [children]
@@ -418,10 +422,12 @@ export default function ParentAttendancePage(): React.ReactElement {
           : API_ENDPOINTS.leaveApplications
       );
       setLeaves(data.items);
+      setLeaveCount(data.totalCount);
     } catch {
       setLeavesError("Failed to load leave applications.");
     } finally {
       setIsLoadingLeaves(false);
+      setHasLoadedLeaves(true);
     }
   }, [selectedChildId]);
 
@@ -442,12 +448,30 @@ export default function ParentAttendancePage(): React.ReactElement {
   React.useEffect(() => {
     if (isAuthLoading) return;
     if (!token) return;
-    fetchAttendance();
+    void fetchAttendance();
   }, [fetchAttendance, isAuthLoading, token]);
 
   React.useEffect(() => {
-    if (activeTab === "leaves") fetchLeaves();
-  }, [activeTab, fetchLeaves]);
+    if (isAuthLoading) return;
+    if (!token) return;
+    if (lastFetchedLeaveScopeRef.current === selectedChildId) return;
+
+    lastFetchedLeaveScopeRef.current = selectedChildId;
+    void fetchLeaves();
+  }, [fetchLeaves, isAuthLoading, selectedChildId, token]);
+
+  React.useEffect(() => {
+    const switchedToLeaves =
+      previousActiveTabRef.current !== "leaves" && activeTab === "leaves";
+
+    previousActiveTabRef.current = activeTab;
+
+    if (isAuthLoading) return;
+    if (!token) return;
+    if (!switchedToLeaves) return;
+
+    void fetchLeaves();
+  }, [activeTab, fetchLeaves, isAuthLoading, token]);
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr + "T00:00:00");
@@ -507,7 +531,10 @@ export default function ParentAttendancePage(): React.ReactElement {
         )}
         stats={[
           { label: "Absences", value: records.length.toString() },
-          { label: "Leave requests", value: leaves.length.toString() },
+          {
+            label: "Leave requests",
+            value: !hasLoadedLeaves && isLoadingLeaves ? "..." : leaveCount.toString(),
+          },
         ]}
       />
 
