@@ -10,6 +10,7 @@ import type {
   AttendanceRecord,
   LeaveApplication,
   ApplyLeaveRequest,
+  ApplyLeaveResponse,
   UpdateLeaveRequest,
   GetLeaveApplicationsResponse,
 } from "@/lib/types/attendance";
@@ -25,6 +26,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { ParentChildFilter } from "@/components/shared/parent-child-filter";
+import { ParentChildMultiSelect } from "@/components/shared/parent-child-multi-select";
 import { StatusBanner } from "@/components/shared/status-banner";
 import { CalendarDays, PlusCircle, X } from "lucide-react";
 
@@ -59,8 +61,20 @@ function LeaveApplicationForm({
   const today = new Date().toISOString().slice(0, 10);
   const titleId = React.useId();
   const descriptionId = React.useId();
+  const isEditing = !!initialLeave?.id;
+
+  // Edit mode acts on exactly one existing leave row, so we keep a single
+  // studentId. Create mode supports multi-select: a parent with 3 children
+  // can apply for any subset in one submission.
   const [studentId, setStudentId] = React.useState(
     initialLeave?.studentId ?? defaultStudentId ?? ""
+  );
+  const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>(
+    () => {
+      if (initialLeave?.studentId) return [initialLeave.studentId];
+      if (defaultStudentId) return [defaultStudentId];
+      return [];
+    }
   );
   const [startDate, setStartDate] = React.useState(initialLeave?.startDate ?? today);
   const [endDate, setEndDate] = React.useState(initialLeave?.endDate ?? today);
@@ -93,32 +107,44 @@ function LeaveApplicationForm({
     };
   }, [onClose]);
 
+  // Seed the selection once the children list is loaded.
+  //
+  // Priority:
+  //   1. Edit mode — lock to the existing leave's student.
+  //   2. The "currently filtered" child from the page (if any).
+  //   3. Parent has only one child — auto-select that child.
+  //   4. Otherwise, leave the selection empty so the parent picks deliberately.
   React.useEffect(() => {
-    if (isLoadingStudents) {
-      return;
-    }
+    if (isLoadingStudents) return;
 
     if (initialLeave?.studentId) {
       setError("");
       setStudentId(initialLeave.studentId);
+      setSelectedStudentIds([initialLeave.studentId]);
       return;
     }
 
-    if (defaultStudentId && students.some((student) => student.id === defaultStudentId)) {
-      setError("");
-      setStudentId(defaultStudentId);
+    if (students.length === 0) {
+      setStudentId("");
+      setSelectedStudentIds([]);
+      setError(studentsError || "No linked students were found for this parent account.");
       return;
     }
 
-    const firstStudent = students[0];
-    if (firstStudent) {
-      setError("");
-      setStudentId(firstStudent.id);
-      return;
+    setError("");
+
+    // Default: filtered child if valid, or single-child auto-pick. Multi-child
+    // parents see an empty selection forcing an explicit choice — this avoids
+    // accidentally submitting leave for the wrong child on first open.
+    let defaults: string[] = [];
+    if (defaultStudentId && students.some((s) => s.id === defaultStudentId)) {
+      defaults = [defaultStudentId];
+    } else if (students.length === 1) {
+      defaults = [students[0]!.id];
     }
 
-    setStudentId("");
-    setError(studentsError || "No linked students were found for this parent account.");
+    setSelectedStudentIds(defaults);
+    setStudentId(defaults[0] ?? students[0]?.id ?? "");
   }, [defaultStudentId, initialLeave?.studentId, isLoadingStudents, students, studentsError]);
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -130,19 +156,29 @@ function LeaveApplicationForm({
       return;
     }
 
-    if (!studentId) {
-      setError("Please select a child before submitting the leave request.");
+    if (isEditing) {
+      if (!studentId) {
+        setError("Please select a child before submitting the leave request.");
+        return;
+      }
+    } else if (selectedStudentIds.length === 0) {
+      setError("Please select at least one child to apply leave for.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      if (initialLeave?.id) {
+      if (isEditing && initialLeave?.id) {
         const payload: UpdateLeaveRequest = { startDate, endDate, reason };
         await apiPut(`${API_ENDPOINTS.leaveApplications}/${initialLeave.id}`, payload);
       } else {
-        const payload: ApplyLeaveRequest = { studentId, startDate, endDate, reason };
-        await apiPost(API_ENDPOINTS.leaveApplications, payload);
+        const payload: ApplyLeaveRequest = {
+          studentIds: selectedStudentIds,
+          startDate,
+          endDate,
+          reason,
+        };
+        await apiPost<ApplyLeaveResponse>(API_ENDPOINTS.leaveApplications, payload);
       }
       onSuccess();
       onClose();
@@ -186,8 +222,11 @@ function LeaveApplicationForm({
                   id={descriptionId}
                   className="max-w-md text-sm leading-6 text-muted-foreground"
                 >
-                  Select your child, choose the dates, and share the reason for
-                  the leave request.
+                  {isEditing
+                    ? "Update the dates or reason for this leave request."
+                    : students.length > 1
+                      ? "Pick one or more of your children, choose the dates, and share the reason."
+                      : "Choose the dates and share the reason for the leave request."}
                 </p>
               </div>
             </div>
@@ -221,22 +260,7 @@ function LeaveApplicationForm({
                 <Spinner size="sm" />
                 Loading children...
               </div>
-            ) : students.length > 0 ? (
-              <Select
-                label="Child"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                className="bg-card/96 backdrop-blur-none"
-                disabled={!!initialLeave?.id}
-                required
-              >
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.rollNumber})
-                  </option>
-                ))}
-              </Select>
-            ) : (
+            ) : students.length === 0 ? (
               <div className="rounded-[26px] border border-dashed border-border/80 bg-card/75 px-4 py-4 dark:bg-card/88">
                 <p className="text-sm font-medium text-foreground">
                   No linked students available
@@ -245,6 +269,33 @@ function LeaveApplicationForm({
                   This account does not have any linked children yet, so a leave
                   request cannot be submitted.
                 </p>
+              </div>
+            ) : isEditing ? (
+              // Edit mode: the existing leave row is tied to one child, so
+              // show the child as read-only context rather than a selector.
+              <div className="rounded-[26px] border border-border/75 bg-card/84 p-4 dark:bg-card/92">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  Child
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {students.find((s) => s.id === studentId)?.name ?? "Child"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  To change the child on a leave request, cancel this one and submit a new request.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-[26px] border border-border/75 bg-card/84 p-4 shadow-[0_22px_44px_-34px_rgba(15,40,69,0.42)] dark:bg-card/92">
+                <ParentChildMultiSelect
+                  students={students}
+                  selectedIds={selectedStudentIds}
+                  onChange={setSelectedStudentIds}
+                  label={
+                    students.length > 1
+                      ? "Who is this leave for?"
+                      : "Child"
+                  }
+                />
               </div>
             )}
 
@@ -308,13 +359,20 @@ function LeaveApplicationForm({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || isLoadingStudents || students.length === 0}
+                disabled={
+                  isSubmitting ||
+                  isLoadingStudents ||
+                  students.length === 0 ||
+                  (!isEditing && selectedStudentIds.length === 0)
+                }
                 className="w-full sm:flex-1"
               >
                 {isSubmitting ? (
                   <Spinner size="sm" />
-                ) : initialLeave?.id ? (
+                ) : isEditing ? (
                   "Update Request"
+                ) : selectedStudentIds.length > 1 ? (
+                  `Submit for ${selectedStudentIds.length} children`
                 ) : (
                   "Submit Application"
                 )}
