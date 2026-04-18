@@ -8,6 +8,7 @@ using EduConnect.Api.Features.Parents.CreateParent;
 using EduConnect.Api.Features.Teachers.AssignClassToTeacher;
 using EduConnect.Api.Features.Teachers.CreateTeacher;
 using EduConnect.Api.Features.Teachers.PromoteClassTeacher;
+using EduConnect.Api.Features.Teachers.RemoveClassFromTeacher;
 using EduConnect.Api.Features.Students.EnrollStudent;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
@@ -15,6 +16,7 @@ using EduConnect.Api.Infrastructure.Services;
 using FluentAssertions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -39,6 +41,8 @@ public class AdminOnboardingFlowTests
             currentUser,
             passwordHasher,
             Mock.Of<ISender>(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<CreateTeacherCommandHandler>>());
 
         var response = await handler.Handle(
@@ -68,6 +72,8 @@ public class AdminOnboardingFlowTests
             currentUser,
             passwordHasher,
             Mock.Of<ISender>(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<CreateTeacherCommandHandler>>());
 
         var response = await handler.Handle(
@@ -121,6 +127,8 @@ public class AdminOnboardingFlowTests
             currentUser,
             passwordHasher,
             sender,
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<CreateTeacherCommandHandler>>());
 
         var response = await createHandler.Handle(
@@ -159,6 +167,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             pinService,
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<CreateParentCommandHandler>>());
 
         var response = await handler.Handle(
@@ -200,6 +210,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var response = await handler.Handle(
@@ -245,6 +257,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             pinService,
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var response = await handler.Handle(
@@ -308,6 +322,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var response = await handler.Handle(
@@ -374,6 +390,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var act = () => handler.Handle(
@@ -431,6 +449,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var act = () => handler.Handle(
@@ -488,6 +508,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var act = () => handler.Handle(
@@ -546,6 +568,8 @@ public class AdminOnboardingFlowTests
             context,
             currentUser,
             new PinService(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<EnrollStudentCommandHandler>>());
 
         var act = () => handler.Handle(
@@ -742,6 +766,130 @@ public class AdminOnboardingFlowTests
 
         assignments.Single(tca => tca.Id == assignmentOneId).IsClassTeacher.Should().BeFalse();
         assignments.Single(tca => tca.Id == assignmentTwoId).IsClassTeacher.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RemoveClassFromTeacher_ForClassTeacher_ClearsRoleButKeepsAssignment()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "8",
+                    Section = "A",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "09000000030", "Teacher Class", "tc@school.com")
+            ],
+            assignments:
+            [
+                new TeacherClassAssignmentEntity
+                {
+                    Id = assignmentId,
+                    SchoolId = schoolId,
+                    TeacherId = teacherId,
+                    ClassId = classId,
+                    Subject = "Mathematics",
+                    IsClassTeacher = true,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new RemoveClassFromTeacherCommandHandler(
+            context,
+            currentUser,
+            Mock.Of<ILogger<RemoveClassFromTeacherCommandHandler>>());
+
+        var response = await handler.Handle(
+            new RemoveClassFromTeacherCommand(teacherId, assignmentId),
+            CancellationToken.None);
+
+        response.Message.Should().Contain("Class teacher role removed");
+
+        // Assignment must still exist so the teacher remains associated with the
+        // class as the subject teacher — only the role flag should be cleared.
+        var assignment = await context.TeacherClassAssignments
+            .SingleOrDefaultAsync(tca => tca.Id == assignmentId);
+        assignment.Should().NotBeNull();
+        assignment!.IsClassTeacher.Should().BeFalse();
+        assignment.Subject.Should().Be("Mathematics");
+        assignment.TeacherId.Should().Be(teacherId);
+        assignment.ClassId.Should().Be(classId);
+    }
+
+    [Fact]
+    public async Task RemoveClassFromTeacher_ForSubjectTeacher_DeletesAssignment()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin");
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                new ClassEntity
+                {
+                    Id = classId,
+                    SchoolId = schoolId,
+                    Name = "8",
+                    Section = "B",
+                    AcademicYear = "2026-27"
+                }
+            ],
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "09000000031", "Subject Teacher", "st@school.com")
+            ],
+            assignments:
+            [
+                new TeacherClassAssignmentEntity
+                {
+                    Id = assignmentId,
+                    SchoolId = schoolId,
+                    TeacherId = teacherId,
+                    ClassId = classId,
+                    Subject = "Science",
+                    IsClassTeacher = false,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var handler = new RemoveClassFromTeacherCommandHandler(
+            context,
+            currentUser,
+            Mock.Of<ILogger<RemoveClassFromTeacherCommandHandler>>());
+
+        var response = await handler.Handle(
+            new RemoveClassFromTeacherCommand(teacherId, assignmentId),
+            CancellationToken.None);
+
+        response.Message.Should().Be("Assignment removed successfully.");
+
+        var assignment = await context.TeacherClassAssignments
+            .SingleOrDefaultAsync(tca => tca.Id == assignmentId);
+        assignment.Should().BeNull();
     }
 
     [Fact]

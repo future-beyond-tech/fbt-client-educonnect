@@ -132,6 +132,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attendance/leave/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["UpdateLeaveApplication"];
+        post?: never;
+        delete: operations["CancelLeaveApplication"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attendance/leave/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ApproveLeave"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attendance/leave/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["RejectLeave"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attendance/take": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetAttendanceTakeContext"];
+        put?: never;
+        post: operations["SubmitAttendanceTake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -276,6 +340,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ChangePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/change-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ChangePin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/classes": {
         parameters: {
             query?: never;
@@ -286,6 +382,22 @@ export interface paths {
         get: operations["GetClassesBySchool"];
         put?: never;
         post: operations["CreateClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/classes/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetClassAssignments"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -773,6 +885,16 @@ export interface components {
             entityId?: string;
             entityType?: string | null;
         };
+        ChangePasswordCommand: {
+            currentPassword?: string | null;
+            newPassword?: string | null;
+            confirmPassword?: string | null;
+        };
+        ChangePinCommand: {
+            currentPin?: string | null;
+            newPin?: string | null;
+            confirmPin?: string | null;
+        };
         CreateClassCommand: {
             name?: string | null;
             section?: string | null;
@@ -791,8 +913,7 @@ export interface components {
             title?: string | null;
             body?: string | null;
             targetAudience?: string | null;
-            /** Format: uuid */
-            targetClassId?: string | null;
+            targetClassIds?: string[] | null;
             /** Format: date-time */
             expiresAt?: string | null;
         };
@@ -810,6 +931,11 @@ export interface components {
             phone?: string | null;
             email?: string | null;
             password?: string | null;
+            role?: string | null;
+            /** Format: uuid */
+            classId?: string | null;
+            subject?: string | null;
+            isClassTeacher?: boolean;
         };
         EnrollStudentCommand: {
             name?: string | null;
@@ -819,6 +945,12 @@ export interface components {
             /** Format: date */
             dateOfBirth?: string | null;
             parent?: components["schemas"]["EnrollStudentParentRequest"];
+            existingParent?: components["schemas"]["EnrollStudentExistingParentRequest"];
+        };
+        EnrollStudentExistingParentRequest: {
+            /** Format: uuid */
+            parentId?: string;
+            relationship?: string | null;
         };
         EnrollStudentParentRequest: {
             name?: string | null;
@@ -857,6 +989,11 @@ export interface components {
         RejectHomeworkRequest: {
             reason?: string | null;
         };
+        RejectLeaveCommand: {
+            /** Format: uuid */
+            leaveApplicationId?: string;
+            reviewNote?: string | null;
+        };
         RequestUploadUrlCommand: {
             fileName?: string | null;
             contentType?: string | null;
@@ -884,6 +1021,19 @@ export interface components {
             pin?: string | null;
             confirmPin?: string | null;
         };
+        SubmitAttendanceItem: {
+            /** Format: uuid */
+            studentId?: string;
+            status?: string | null;
+            reason?: string | null;
+        };
+        SubmitAttendanceTakeCommand: {
+            /** Format: uuid */
+            classId?: string;
+            /** Format: date */
+            date?: string;
+            items?: components["schemas"]["SubmitAttendanceItem"][] | null;
+        };
         UpdateClassCommand: {
             /** Format: uuid */
             id?: string;
@@ -898,6 +1048,15 @@ export interface components {
             description?: string | null;
             /** Format: date */
             dueDate?: string;
+        };
+        UpdateLeaveApplicationCommand: {
+            /** Format: uuid */
+            leaveApplicationId?: string;
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            endDate?: string;
+            reason?: string | null;
         };
         UpdateStudentCommand: {
             /** Format: uuid */
@@ -1137,6 +1296,137 @@ export interface operations {
             };
         };
     };
+    UpdateLeaveApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLeaveApplicationCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CancelLeaveApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApproveLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RejectLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectLeaveCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetAttendanceTakeContext: {
+        parameters: {
+            query: {
+                classId: string;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SubmitAttendanceTake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitAttendanceTakeCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     Login: {
         parameters: {
             query?: never;
@@ -1327,6 +1617,50 @@ export interface operations {
             };
         };
     };
+    ChangePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ChangePin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePinCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     GetClassesBySchool: {
         parameters: {
             query?: never;
@@ -1357,6 +1691,26 @@ export interface operations {
                 "application/json": components["schemas"]["CreateClassCommand"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetClassAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {

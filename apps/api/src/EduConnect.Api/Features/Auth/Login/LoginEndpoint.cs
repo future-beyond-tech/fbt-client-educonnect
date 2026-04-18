@@ -9,7 +9,11 @@ public static class LoginEndpoint
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var accessToken = await mediator.Send(command, cancellationToken);
-        return Results.Ok(new { accessToken });
+        var response = await mediator.Send(command, cancellationToken);
+        return Results.Ok(new
+        {
+            accessToken = response.AccessToken,
+            mustChangePassword = response.MustChangePassword
+        });
     }
 }

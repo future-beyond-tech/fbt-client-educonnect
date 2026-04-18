@@ -23,6 +23,10 @@ public static class RefreshTokenEndpoint
             result.NewRefreshToken,
             RefreshTokenCookieOptions.Create(context.Request, refreshTokenExpiresAt));
 
-        return Results.Ok(new { accessToken = result.AccessToken });
+        return Results.Ok(new
+        {
+            accessToken = result.AccessToken,
+            mustChangePassword = result.MustChangePassword
+        });
     }
 }

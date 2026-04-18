@@ -79,7 +79,13 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             throw new UnauthorizedException("User is inactive.");
         }
 
-        var newAccessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.SchoolId, user.Role, user.Name, 15);
+        var newAccessToken = _jwtTokenService.GenerateAccessToken(
+            user.Id,
+            user.SchoolId,
+            user.Role,
+            user.Name,
+            15,
+            user.MustChangePassword);
         var newRefreshTokenId = Guid.NewGuid();
         var newRefreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var newRefreshToken = _jwtTokenService.BuildRefreshToken(newRefreshTokenId, newRefreshTokenSecret);
@@ -104,6 +110,6 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
 
         _logger.LogInformation("Refresh token rotated for user {UserId}", user.Id);
 
-        return new RefreshTokenResponse(newAccessToken, newRefreshToken);
+        return new RefreshTokenResponse(newAccessToken, newRefreshToken, user.MustChangePassword);
     }
 }

@@ -31,7 +31,8 @@ export function AuthGuard({
   const pathname = usePathname();
   const router = useRouter();
   const requiredRole = getRequiredRole(pathname);
-  const canRender = user && (!requiredRole || user.role === requiredRole);
+  const mustChange = !!user?.mustChangePassword;
+  const canRender = user && !mustChange && (!requiredRole || user.role === requiredRole);
 
   React.useEffect(() => {
     if (isLoading) {
@@ -40,6 +41,11 @@ export function AuthGuard({
 
     if (!user) {
       router.replace("/login");
+      return;
+    }
+
+    if (user.mustChangePassword) {
+      router.replace(user.role === "Parent" ? "/change-pin" : "/change-password");
       return;
     }
 

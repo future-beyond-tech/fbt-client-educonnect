@@ -21,6 +21,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * True when the API rejected the call because the authenticated user still has
+ * `must_change_password=true` on their JWT. The server returns HTTP 403 with
+ * `errors.code = ["MUST_CHANGE_PASSWORD"]`.
+ */
+export function isMustChangePasswordError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  if (error.statusCode !== 403) return false;
+  const code = error.details?.errors?.code;
+  return Array.isArray(code) && code.includes("MUST_CHANGE_PASSWORD");
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}

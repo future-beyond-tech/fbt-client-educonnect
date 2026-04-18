@@ -4,6 +4,8 @@ import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { useParentChildren } from "@/hooks/use-parent-children";
+import { ALL_CHILDREN_VALUE } from "@/lib/parent-children";
 import type {
   AttendanceRecord,
   LeaveApplication,
@@ -22,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
+import { ParentChildFilter } from "@/components/shared/parent-child-filter";
 import { StatusBanner } from "@/components/shared/status-banner";
 import { CalendarDays, PlusCircle, X } from "lucide-react";
 
@@ -37,27 +40,33 @@ type TabId = "absences" | "leaves";
 interface LeaveFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  students: ParentChildItem[];
+  isLoadingStudents: boolean;
+  studentsError?: string;
+  defaultStudentId?: string;
   initialLeave?: LeaveApplication | null;
 }
 
 function LeaveApplicationForm({
   onClose,
   onSuccess,
+  students,
+  isLoadingStudents,
+  studentsError,
+  defaultStudentId,
   initialLeave,
 }: LeaveFormProps): React.ReactElement {
   const today = new Date().toISOString().slice(0, 10);
   const titleId = React.useId();
   const descriptionId = React.useId();
-  const [studentId, setStudentId] = React.useState(initialLeave?.studentId ?? "");
+  const [studentId, setStudentId] = React.useState(
+    initialLeave?.studentId ?? defaultStudentId ?? ""
+  );
   const [startDate, setStartDate] = React.useState(initialLeave?.startDate ?? today);
   const [endDate, setEndDate] = React.useState(initialLeave?.endDate ?? today);
   const [reason, setReason] = React.useState(initialLeave?.reason ?? "");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
-
-  // Fetch linked students so the parent can pick which child
-  const [students, setStudents] = React.useState<ParentChildItem[]>([]);
-  const [loadingStudents, setLoadingStudents] = React.useState(true);
 
   React.useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -85,30 +94,32 @@ function LeaveApplicationForm({
   }, [onClose]);
 
   React.useEffect(() => {
-    apiGet<ParentChildItem[]>(API_ENDPOINTS.studentsMyChildren)
-      .then((data) => {
-        setStudents(data);
-        if (initialLeave?.studentId) {
-          // Keep the student locked to the original leave request when editing.
-          setStudentId(initialLeave.studentId);
-          return;
-        }
+    if (isLoadingStudents) {
+      return;
+    }
 
-        const first = data[0];
-        if (first) {
-          setStudentId(first.id);
-          return;
-        }
+    if (initialLeave?.studentId) {
+      setError("");
+      setStudentId(initialLeave.studentId);
+      return;
+    }
 
-        setError("No linked students were found for this parent account.");
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Failed to load student details."
-        )
-      )
-      .finally(() => setLoadingStudents(false));
-  }, [initialLeave?.studentId]);
+    if (defaultStudentId && students.some((student) => student.id === defaultStudentId)) {
+      setError("");
+      setStudentId(defaultStudentId);
+      return;
+    }
+
+    const firstStudent = students[0];
+    if (firstStudent) {
+      setError("");
+      setStudentId(firstStudent.id);
+      return;
+    }
+
+    setStudentId("");
+    setError(studentsError || "No linked students were found for this parent account.");
+  }, [defaultStudentId, initialLeave?.studentId, isLoadingStudents, students, studentsError]);
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -205,7 +216,7 @@ function LeaveApplicationForm({
               </p>
             </div>
 
-            {loadingStudents ? (
+            {isLoadingStudents ? (
               <div className="flex min-h-20 items-center gap-3 rounded-[26px] border border-dashed border-border/80 bg-card/75 px-4 py-4 text-sm text-muted-foreground dark:bg-card/88">
                 <Spinner size="sm" />
                 Loading children...
@@ -297,7 +308,7 @@ function LeaveApplicationForm({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || loadingStudents || students.length === 0}
+                disabled={isSubmitting || isLoadingStudents || students.length === 0}
                 className="w-full sm:flex-1"
               >
                 {isSubmitting ? (
@@ -332,6 +343,15 @@ function leaveStatusVariant(
 
 export default function ParentAttendancePage(): React.ReactElement {
   const { token, isLoading: isAuthLoading } = useAuth();
+  const {
+    children,
+    selectedChild,
+    selectedChildId,
+    hasMultipleChildren,
+    isLoading: isLoadingChildren,
+    error: childrenError,
+    setSelectedChildId,
+  } = useParentChildren();
   // ── Tabs
   const [activeTab, setActiveTab] = React.useState<TabId>("absences");
 
@@ -348,14 +368,27 @@ export default function ParentAttendancePage(): React.ReactElement {
   const [leavesError, setLeavesError] = React.useState("");
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
   const [editingLeave, setEditingLeave] = React.useState<LeaveApplication | null>(null);
+  const childById = React.useMemo(
+    () => new Map(children.map((child) => [child.id, child])),
+    [children]
+  );
 
   // ── Fetch absence records
   const fetchAttendance = React.useCallback(async () => {
     setIsLoadingRecords(true);
     setRecordsError("");
     try {
+      const params = new URLSearchParams({
+        month: selectedMonth.toString(),
+        year: selectedYear.toString(),
+      });
+
+      if (selectedChildId !== ALL_CHILDREN_VALUE) {
+        params.set("studentId", selectedChildId);
+      }
+
       const data = await apiGet<AttendanceRecord[]>(
-        `${API_ENDPOINTS.attendance}?month=${selectedMonth}&year=${selectedYear}`
+        `${API_ENDPOINTS.attendance}?${params.toString()}`
       );
       setRecords(data);
     } catch (err) {
@@ -367,15 +400,22 @@ export default function ParentAttendancePage(): React.ReactElement {
     } finally {
       setIsLoadingRecords(false);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedChildId, selectedMonth, selectedYear]);
 
   // ── Fetch leave applications
   const fetchLeaves = React.useCallback(async () => {
     setIsLoadingLeaves(true);
     setLeavesError("");
     try {
+      const params = new URLSearchParams();
+      if (selectedChildId !== ALL_CHILDREN_VALUE) {
+        params.set("studentId", selectedChildId);
+      }
+
       const data = await apiGet<GetLeaveApplicationsResponse>(
-        API_ENDPOINTS.leaveApplications
+        params.size > 0
+          ? `${API_ENDPOINTS.leaveApplications}?${params.toString()}`
+          : API_ENDPOINTS.leaveApplications
       );
       setLeaves(data.items);
     } catch {
@@ -383,7 +423,7 @@ export default function ParentAttendancePage(): React.ReactElement {
     } finally {
       setIsLoadingLeaves(false);
     }
-  }, []);
+  }, [selectedChildId]);
 
   const handleCancelLeave = async (leaveId: string): Promise<void> => {
     const ok = window.confirm("Cancel this leave request? This cannot be undone.");
@@ -423,6 +463,10 @@ export default function ParentAttendancePage(): React.ReactElement {
     return `${formatDate(start)} – ${formatDate(end)}`;
   };
 
+  const handleChildChange = (value: string): void => {
+    setSelectedChildId(value);
+  };
+
   // ── Tab button component
   const TabButton = ({ id, label }: { id: TabId; label: string }): React.ReactElement => (
     <button
@@ -443,7 +487,11 @@ export default function ParentAttendancePage(): React.ReactElement {
       <PageHeader
         eyebrow="Family updates"
         title="Attendance"
-        description="Review recorded absences and keep leave requests organized for your child."
+        description={
+          selectedChild
+            ? `Review recorded absences and keep leave requests organized for ${selectedChild.name}.`
+            : "Review recorded absences and keep leave requests organized for all linked children."
+        }
         icon={<CalendarDays className="h-6 w-6" aria-hidden="true" />}
         actions={(
           <Button
@@ -464,6 +512,25 @@ export default function ParentAttendancePage(): React.ReactElement {
       />
 
       <PageSection className="space-y-5">
+        {hasMultipleChildren ? (
+          <div className="max-w-md">
+            <ParentChildFilter
+              students={children}
+              value={selectedChildId}
+              onChange={handleChildChange}
+              label="Viewing"
+              className="bg-card/96 backdrop-blur-none"
+            />
+          </div>
+        ) : null}
+
+        {childrenError ? (
+          <StatusBanner variant="error">
+            Child filters are unavailable right now. You can still review records,
+            but child names may be hidden until the linked-children list loads again.
+          </StatusBanner>
+        ) : null}
+
         <div className="inline-flex flex-wrap gap-2 rounded-full border border-border/70 bg-card/72 p-2 shadow-[0_16px_36px_-30px_rgba(15,40,69,0.45)] backdrop-blur-sm dark:bg-card/88">
           <TabButton id="absences" label="Absence Records" />
           <TabButton id="leaves" label="Leave Applications" />
@@ -505,29 +572,42 @@ export default function ParentAttendancePage(): React.ReactElement {
             ) : records.length === 0 ? (
               <EmptyState
                 title="No absences recorded"
-                description={`No absence records for ${MONTHS[selectedMonth - 1]} ${selectedYear}.`}
+                description={
+                  selectedChild
+                    ? `No absence records for ${selectedChild.name} in ${MONTHS[selectedMonth - 1]} ${selectedYear}.`
+                    : `No absence records for ${MONTHS[selectedMonth - 1]} ${selectedYear}.`
+                }
                 icon={<CalendarDays className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
               />
             ) : (
               <div className="space-y-3">
-                {records.map((record) => (
-                  <Card key={record.recordId}>
-                    <CardContent className="flex items-center justify-between gap-4 p-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="font-medium">{formatDate(record.date)}</p>
-                        {record.reason && (
-                          <p className="text-sm text-muted-foreground">{record.reason}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Badge variant="destructive">{record.status}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          by {record.enteredByRole}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {records.map((record) => {
+                  const child = childById.get(record.studentId);
+
+                  return (
+                    <Card key={record.recordId}>
+                      <CardContent className="flex items-center justify-between gap-4 p-4">
+                        <div className="min-w-0 space-y-1">
+                          <p className="font-medium">{formatDate(record.date)}</p>
+                          {hasMultipleChildren && child ? (
+                            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                              {child.name} ({child.rollNumber})
+                            </p>
+                          ) : null}
+                          {record.reason && (
+                            <p className="text-sm text-muted-foreground">{record.reason}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Badge variant="destructive">{record.status}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            by {record.enteredByRole}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </>
@@ -544,7 +624,11 @@ export default function ParentAttendancePage(): React.ReactElement {
             ) : leaves.length === 0 ? (
               <EmptyState
                 title="No leave applications"
-                description="You haven't submitted any leave applications yet."
+                description={
+                  selectedChild
+                    ? `You haven't submitted any leave applications for ${selectedChild.name} yet.`
+                    : "You haven't submitted any leave applications yet."
+                }
                 icon={<CalendarDays className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
               />
             ) : (
@@ -618,6 +702,12 @@ export default function ParentAttendancePage(): React.ReactElement {
             setEditingLeave(null);
           }}
           onSuccess={fetchLeaves}
+          students={children}
+          isLoadingStudents={isLoadingChildren}
+          studentsError={childrenError}
+          defaultStudentId={
+            selectedChildId === ALL_CHILDREN_VALUE ? undefined : selectedChildId
+          }
           initialLeave={editingLeave}
         />
       )}

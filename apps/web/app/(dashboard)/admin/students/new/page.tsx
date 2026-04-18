@@ -29,6 +29,7 @@ import {
   PageShell,
 } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
+import { TemporaryCredentialCard } from "@/components/shared/temporary-credential-card";
 import { ArrowLeft, Search, UserCheck } from "lucide-react";
 import type {
   ClassItem,
@@ -124,6 +125,12 @@ export default function EnrollStudentPage(): React.ReactElement {
   const [fieldErrors, setFieldErrors] = React.useState<
     Partial<Record<FieldErrorKey, string>>
   >({});
+  const [enrolled, setEnrolled] = React.useState<{
+    studentId: string;
+    studentName: string;
+    parentName?: string;
+    temporaryPin?: string;
+  } | null>(null);
 
   const clearNewParentFields = React.useCallback((): void => {
     setParentName("");
@@ -317,7 +324,20 @@ export default function EnrollStudentPage(): React.ReactElement {
       }
 
       const result = await apiPost<MutationResponse>(API_ENDPOINTS.students, body);
-      router.push(`/admin/students/${result.studentId}`);
+
+      // If we created an inline parent, hold the admin on-screen so they can
+      // capture the temporary PIN before navigating away. For other modes,
+      // there's nothing to surface — go straight to the profile.
+      if (parentMode === "new" && result.studentId) {
+        setEnrolled({
+          studentId: result.studentId,
+          studentName: name.trim(),
+          parentName: parentName.trim(),
+          temporaryPin: result.temporaryPin ?? parentPin,
+        });
+      } else {
+        router.push(`/admin/students/${result.studentId}`);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         const serverFieldErrors = getServerFieldErrors(err.details);
@@ -355,6 +375,42 @@ export default function EnrollStudentPage(): React.ReactElement {
 
       <PageSection>
         <CardContent className="p-0">
+          {enrolled ? (
+            <div className="max-w-2xl space-y-4">
+              <StatusBanner variant="success" title="Student enrolled">
+                <p>
+                  {enrolled.studentName} has been added and linked to the new
+                  parent account
+                  {enrolled.parentName ? ` for ${enrolled.parentName}` : ""}.
+                </p>
+              </StatusBanner>
+              {enrolled.temporaryPin && (
+                <TemporaryCredentialCard
+                  label="Temporary Parent PIN"
+                  value={enrolled.temporaryPin}
+                  recipient={enrolled.parentName}
+                  helperText="The parent will be asked to choose a new PIN on their first login."
+                />
+              )}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/admin/students/${enrolled.studentId}`)
+                  }
+                >
+                  Go to Student Profile
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push("/admin/students")}
+                >
+                  Back to Students
+                </Button>
+              </div>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
             {classes.length === 0 && (
               <StatusBanner variant="warning">
@@ -668,6 +724,7 @@ export default function EnrollStudentPage(): React.ReactElement {
               </Button>
             </div>
           </form>
+          )}
         </CardContent>
       </PageSection>
     </PageShell>

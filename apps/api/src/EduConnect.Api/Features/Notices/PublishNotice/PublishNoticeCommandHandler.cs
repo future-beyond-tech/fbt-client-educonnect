@@ -1,6 +1,8 @@
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
+using EduConnect.Api.Infrastructure.Database.Entities;
+using EduConnect.Api.Infrastructure.Email;
 using EduConnect.Api.Infrastructure.Services;
 using MediatR;
 
@@ -11,17 +13,23 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<PublishNoticeCommandHandler> _logger;
 
     public PublishNoticeCommandHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
         INotificationService notificationService,
+        IEmailService emailService,
+        IConfiguration configuration,
         ILogger<PublishNoticeCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
+        _emailService = emailService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -78,6 +86,9 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
                 notice.Id,
                 "notice",
                 cancellationToken);
+
+            // Fire-and-log: email notice to everyone who has an email on file.
+            await SendNoticeEmailsAsync(notice, targetUserIds, cancellationToken);
         }
 
         _logger.LogInformation(
@@ -85,6 +96,96 @@ public class PublishNoticeCommandHandler : IRequestHandler<PublishNoticeCommand,
             request.NoticeId, _currentUserService.UserId, targetUserIds.Count);
 
         return new PublishNoticeResponse("Notice published successfully. It is now immutable.");
+    }
+
+    private async Task SendNoticeEmailsAsync(
+        NoticeEntity notice,
+        List<Guid> targetUserIds,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var school = await _context.Schools
+                .FirstOrDefaultAsync(s => s.Id == _currentUserService.SchoolId, cancellationToken);
+
+            if (school is null)
+            {
+                return;
+            }
+
+            var recipients = await _context.Users
+                .Where(u =>
+                    u.SchoolId == _currentUserService.SchoolId &&
+                    targetUserIds.Contains(u.Id) &&
+                    u.IsActive &&
+                    u.Email != null &&
+                    u.Email != string.Empty)
+                .Select(u => new { u.Id, u.Name, u.Email })
+                .ToListAsync(cancellationToken);
+
+            if (recipients.Count == 0)
+            {
+                return;
+            }
+
+            var appUrl = EmailBranding.ResolveAppUrl(_configuration);
+            var logoUrl = EmailBranding.ResolveLogoUrl(_configuration);
+            var viewUrl = $"{appUrl}/notices/{notice.Id}";
+            var publishedAt = notice.PublishedAt ?? DateTimeOffset.UtcNow;
+
+            var successCount = 0;
+            var failureCount = 0;
+            foreach (var recipient in recipients)
+            {
+                try
+                {
+                    var content = EmailTemplates.BuildNotice(
+                        school,
+                        recipientName: recipient.Name,
+                        noticeTitle: notice.Title,
+                        noticeBody: notice.Body,
+                        publishedAt: publishedAt,
+                        viewUrl: viewUrl,
+                        logoUrl: logoUrl);
+
+                    var ok = await _emailService.SendEmailAsync(
+                        recipient.Email!,
+                        content.Subject,
+                        content.Html,
+                        content.Text,
+                        cancellationToken);
+
+                    if (ok)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failureCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    _logger.LogError(
+                        ex,
+                        "Failed to email notice {NoticeId} to user {UserId}",
+                        notice.Id,
+                        recipient.Id);
+                }
+            }
+
+            _logger.LogInformation(
+                "Notice {NoticeId} email dispatch: {Success} sent, {Failure} failed (of {Total} recipients with email)",
+                notice.Id, successCount, failureCount, recipients.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed while dispatching notice emails for {NoticeId}",
+                notice.Id);
+        }
     }
 
     private async Task<List<Guid>> ResolveTargetUserIds(

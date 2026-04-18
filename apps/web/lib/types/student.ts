@@ -106,6 +106,12 @@ export interface LinkParentRequest {
 export interface ParentMutationResponse {
   parentId?: string;
   message: string;
+  /**
+   * Plain-text temporary PIN echoed back from the API when a parent account is
+   * first created. Shown once to the admin so they can relay it to the new
+   * parent. Do NOT persist or log this value.
+   */
+  temporaryPin?: string;
 }
 
 export interface CreateClassRequest {
@@ -129,4 +135,10 @@ export interface MutationResponse {
   studentId?: string;
   linkId?: string;
   message: string;
+  /**
+   * Plain-text temporary PIN echoed back when enrolling a student with an
+   * inline parent account. Empty when linking an existing parent. Do NOT
+   * persist or log this value.
+   */
+  temporaryPin?: string;
 }

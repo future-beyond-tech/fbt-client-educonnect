@@ -257,6 +257,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.UseTenantIsolation();
+app.UseMustChangePasswordEnforcement();
 app.UseRequestLogging();
 
 app.MapAllEndpoints();

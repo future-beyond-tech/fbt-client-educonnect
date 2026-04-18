@@ -6,6 +6,7 @@ export interface JwtPayload {
   schoolId: string;
   role: RoleType;
   name: string;
+  must_change_password?: string | boolean;
   iat: number;
   exp: number;
 }
@@ -15,6 +16,7 @@ export interface AuthUser {
   schoolId: string;
   role: RoleType;
   name: string;
+  mustChangePassword: boolean;
 }
 
 export function decodeJwtPayload(token: string): JwtPayload | null {
@@ -45,10 +47,16 @@ export function getUserFromToken(token: string): AuthUser | null {
     return null;
   }
 
+  const mustChange =
+    payload.must_change_password === true ||
+    (typeof payload.must_change_password === "string" &&
+      payload.must_change_password.toLowerCase() === "true");
+
   return {
     userId: payload.userId,
     schoolId: payload.schoolId,
     role: payload.role,
     name: payload.name,
+    mustChangePassword: mustChange,
   };
 }

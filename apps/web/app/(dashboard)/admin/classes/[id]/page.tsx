@@ -274,9 +274,11 @@ export default function AdminClassDetailPage(): React.ReactElement {
   };
 
   const handleUnassign = async (assignment: ClassAssignmentItem): Promise<void> => {
-    if (
-      !confirm(`Unassign ${assignment.teacherName} from ${assignment.subject}?`)
-    ) {
+    const confirmMessage = assignment.isClassTeacher
+      ? `Remove class-teacher role from ${assignment.teacherName}? They will remain assigned to this class as the ${assignment.subject} teacher.`
+      : `Unassign ${assignment.teacherName} from ${assignment.subject}?`;
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
