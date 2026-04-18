@@ -6,8 +6,9 @@
 -- Development PIN for all parents: "1234"
 -- (Actual working hashes are written by 004_fix_* and 005_fix_* seeds.)
 --
--- Fully idempotent — re-running this file is a no-op because every INSERT
--- uses ON CONFLICT DO NOTHING on the primary key.
+-- Fully idempotent — core entities rely on fixed IDs, while associative rows
+-- also guard on their natural unique keys so reruns do not fail if the same
+-- relationship was created earlier with a different ID.
 -- ============================================================================
 
 BEGIN;
@@ -68,7 +69,7 @@ VALUES
   ('d1d2d3d4-0002-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'b1b2c3d4-0002-4000-8000-000000000001', 'c1c2c3d4-0002-4000-8000-000000000001', 'English'),
   ('d1d2d3d4-0003-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'b1b2c3d4-0003-4000-8000-000000000001', 'c1c2c3d4-0001-4000-8000-000000000001', 'Science'),
   ('d1d2d3d4-0004-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'b1b2c3d4-0003-4000-8000-000000000001', 'c1c2c3d4-0003-4000-8000-000000000001', 'Mathematics')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (teacher_id, class_id, subject) DO NOTHING;
 
 -- ─── STUDENTS ─────────────────────────────────
 INSERT INTO students (id, school_id, class_id, roll_number, name)
@@ -98,6 +99,6 @@ VALUES
   ('f1f2f3f4-0008-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'b1b2c3d4-0014-4000-8000-000000000001', 'e1e2e3e4-0005-4000-8000-000000000001'),
   -- Vikram Anand (5B-003) linked to Karthik Rajan so every student has at least one parent
   ('f1f2f3f4-0009-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'b1b2c3d4-0013-4000-8000-000000000001', 'e1e2e3e4-0007-4000-8000-000000000001')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (parent_id, student_id) DO NOTHING;
 
 COMMIT;

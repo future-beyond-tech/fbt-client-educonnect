@@ -230,7 +230,7 @@ var app = builder.Build();
     }
     catch (Exception ex)
     {
-        logger.LogCritical(ex, "Failed to apply EF Core Migrations.");
+        logger.LogCritical(ex, "Failed to initialize database on startup.");
         throw;
     }
 }
