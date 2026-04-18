@@ -133,36 +133,47 @@ export default function TeacherAttendancePage(): React.ReactElement {
     }
   }, []);
 
-  const hydrateFormFromContext = React.useCallback((ctx: TakeContextResponse) => {
-    const nextStatus: Record<string, TakeStatus> = {};
-    const nextReason: Record<string, string> = {};
+  const hydrateFormFromContext = React.useCallback(
+    (ctx: TakeContextResponse, options?: { preserveSaved?: boolean }) => {
+      const nextStatus: Record<string, TakeStatus> = {};
+      const nextReason: Record<string, string> = {};
 
-    for (const s of ctx.students) {
-      nextStatus[s.id] = "Present";
-      nextReason[s.id] = "";
-    }
+      for (const s of ctx.students) {
+        nextStatus[s.id] = "Present";
+        nextReason[s.id] = "";
+      }
 
-    for (const ex of ctx.exceptions) {
-      nextStatus[ex.studentId] = ex.status === "Late" ? "Late" : "Absent";
-      nextReason[ex.studentId] = ex.reason ?? "";
-    }
+      for (const ex of ctx.exceptions) {
+        nextStatus[ex.studentId] = ex.status === "Late" ? "Late" : "Absent";
+        nextReason[ex.studentId] = ex.reason ?? "";
+      }
 
-    // Approved leave: lock to Present (excused)
-    for (const leave of ctx.approvedLeaves) {
-      nextStatus[leave.studentId] = "Present";
-      nextReason[leave.studentId] = "";
-    }
+      // Approved leave: lock to Present (excused)
+      for (const leave of ctx.approvedLeaves) {
+        nextStatus[leave.studentId] = "Present";
+        nextReason[leave.studentId] = "";
+      }
 
-    setStatusByStudentId(nextStatus);
-    setReasonByStudentId(nextReason);
-    // For editable (class-teacher) contexts: if the backend already has
-    // exception records, the teacher has previously saved attendance — lock
-    // the rows and surface an Edit affordance.
-    // For read-only (subject-teacher) contexts: the saved/editing machinery
-    // doesn't apply, so keep it reset.
-    setHasSaved(ctx.canEdit && ctx.exceptions.length > 0);
-    setEditingStudentIds(new Set());
-  }, []);
+      setStatusByStudentId(nextStatus);
+      setReasonByStudentId(nextReason);
+
+      // For editable (class-teacher) contexts: if the backend already has
+      // exception records, the teacher has previously saved attendance — lock
+      // the rows and surface an Edit affordance.
+      //
+      // `preserveSaved` is true right after a successful save — in that case
+      // we ALWAYS lock the rows, even when the saved state was "everyone
+      // present" (which produces zero exception records on the server and
+      // would otherwise look indistinguishable from an unsaved context).
+      //
+      // For read-only (subject-teacher) contexts: the saved/editing machinery
+      // doesn't apply, so keep it reset.
+      const hasServerExceptions = ctx.exceptions.length > 0;
+      setHasSaved(ctx.canEdit && (hasServerExceptions || !!options?.preserveSaved));
+      setEditingStudentIds(new Set());
+    },
+    []
+  );
 
   const fetchContext = React.useCallback(async () => {
     if (!classId || !date) return;
@@ -235,14 +246,36 @@ export default function TeacherAttendancePage(): React.ReactElement {
         items,
       });
 
-      // Lock every row and surface the Edit affordance so the teacher has a
-      // clear visual confirmation the save took effect.
-      setHasSaved(true);
-      setEditingStudentIds(new Set());
-      setActionSuccess(
-        res.message ||
-          `Attendance saved successfully (${res.createdCount} created, ${res.updatedCount} updated).`
-      );
+      // Refetch the authoritative server state so the UI can never disagree
+      // with what was persisted. If the POST succeeded but the server didn't
+      // actually persist (e.g. a proxy returned a cached 200), the hydrated
+      // context will make that visible instead of silently lying to the user.
+      //
+      // We intentionally bypass the shared fetchContext() here because it
+      // clears actionSuccess on entry — we want to set the banner AFTER the
+      // hydrate so it sticks.
+      let refreshed: TakeContextResponse | null = null;
+      try {
+        refreshed = await apiGet<TakeContextResponse>(
+          `${API_ENDPOINTS.attendance}/take?classId=${context.classId}&date=${context.date}`
+        );
+        setContext(refreshed);
+        hydrateFormFromContext(refreshed, { preserveSaved: true });
+      } catch {
+        // Refetch is best-effort. The POST already succeeded, so fall back to
+        // purely local state — lock every row so the teacher still gets the
+        // visual confirmation the save worked.
+        setHasSaved(true);
+        setEditingStudentIds(new Set());
+      }
+
+      // Build a clean, non-"undefined" summary. Counts can legitimately be
+      // zero (e.g. everyone marked present, nothing to persist), so we avoid
+      // the `${res.createdCount} created, ${res.updatedCount} updated` shape
+      // that used to render as "undefined created, undefined updated" when
+      // the JSON didn't expose those fields.
+      const fallbackMessage = "Attendance saved successfully.";
+      setActionSuccess(res?.message?.trim() ? res.message : fallbackMessage);
 
       // Scroll the success banner into view — on mobile the teacher is often
       // scrolled down to the last student when they hit Save, and the banner
@@ -250,12 +283,6 @@ export default function TeacherAttendancePage(): React.ReactElement {
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-
-      // Intentionally do NOT refetch here: fetchContext() clears
-      // actionSuccess, which would make the banner flash and disappear.
-      // Local state (hasSaved, statusByStudentId, reasonByStudentId) already
-      // reflects the write, and nothing returned by the /take GET can change
-      // as a side-effect of saving. The next class/date change will refetch.
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to save attendance.");
     } finally {
