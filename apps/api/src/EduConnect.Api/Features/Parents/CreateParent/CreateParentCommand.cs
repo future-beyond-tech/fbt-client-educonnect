@@ -6,4 +6,4 @@ public record CreateParentCommand(
     string Email,
     string Pin) : IRequest<CreateParentResponse>;
 
-public record CreateParentResponse(Guid ParentId, string Message);
+public record CreateParentResponse(Guid ParentId, string Message, string TemporaryPin);

@@ -3,6 +3,8 @@ using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
+using EduConnect.Api.Infrastructure.Email;
+using EduConnect.Api.Infrastructure.Services;
 
 namespace EduConnect.Api.Features.Parents.CreateParent;
 
@@ -11,17 +13,23 @@ public class CreateParentCommandHandler : IRequestHandler<CreateParentCommand, C
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly PinService _pinService;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CreateParentCommandHandler> _logger;
 
     public CreateParentCommandHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
         PinService pinService,
+        IEmailService emailService,
+        IConfiguration configuration,
         ILogger<CreateParentCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _pinService = pinService;
+        _emailService = emailService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -75,6 +83,7 @@ public class CreateParentCommandHandler : IRequestHandler<CreateParentCommand, C
             Role = "Parent",
             PinHash = _pinService.HashPin(request.Pin),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -87,6 +96,45 @@ public class CreateParentCommandHandler : IRequestHandler<CreateParentCommand, C
             parent.Id,
             _currentUserService.UserId);
 
-        return new CreateParentResponse(parent.Id, "Parent created successfully.");
+        // Fire-and-log: welcome email failure must not fail account creation.
+        try
+        {
+            var school = await _context.Schools
+                .FirstOrDefaultAsync(s => s.Id == _currentUserService.SchoolId, cancellationToken);
+
+            if (school is not null && !string.IsNullOrWhiteSpace(parent.Email))
+            {
+                var appUrl = EmailBranding.ResolveAppUrl(_configuration);
+                var logoUrl = EmailBranding.ResolveLogoUrl(_configuration);
+                var loginUrl = $"{appUrl}/login";
+
+                var content = EmailTemplates.BuildWelcomeParent(
+                    school,
+                    parentName: parent.Name,
+                    studentName: "your child",
+                    loginUrl: loginUrl,
+                    tempPin: request.Pin,
+                    logoUrl: logoUrl);
+
+                await _emailService.SendEmailAsync(
+                    parent.Email!,
+                    content.Subject,
+                    content.Html,
+                    content.Text,
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to dispatch welcome email for Parent {ParentId}",
+                parent.Id);
+        }
+
+        return new CreateParentResponse(
+            parent.Id,
+            "Parent created successfully. Share the temporary PIN with them — they will be required to change it on first login.",
+            request.Pin);
     }
 }

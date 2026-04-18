@@ -72,4 +72,10 @@ export interface TeacherMutationResponse {
   teacherId?: string;
   assignmentId?: string;
   message: string;
+  /**
+   * Plain-text temporary password echoed back from the API when a staff
+   * account is first created. Shown once to the admin so they can relay it
+   * to the new user. Do NOT persist or log this value.
+   */
+  temporaryPassword?: string;
 }

@@ -10,6 +10,10 @@ public static class LoginParentEndpoint
         CancellationToken cancellationToken)
     {
         var response = await mediator.Send(command, cancellationToken);
-        return Results.Ok(new { accessToken = response.AccessToken });
+        return Results.Ok(new
+        {
+            accessToken = response.AccessToken,
+            mustChangePassword = response.MustChangePassword
+        });
     }
 }

@@ -25,6 +25,8 @@ export const API_ENDPOINTS = {
   resetPassword: "/api/auth/reset-password",
   forgotPin: "/api/auth/forgot-pin",
   resetPin: "/api/auth/reset-pin",
+  changePassword: "/api/auth/change-password",
+  changePin: "/api/auth/change-pin",
   attendance: "/api/attendance",
   homework: "/api/homework",
   notices: "/api/notices",

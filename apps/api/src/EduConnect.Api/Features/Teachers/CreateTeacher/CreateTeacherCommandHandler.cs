@@ -4,6 +4,8 @@ using EduConnect.Api.Common.PhoneNumbers;
 using EduConnect.Api.Features.Teachers.AssignClassToTeacher;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
+using EduConnect.Api.Infrastructure.Email;
+using EduConnect.Api.Infrastructure.Services;
 using MediatR;
 
 namespace EduConnect.Api.Features.Teachers.CreateTeacher;
@@ -14,6 +16,8 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
     private readonly CurrentUserService _currentUserService;
     private readonly PasswordHasher _passwordHasher;
     private readonly ISender _sender;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CreateTeacherCommandHandler> _logger;
 
     public CreateTeacherCommandHandler(
@@ -21,12 +25,16 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
         CurrentUserService currentUserService,
         PasswordHasher passwordHasher,
         ISender sender,
+        IEmailService emailService,
+        IConfiguration configuration,
         ILogger<CreateTeacherCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _passwordHasher = passwordHasher;
         _sender = sender;
+        _emailService = emailService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -81,6 +89,7 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
             Role = normalizedRole,
             PasswordHash = _passwordHasher.HashPassword(request.Password),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -140,7 +149,47 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
             teacher.Id,
             _currentUserService.UserId);
 
-        return new CreateTeacherResponse(teacher.Id, $"{normalizedRole} created successfully.");
+        // Fire-and-log: welcome email failure must not fail account creation.
+        try
+        {
+            var school = await _context.Schools
+                .FirstOrDefaultAsync(s => s.Id == _currentUserService.SchoolId, cancellationToken);
+
+            if (school is not null && !string.IsNullOrWhiteSpace(teacher.Email))
+            {
+                var appUrl = EmailBranding.ResolveAppUrl(_configuration);
+                var logoUrl = EmailBranding.ResolveLogoUrl(_configuration);
+                var loginUrl = $"{appUrl}/login";
+
+                var content = EmailTemplates.BuildWelcomeStaff(
+                    school,
+                    userName: teacher.Name,
+                    role: normalizedRole,
+                    loginUrl: loginUrl,
+                    tempPassword: request.Password,
+                    logoUrl: logoUrl);
+
+                await _emailService.SendEmailAsync(
+                    teacher.Email!,
+                    content.Subject,
+                    content.Html,
+                    content.Text,
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to dispatch welcome email for {Role} {TeacherId}",
+                normalizedRole,
+                teacher.Id);
+        }
+
+        return new CreateTeacherResponse(
+            teacher.Id,
+            $"{normalizedRole} created successfully. Share the temporary password with them — they will be required to change it on first login.",
+            request.Password);
     }
 
     private static string NormalizeRole(string role)

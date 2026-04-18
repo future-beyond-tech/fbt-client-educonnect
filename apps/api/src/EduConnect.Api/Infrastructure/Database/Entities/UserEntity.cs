@@ -11,6 +11,7 @@ public class UserEntity
     public string? PasswordHash { get; set; }
     public string? PinHash { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool MustChangePassword { get; set; } = false;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -2,6 +2,7 @@ using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
+using EduConnect.Api.Infrastructure.Email;
 using EduConnect.Api.Infrastructure.Services;
 using MediatR;
 
@@ -12,17 +13,23 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<MarkAbsenceCommandHandler> _logger;
 
     public MarkAbsenceCommandHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
         INotificationService notificationService,
+        IEmailService emailService,
+        IConfiguration configuration,
         ILogger<MarkAbsenceCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
+        _emailService = emailService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -142,6 +149,9 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
                 attendanceRecord.Id,
                 "attendance",
                 cancellationToken);
+
+            // Fire-and-log: email every linked parent who has an email on file.
+            await SendAbsenceEmailsAsync(student, attendanceRecord, allParentIds, cancellationToken);
         }
 
         _logger.LogInformation(
@@ -149,5 +159,107 @@ public class MarkAbsenceCommandHandler : IRequestHandler<MarkAbsenceCommand, Mar
             attendanceRecord.Id, student.Id, request.RollNumber, _currentUserService.UserId, role);
 
         return new MarkAbsenceResponse(attendanceRecord.Id, "Absent", "Absence marked successfully.");
+    }
+
+    private async Task SendAbsenceEmailsAsync(
+        StudentEntity student,
+        AttendanceRecordEntity attendanceRecord,
+        List<Guid> parentIds,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var school = await _context.Schools
+                .FirstOrDefaultAsync(s => s.Id == _currentUserService.SchoolId, cancellationToken);
+
+            if (school is null)
+            {
+                return;
+            }
+
+            var classEntity = await _context.Classes
+                .FirstOrDefaultAsync(
+                    c => c.Id == student.ClassId && c.SchoolId == _currentUserService.SchoolId,
+                    cancellationToken);
+
+            var className = classEntity is null
+                ? "—"
+                : string.IsNullOrWhiteSpace(classEntity.Section)
+                    ? classEntity.Name
+                    : $"{classEntity.Name} - {classEntity.Section}";
+
+            var parents = await _context.Users
+                .Where(u =>
+                    u.SchoolId == _currentUserService.SchoolId &&
+                    parentIds.Contains(u.Id) &&
+                    u.IsActive &&
+                    u.Email != null &&
+                    u.Email != string.Empty)
+                .Select(u => new { u.Id, u.Name, u.Email })
+                .ToListAsync(cancellationToken);
+
+            if (parents.Count == 0)
+            {
+                return;
+            }
+
+            var appUrl = EmailBranding.ResolveAppUrl(_configuration);
+            var logoUrl = EmailBranding.ResolveLogoUrl(_configuration);
+            var viewUrl = $"{appUrl}/attendance";
+
+            var successCount = 0;
+            var failureCount = 0;
+            foreach (var parent in parents)
+            {
+                try
+                {
+                    var content = EmailTemplates.BuildAbsence(
+                        school,
+                        parentName: parent.Name,
+                        studentName: student.Name,
+                        className: className,
+                        absenceDate: attendanceRecord.Date,
+                        reason: attendanceRecord.Reason,
+                        viewUrl: viewUrl,
+                        logoUrl: logoUrl);
+
+                    var ok = await _emailService.SendEmailAsync(
+                        parent.Email!,
+                        content.Subject,
+                        content.Html,
+                        content.Text,
+                        cancellationToken);
+
+                    if (ok)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failureCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    _logger.LogError(
+                        ex,
+                        "Failed to email absence for student {StudentId} to parent {ParentId}",
+                        student.Id,
+                        parent.Id);
+                }
+            }
+
+            _logger.LogInformation(
+                "Absence email dispatch for student {StudentId} on {Date}: {Success} sent, {Failure} failed (of {Total} parents with email)",
+                student.Id, attendanceRecord.Date, successCount, failureCount, parents.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed while dispatching absence emails for student {StudentId}",
+                student.Id);
+        }
     }
 }

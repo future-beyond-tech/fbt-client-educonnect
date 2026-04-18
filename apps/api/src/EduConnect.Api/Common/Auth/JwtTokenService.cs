@@ -20,7 +20,13 @@ public class JwtTokenService
         _logger = logger;
     }
 
-    public string GenerateAccessToken(Guid userId, Guid schoolId, string role, string name, int expirationMinutes = 15)
+    public string GenerateAccessToken(
+        Guid userId,
+        Guid schoolId,
+        string role,
+        string name,
+        int expirationMinutes = 15,
+        bool mustChangePassword = false)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -31,7 +37,8 @@ public class JwtTokenService
             new Claim("userId", userId.ToString()),
             new Claim("schoolId", schoolId.ToString()),
             new Claim("role", role),
-            new Claim("name", name)
+            new Claim("name", name),
+            new Claim("must_change_password", mustChangePassword ? "true" : "false")
         };
 
         var token = new JwtSecurityToken(

@@ -64,7 +64,13 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
             throw new UnauthorizedException("Invalid phone or PIN.");
         }
 
-        var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.SchoolId, user.Role, user.Name, 15);
+        var accessToken = _jwtTokenService.GenerateAccessToken(
+            user.Id,
+            user.SchoolId,
+            user.Role,
+            user.Name,
+            15,
+            user.MustChangePassword);
         var refreshTokenId = Guid.NewGuid();
         var refreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var refreshToken = _jwtTokenService.BuildRefreshToken(refreshTokenId, refreshTokenSecret);
@@ -95,6 +101,6 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
         _logger.LogInformation("Parent user {UserId} logged in successfully", user.Id);
 
-        return new LoginParentResponse(accessToken);
+        return new LoginParentResponse(accessToken, user.MustChangePassword);
     }
 }

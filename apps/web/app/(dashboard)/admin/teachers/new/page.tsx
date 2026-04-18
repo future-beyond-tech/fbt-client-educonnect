@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { ClassSelector } from "@/components/shared/class-selector";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
+import { TemporaryCredentialCard } from "@/components/shared/temporary-credential-card";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
@@ -49,6 +50,12 @@ export default function CreateTeacherPage(): React.ReactElement {
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [catalogLoading, setCatalogLoading] = React.useState(true);
   const [catalogError, setCatalogError] = React.useState("");
+  const [createdTeacher, setCreatedTeacher] = React.useState<{
+    teacherId: string;
+    name: string;
+    role: "Teacher" | "Admin";
+    temporaryPassword: string;
+  } | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -132,7 +139,19 @@ export default function CreateTeacherPage(): React.ReactElement {
         API_ENDPOINTS.teachers,
         body
       );
-      router.push(`/admin/teachers/${result.teacherId}`);
+      // Hold the admin on-screen so they can capture the temporary password —
+      // the API never echoes it back again. They'll navigate to the profile
+      // from the confirmation card.
+      if (result.teacherId) {
+        setCreatedTeacher({
+          teacherId: result.teacherId,
+          name: body.name,
+          role,
+          temporaryPassword: result.temporaryPassword ?? password,
+        });
+      } else {
+        router.push("/admin/teachers");
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create staff account.");
     } finally {
@@ -164,6 +183,39 @@ export default function CreateTeacherPage(): React.ReactElement {
 
       <PageSection>
         <CardContent className="p-0">
+          {createdTeacher ? (
+            <div className="max-w-2xl space-y-4">
+              <StatusBanner variant="success" title={`${createdTeacher.role} account created`}>
+                <p>
+                  {createdTeacher.name} can now sign in. They will be required
+                  to change this temporary password on their first login.
+                </p>
+              </StatusBanner>
+              <TemporaryCredentialCard
+                label="Temporary Password"
+                value={createdTeacher.temporaryPassword}
+                recipient={createdTeacher.name}
+                helperText="Staff must replace this password on first login; the change-password flow will revoke any existing sessions."
+              />
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/admin/teachers/${createdTeacher.teacherId}`)
+                  }
+                >
+                  Go to {createdTeacher.role} Profile
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push("/admin/teachers")}
+                >
+                  Back to Staff List
+                </Button>
+              </div>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
             <Input
               label={role === "Admin" ? "Admin Name" : "Teacher Name"}
@@ -361,6 +413,7 @@ export default function CreateTeacherPage(): React.ReactElement {
               </Button>
             </div>
           </form>
+          )}
         </CardContent>
       </PageSection>
     </PageShell>

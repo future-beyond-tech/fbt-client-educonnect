@@ -8,7 +8,7 @@ using BCrypt.Net;
 
 namespace EduConnect.Api.Features.Auth.Login;
 
-public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
+public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 {
     private readonly AppDbContext _context;
     private readonly PasswordHasher _passwordHasher;
@@ -30,7 +30,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
         _logger = logger;
     }
 
-    public async Task<string> Handle(LoginCommand request, CancellationToken cancellationToken)
+    public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var normalizedPhone = JapanPhoneNumber.NormalizeUserInput(request.Phone);
 
@@ -62,7 +62,13 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
             throw new UnauthorizedException("Invalid phone or password.");
         }
 
-        var accessToken = _jwtTokenService.GenerateAccessToken(user.Id, user.SchoolId, user.Role, user.Name, 15);
+        var accessToken = _jwtTokenService.GenerateAccessToken(
+            user.Id,
+            user.SchoolId,
+            user.Role,
+            user.Name,
+            15,
+            user.MustChangePassword);
         var refreshTokenId = Guid.NewGuid();
         var refreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var refreshToken = _jwtTokenService.BuildRefreshToken(refreshTokenId, refreshTokenSecret);
@@ -93,6 +99,6 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, string>
 
         _logger.LogInformation("User {UserId} logged in successfully", user.Id);
 
-        return accessToken;
+        return new LoginResponse(accessToken, user.MustChangePassword);
     }
 }

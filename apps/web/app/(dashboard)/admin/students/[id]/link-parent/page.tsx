@@ -19,6 +19,7 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
+import { TemporaryCredentialCard } from "@/components/shared/temporary-credential-card";
 import { ArrowLeft, Search, UserCheck } from "lucide-react";
 import type {
   ParentSearchResult,
@@ -53,6 +54,10 @@ export default function LinkParentPage(): React.ReactElement {
   const [isCreatingParent, setIsCreatingParent] = React.useState(false);
   const [error, setError] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
+  const [newParentCredential, setNewParentCredential] = React.useState<{
+    name: string;
+    pin: string;
+  } | null>(null);
 
   const resetCreateForm = React.useCallback((): void => {
     setShowCreateForm(false);
@@ -152,6 +157,7 @@ export default function LinkParentPage(): React.ReactElement {
     setIsCreatingParent(true);
     setError("");
     setSuccessMessage("");
+    setNewParentCredential(null);
 
     let createdParentId: string | undefined;
 
@@ -184,6 +190,10 @@ export default function LinkParentPage(): React.ReactElement {
       );
 
       setSuccessMessage(`Parent created and linked successfully. ${linkResult.message}`);
+      setNewParentCredential({
+        name: trimmedName,
+        pin: parentResult.temporaryPin ?? newParentPin,
+      });
       setSearchResults([]);
       setHasSearched(false);
       setPhone("");
@@ -224,6 +234,14 @@ export default function LinkParentPage(): React.ReactElement {
 
       {successMessage && (
         <StatusBanner variant="success">{successMessage}</StatusBanner>
+      )}
+      {newParentCredential && (
+        <TemporaryCredentialCard
+          label="Temporary Parent PIN"
+          value={newParentCredential.pin}
+          recipient={newParentCredential.name}
+          helperText="The parent will be asked to choose a new PIN the first time they sign in."
+        />
       )}
       {error && (
         <StatusBanner variant="error">{error}</StatusBanner>

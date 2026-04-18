@@ -21,6 +21,7 @@ import { StatusBanner } from "@/components/shared/status-banner";
 
 interface LoginResponse {
   accessToken: string;
+  mustChangePassword?: boolean;
 }
 
 type LoginMode = "parent" | "staff";
@@ -40,9 +41,12 @@ export function LoginForm(): React.ReactElement {
     "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60";
 
   React.useEffect(() => {
-    if (!isAuthLoading && user) {
-      router.replace(defaultRouteByRole[user.role]);
+    if (isAuthLoading || !user) return;
+    if (user.mustChangePassword) {
+      router.replace(user.role === "Parent" ? "/change-pin" : "/change-password");
+      return;
     }
+    router.replace(defaultRouteByRole[user.role]);
   }, [isAuthLoading, router, user]);
 
   const handlePhoneChange = (value: string): void => {

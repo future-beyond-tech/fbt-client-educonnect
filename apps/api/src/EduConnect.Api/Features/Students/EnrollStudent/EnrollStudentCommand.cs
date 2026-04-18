@@ -19,4 +19,4 @@ public record EnrollStudentCommand(
     EnrollStudentParentRequest? Parent = null,
     EnrollStudentExistingParentRequest? ExistingParent = null) : IRequest<EnrollStudentResponse>;
 
-public record EnrollStudentResponse(Guid StudentId, string Message);
+public record EnrollStudentResponse(Guid StudentId, string Message, string? TemporaryPin = null);

@@ -18,6 +18,8 @@ using EduConnect.Api.Features.Auth.ForgotPassword;
 using EduConnect.Api.Features.Auth.ResetPassword;
 using EduConnect.Api.Features.Auth.ForgotPin;
 using EduConnect.Api.Features.Auth.ResetPin;
+using EduConnect.Api.Features.Auth.ChangePassword;
+using EduConnect.Api.Features.Auth.ChangePin;
 using EduConnect.Api.Features.Homework.CreateHomework;
 using EduConnect.Api.Features.Homework.GetHomework;
 using EduConnect.Api.Features.Homework.UpdateHomework;
@@ -92,6 +94,8 @@ public static class EndpointRouteBuilderExtensions
         group.MapPost("/reset-password", ResetPasswordEndpoint.Handle).WithName("ResetPassword").AllowAnonymous();
         group.MapPost("/forgot-pin", ForgotPinEndpoint.Handle).WithName("ForgotPin").AllowAnonymous();
         group.MapPost("/reset-pin", ResetPinEndpoint.Handle).WithName("ResetPin").AllowAnonymous();
+        group.MapPost("/change-password", ChangePasswordEndpoint.Handle).WithName("ChangePassword").RequireAuthorization();
+        group.MapPost("/change-pin", ChangePinEndpoint.Handle).WithName("ChangePin").RequireAuthorization();
     }
 
     private static void MapAttendanceEndpoints(this WebApplication app)

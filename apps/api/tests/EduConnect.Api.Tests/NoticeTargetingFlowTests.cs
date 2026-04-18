@@ -7,6 +7,7 @@ using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -202,6 +203,8 @@ public class NoticeTargetingFlowTests
             context,
             currentUser,
             notificationService.Object,
+            Mock.Of<IEmailService>(),
+            Mock.Of<IConfiguration>(),
             Mock.Of<ILogger<PublishNoticeCommandHandler>>());
 
         var response = await handler.Handle(new PublishNoticeCommand(noticeId), CancellationToken.None);

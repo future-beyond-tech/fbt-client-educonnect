@@ -10,4 +10,4 @@ public record CreateTeacherCommand(
     string? Subject = null,
     bool IsClassTeacher = false) : IRequest<CreateTeacherResponse>;
 
-public record CreateTeacherResponse(Guid TeacherId, string Message);
+public record CreateTeacherResponse(Guid TeacherId, string Message, string TemporaryPassword);
