@@ -11,13 +11,23 @@ public class SubmitAttendanceTakeCommandValidator : AbstractValidator<SubmitAtte
         "Late",
     };
 
+    // How many days back a teacher is allowed to mark attendance for.
+    // Anything older requires admin involvement (see bug report: attendance
+    // could previously be marked for arbitrary past dates, enabling
+    // record manipulation). Future dates are never allowed.
+    public const int MaxBackdateDays = 7;
+
     public SubmitAttendanceTakeCommandValidator()
     {
         RuleFor(x => x.ClassId)
             .NotEmpty().WithMessage("Class ID is required.");
 
         RuleFor(x => x.Date)
-            .NotEmpty().WithMessage("Date is required.");
+            .NotEmpty().WithMessage("Date is required.")
+            .Must(date => date <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .WithMessage("Attendance cannot be marked for a future date.")
+            .Must(date => date >= DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-MaxBackdateDays))
+            .WithMessage($"Attendance can only be marked for the last {MaxBackdateDays} days. Contact an admin to change older records.");
 
         RuleFor(x => x.Items)
             .NotNull().WithMessage("Items are required.")

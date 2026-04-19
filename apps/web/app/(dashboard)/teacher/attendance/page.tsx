@@ -61,9 +61,19 @@ interface SubmitAttendanceResponse {
   message: string;
 }
 
+// How many days back a teacher is allowed to mark attendance for. Kept in
+// sync with SubmitAttendanceTakeCommandValidator.MaxBackdateDays on the
+// backend — if you change one, change both. Future dates are never allowed.
+const MAX_BACKDATE_DAYS = 7;
+
 export default function TeacherAttendancePage(): React.ReactElement {
   const { token, isLoading: isAuthLoading } = useAuth();
   const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const minDate = React.useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - MAX_BACKDATE_DAYS);
+    return d.toISOString().slice(0, 10);
+  }, []);
 
   // Assignments => classes dropdown
   const [assignments, setAssignments] = React.useState<TeacherClassItem[]>([]);
@@ -387,7 +397,24 @@ export default function TeacherAttendancePage(): React.ReactElement {
             type="date"
             label="Date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            // Attendance is only editable for the last N days, never the
+            // future. The native date picker enforces this visually; the
+            // onChange clamp below enforces it when a user types a date
+            // manually (which bypasses min/max in most browsers).
+            min={minDate}
+            max={today}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!next) return;
+              if (next > today || next < minDate) {
+                setActionError(
+                  `Attendance can only be marked for dates between ${minDate} and ${today}.`
+                );
+                return;
+              }
+              setActionError("");
+              setDate(next);
+            }}
             disabled={!classId}
           />
         </div>
