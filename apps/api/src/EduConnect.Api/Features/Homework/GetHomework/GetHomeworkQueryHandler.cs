@@ -71,11 +71,19 @@ public class GetHomeworkQueryHandler : IRequestHandler<GetHomeworkQuery, List<Ho
             query = query.Where(h => h.Subject == request.Subject);
         }
 
+        // Project ClassName / Section via the h.Class navigation property so
+        // every consumer (teacher list, parent list, approvals view) gets the
+        // class context without a per-page lookup. Matches the defensive
+        // `tca.Class != null ? tca.Class.Name : ""` pattern used in
+        // GetTeacherProfileQueryHandler — guards against soft-deleted or
+        // otherwise-orphaned rows without dropping them from the result.
         var homeworks = await query
             .OrderByDescending(h => h.DueDate)
             .Select(h => new HomeworkDto(
                 h.Id,
                 h.ClassId,
+                h.Class != null ? h.Class.Name : string.Empty,
+                h.Class != null ? h.Class.Section : string.Empty,
                 h.Subject,
                 h.Title,
                 h.Description,

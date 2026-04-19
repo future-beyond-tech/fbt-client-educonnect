@@ -18,6 +18,9 @@ import { AttachmentList } from "@/components/shared/attachment-list";
 interface HomeworkItem {
   homeworkId: string;
   classId: string;
+  /** Denormalised from the API so parents see "5 A · Science" on each card. */
+  className: string;
+  section: string;
   subject: string;
   title: string;
   description: string;
@@ -125,6 +128,16 @@ export default function ParentHomeworkPage(): React.ReactElement {
     return childNames.length > 0 ? childNames.join(", ") : null;
   };
 
+  // Format class + section as "5 A". Handles the defensive case where the
+  // API fails to populate either field (shouldn't happen under current data
+  // rules, but we still render "" gracefully rather than crashing).
+  const formatClassLabel = (item: HomeworkItem): string => {
+    const name = (item.className ?? "").trim();
+    const section = (item.section ?? "").trim();
+    if (!name && !section) return "";
+    return section ? `${name} ${section}` : name;
+  };
+
   return (
     <PageShell>
       <PageHeader
@@ -219,7 +232,17 @@ export default function ParentHomeworkPage(): React.ReactElement {
               <Card key={item.homeworkId}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="text-lg">{item.title}</CardTitle>
+                      {/* Class + subject on a dedicated secondary line so
+                          parents with children in multiple classes can tell
+                          at a glance which class this homework belongs to. */}
+                      {formatClassLabel(item) && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatClassLabel(item)} · {item.subject}
+                        </p>
+                      )}
+                    </div>
                     <Badge variant="secondary">{item.subject}</Badge>
                   </div>
                 </CardHeader>
