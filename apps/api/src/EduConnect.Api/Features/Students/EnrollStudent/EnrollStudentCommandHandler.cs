@@ -35,12 +35,36 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
 
     public async Task<EnrollStudentResponse> Handle(EnrollStudentCommand request, CancellationToken cancellationToken)
     {
-        if (_currentUserService.Role != "Admin")
+        // Admins can enroll into any class in their school.
+        // Class teachers (IsClassTeacher = true) can enroll into their own
+        // class(es) only — this is the guard that delivers the "no access to
+        // other classes" requirement for the class-teacher self-service flow.
+        // Any other role is forbidden outright.
+        if (_currentUserService.Role != "Admin" && _currentUserService.Role != "Teacher")
         {
             _logger.LogWarning(
                 "User {UserId} with role {Role} attempted to enroll a student",
                 _currentUserService.UserId, _currentUserService.Role);
-            throw new ForbiddenException("Only admins can enroll students.");
+            throw new ForbiddenException("Only admins and class teachers can enroll students.");
+        }
+
+        if (_currentUserService.Role == "Teacher")
+        {
+            var isClassTeacherOfTarget = await _context.TeacherClassAssignments
+                .AnyAsync(tca =>
+                    tca.TeacherId == _currentUserService.UserId &&
+                    tca.SchoolId == _currentUserService.SchoolId &&
+                    tca.ClassId == request.ClassId &&
+                    tca.IsClassTeacher,
+                    cancellationToken);
+
+            if (!isClassTeacherOfTarget)
+            {
+                _logger.LogWarning(
+                    "Teacher {UserId} attempted to enroll a student into class {ClassId} but is not its class teacher",
+                    _currentUserService.UserId, request.ClassId);
+                throw new ForbiddenException("You can only enroll students into a class where you are the class teacher.");
+            }
         }
 
         if (request.Parent is not null && request.ExistingParent is not null)
@@ -206,8 +230,8 @@ public class EnrollStudentCommandHandler : IRequestHandler<EnrollStudentCommand,
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Student enrolled: {StudentId} in class {ClassId} by admin {AdminId}. ParentCreated={ParentCreated} LinkedParentId={ParentId}",
-            student.Id, request.ClassId, _currentUserService.UserId, parent is not null, parent?.Id ?? existingParent?.Id);
+            "Student enrolled: {StudentId} in class {ClassId} by {Role} {ActorId}. ParentCreated={ParentCreated} LinkedParentId={ParentId}",
+            student.Id, request.ClassId, _currentUserService.Role, _currentUserService.UserId, parent is not null, parent?.Id ?? existingParent?.Id);
 
         // Fire-and-log: only send welcome email when a new parent was created
         // inline as part of enrollment. Linking an existing parent reuses
