@@ -167,20 +167,24 @@ export default function TeacherAttendancePage(): React.ReactElement {
       setStatusByStudentId(nextStatus);
       setReasonByStudentId(nextReason);
 
-      // For editable (class-teacher) contexts: if the backend already has
-      // exception records, the teacher has previously saved attendance — lock
-      // the rows and surface an Edit affordance.
-      //
-      // `preserveSaved` is true right after a successful save — in that case
-      // we ALWAYS lock the rows, even when the saved state was "everyone
-      // present" (which produces zero exception records on the server and
-      // would otherwise look indistinguishable from an unsaved context).
-      //
-      // For read-only (subject-teacher) contexts: the saved/editing machinery
-      // doesn't apply, so keep it reset.
-      const hasServerExceptions = ctx.exceptions.length > 0;
-      setHasSaved(ctx.canEdit && (hasServerExceptions || !!options?.preserveSaved));
-      setEditingStudentIds(new Set());
+      if (options?.preserveSaved) {
+        // Called right after a successful save — the UI has ALREADY been
+        // locked by saveAttendance(). Never undo that here: if the refetch
+        // returns canEdit=false (e.g. the teacher's class assignment changed
+        // between the POST and the GET), we'd otherwise unlock the rows and
+        // silently tell the teacher their save didn't stick. Keep hasSaved
+        // whatever it already is, just reset the per-row editing set.
+        setEditingStudentIds(new Set());
+      } else {
+        // Initial load or class/date change. Derive the lock state purely
+        // from what the server reports: exception records mean attendance has
+        // been taken for this date, so we lock and offer Edit affordances.
+        // Read-only (subject-teacher) contexts can never be locked because
+        // they can never enter the save path.
+        const hasServerExceptions = ctx.exceptions.length > 0;
+        setHasSaved(ctx.canEdit && hasServerExceptions);
+        setEditingStudentIds(new Set());
+      }
     },
     []
   );
@@ -256,36 +260,35 @@ export default function TeacherAttendancePage(): React.ReactElement {
         items,
       });
 
-      // Refetch the authoritative server state so the UI can never disagree
-      // with what was persisted. If the POST succeeded but the server didn't
-      // actually persist (e.g. a proxy returned a cached 200), the hydrated
-      // context will make that visible instead of silently lying to the user.
-      //
-      // We intentionally bypass the shared fetchContext() here because it
-      // clears actionSuccess on entry — we want to set the banner AFTER the
-      // hydrate so it sticks.
-      let refreshed: TakeContextResponse | null = null;
+      // Lock the UI IMMEDIATELY on a successful POST. Previously we waited
+      // for the follow-up refetch to succeed before calling setHasSaved(true)
+      // — if that refetch was slow, failed silently, or returned canEdit=false
+      // the teacher would click Save and see no visual change, then assume
+      // nothing happened. Locking here guarantees feedback as soon as the
+      // server confirms the save, regardless of what the refetch does.
+      setHasSaved(true);
+      setEditingStudentIds(new Set());
+
+      // Show the success banner right away for the same reason — don't make
+      // it depend on the follow-up refetch.
+      const fallbackMessage = "Attendance saved successfully.";
+      setActionSuccess(res?.message?.trim() ? res.message : fallbackMessage);
+
+      // Refetch the authoritative server state as a second-pass reconciliation.
+      // If the server has adjusted any values (e.g. an approved leave was
+      // processed concurrently), this keeps the UI in sync. The UI is already
+      // locked by this point, so a failure here is non-fatal.
       try {
-        refreshed = await apiGet<TakeContextResponse>(
+        const refreshed = await apiGet<TakeContextResponse>(
           `${API_ENDPOINTS.attendance}/take?classId=${context.classId}&date=${context.date}`
         );
         setContext(refreshed);
         hydrateFormFromContext(refreshed, { preserveSaved: true });
       } catch {
-        // Refetch is best-effort. The POST already succeeded, so fall back to
-        // purely local state — lock every row so the teacher still gets the
-        // visual confirmation the save worked.
-        setHasSaved(true);
-        setEditingStudentIds(new Set());
+        // Refetch is best-effort — the POST already succeeded and the UI is
+        // locked. Swallow the error silently so we don't confuse the teacher
+        // with a misleading "save failed" message.
       }
-
-      // Build a clean, non-"undefined" summary. Counts can legitimately be
-      // zero (e.g. everyone marked present, nothing to persist), so we avoid
-      // the `${res.createdCount} created, ${res.updatedCount} updated` shape
-      // that used to render as "undefined created, undefined updated" when
-      // the JSON didn't expose those fields.
-      const fallbackMessage = "Attendance saved successfully.";
-      setActionSuccess(res?.message?.trim() ? res.message : fallbackMessage);
 
       // Scroll the success banner into view — on mobile the teacher is often
       // scrolled down to the last student when they hit Save, and the banner
