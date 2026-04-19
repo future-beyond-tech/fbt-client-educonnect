@@ -12,7 +12,7 @@ import { ClassSelector } from "@/components/shared/class-selector";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { Select } from "@/components/ui/select";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, UserMinus } from "lucide-react";
 import type {
   TeacherProfile,
   AssignClassRequest,
@@ -378,9 +378,13 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
                           )}
                         </Button>
                       )}
+                      {/* Labelled "Unassign" instead of a trash icon so the
+                          action reads as "remove this teacher↔class link",
+                          not "delete a record". Mirrors the pattern used on
+                          the class-detail page. */}
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           handleRemove(
                             a.assignmentId,
@@ -388,10 +392,17 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
                           )
                         }
                         disabled={isRemoving === a.assignmentId}
-                        aria-label={`Remove ${a.subject} from ${a.className}`}
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        aria-label={`Unassign ${a.subject} from ${a.className}`}
+                        className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {isRemoving === a.assignmentId ? (
+                          <Spinner size="sm" />
+                        ) : (
+                          <>
+                            <UserMinus className="h-4 w-4" aria-hidden="true" />
+                            Unassign
+                          </>
+                        )}
                       </Button>
                     </div>
                   </li>

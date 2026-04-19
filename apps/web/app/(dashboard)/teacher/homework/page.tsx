@@ -23,6 +23,15 @@ import type { TeacherClassItem } from "@/lib/types/teacher";
 interface HomeworkItem {
   homeworkId: string;
   classId: string;
+  /**
+   * Human-readable class name + section, denormalised by the API from the
+   * Classes table. Exposed so every homework card / approval row can show
+   * "5 A · Science" style labels without a per-page classId→name lookup.
+   * Defaults to empty string when the class row is missing (should not
+   * happen under current constraints, but we guard against it anyway).
+   */
+  className: string;
+  section: string;
   subject: string;
   title: string;
   description: string;
@@ -346,6 +355,17 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     return status;
   };
 
+  // Centralised display helper so every card / approval row formats the
+  // class label identically ("5 A" when a section exists, just "5" when it
+  // doesn't). Takes a loose shape rather than HomeworkItem so the same helper
+  // works for TeacherClassItem-style data too.
+  const formatClassLabel = (c: { className: string; section: string }): string => {
+    const name = (c.className ?? "").trim();
+    const section = (c.section ?? "").trim();
+    if (!name && !section) return "";
+    return section ? `${name} ${section}` : name;
+  };
+
   const submitForApproval = async (id: string): Promise<void> => {
     setActionError("");
     setActionSuccess("");
@@ -469,6 +489,26 @@ export default function TeacherHomeworkPage(): React.ReactElement {
             {assignmentError ? (
               <StatusBanner variant="error">{assignmentError}</StatusBanner>
             ) : null}
+            {/* Live summary of the selected class + subject. Keeps the
+                teacher oriented while they fill in the title/description
+                below — especially important for teachers who teach multiple
+                classes where the form header alone wouldn't disambiguate. */}
+            {createClassId && (() => {
+              const picked = classesForTeacher.find((c) => c.classId === createClassId);
+              if (!picked) return null;
+              return (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Creating homework for</span>
+                  <Badge variant="default">{formatClassLabel(picked)}</Badge>
+                  {createSubject ? (
+                    <>
+                      <span className="text-muted-foreground">in</span>
+                      <Badge variant="secondary">{createSubject}</Badge>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })()}
             <div className="grid gap-3 md:grid-cols-2">
               <Select
                 label="Class"
@@ -618,6 +658,14 @@ export default function TeacherHomeworkPage(): React.ReactElement {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="truncate font-medium">{h.title}</span>
+                          {/* Class-name Badge is the fix for the bug: the
+                              approving class teacher needs to see *which*
+                              class they're publishing into before clicking
+                              "Approve & publish". Rendered first (before the
+                              subject) so it's the left-most context chip. */}
+                          {formatClassLabel(h) && (
+                            <Badge variant="default">{formatClassLabel(h)}</Badge>
+                          )}
                           <Badge variant="secondary">{h.subject}</Badge>
                           <Badge variant={getStatusBadgeVariant(h.status)}>{getStatusLabel(h.status)}</Badge>
                         </div>
@@ -699,7 +747,19 @@ export default function TeacherHomeworkPage(): React.ReactElement {
               <Card key={item.homeworkId}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="text-lg">{item.title}</CardTitle>
+                      {/* Show class + subject together on a dedicated line
+                          beneath the title so teachers with multiple classes
+                          can always tell at a glance which class a given
+                          homework is for. This is the visible part of the
+                          "class name missing" bug fix. */}
+                      {formatClassLabel(item) && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatClassLabel(item)} · {item.subject}
+                        </p>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{item.subject}</Badge>
                       <Badge variant={getStatusBadgeVariant(item.status)}>{getStatusLabel(item.status)}</Badge>

@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, PageSection, PageShell } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { ArrowLeft, GraduationCap, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, GraduationCap, Pencil, UserMinus, UserPlus } from "lucide-react";
 import type {
   ClassItem,
   ClassMutationResponse,
@@ -561,18 +561,26 @@ export default function AdminClassDetailPage(): React.ReactElement {
                       <Badge variant="default">Class teacher</Badge>
                     </div>
                   </div>
+                  {/* Labelled "Unassign" button instead of a bare trash icon —
+                      admins reported the icon-only control was easy to miss
+                      and looked destructive in the way a "delete record"
+                      would, when the action is really removing an assignment
+                      link. Icon kept alongside the word for quick affordance. */}
                   <Button
-                    variant="ghost"
-                    size="icon"
+                    variant="outline"
+                    size="sm"
                     onClick={() => void handleUnassign(classTeacher)}
                     disabled={actionAssignmentId === classTeacher.assignmentId}
                     aria-label="Unassign class teacher"
-                    className="h-9 w-9 text-destructive hover:text-destructive"
+                    className="text-destructive hover:text-destructive"
                   >
                     {actionAssignmentId === classTeacher.assignmentId ? (
                       <Spinner size="sm" />
                     ) : (
-                      <Trash2 className="h-4 w-4" />
+                      <>
+                        <UserMinus className="h-4 w-4" aria-hidden="true" />
+                        Unassign
+                      </>
                     )}
                   </Button>
                 </div>
@@ -633,18 +641,26 @@ export default function AdminClassDetailPage(): React.ReactElement {
                                 )}
                               </Button>
                             ) : null}
+                            {/* Matches the "Unassign" button on the class
+                                teacher card above — labelled text rather than
+                                a trash icon so the action reads as
+                                "remove this teacher from the subject", not
+                                "delete this record". */}
                             <Button
-                              variant="ghost"
-                              size="icon"
+                              variant="outline"
+                              size="sm"
                               onClick={() => void handleUnassign(a)}
                               disabled={actionAssignmentId === a.assignmentId}
-                              aria-label="Unassign"
-                              className="h-9 w-9 text-destructive hover:text-destructive"
+                              aria-label={`Unassign ${a.teacherName} from ${a.subject}`}
+                              className="text-destructive hover:text-destructive"
                             >
                               {actionAssignmentId === a.assignmentId ? (
                                 <Spinner size="sm" />
                               ) : (
-                                <Trash2 className="h-4 w-4" />
+                                <>
+                                  <UserMinus className="h-4 w-4" aria-hidden="true" />
+                                  Unassign
+                                </>
                               )}
                             </Button>
                           </div>
