@@ -18,9 +18,13 @@ public class SearchParentsByPhoneQueryHandler : IRequestHandler<SearchParentsByP
 
     public async Task<List<ParentSearchResultDto>> Handle(SearchParentsByPhoneQuery request, CancellationToken cancellationToken)
     {
-        if (_currentUserService.Role != "Admin")
+        // Admins and class teachers both need parent lookup so they can link
+        // an existing parent (e.g. a sibling already enrolled) during student
+        // enrollment. Teachers who aren't class teachers are still blocked by
+        // EnrollStudentCommandHandler, so read access here is safe.
+        if (_currentUserService.Role != "Admin" && _currentUserService.Role != "Teacher")
         {
-            throw new ForbiddenException("Only admins can search for parents.");
+            throw new ForbiddenException("Only admins and class teachers can search for parents.");
         }
 
         var phoneSearch = JapanPhoneNumber.NormalizeSearchTerm(request.Phone);
