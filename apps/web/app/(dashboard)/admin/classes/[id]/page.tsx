@@ -33,6 +33,22 @@ import type {
 } from "@/lib/types/teacher";
 import type { ClassAssignmentItem } from "@/lib/types/class-assignments";
 
+// Shape of a pending class-teacher replacement awaiting admin confirmation.
+// Carries enough context to (a) show the right dialog copy and (b) fire the
+// correct API call after Confirm — the two paths are a fresh Assign (POST)
+// and a Promote of an existing subject assignment (PUT).
+type ReplaceClassTeacherPayload =
+  | {
+      kind: "assign";
+      teacherId: string;
+      teacherName: string;
+      subject: string;
+    }
+  | {
+      kind: "promote";
+      assignment: ClassAssignmentItem;
+    };
+
 export default function AdminClassDetailPage(): React.ReactElement {
   const params = useParams();
   const router = useRouter();
@@ -67,6 +83,13 @@ export default function AdminClassDetailPage(): React.ReactElement {
   const [editAcademicYear, setEditAcademicYear] = React.useState("");
   const [editError, setEditError] = React.useState("");
   const [isSavingClass, setIsSavingClass] = React.useState(false);
+
+  // Replace-class-teacher confirmation state. When set, the dialog at the
+  // bottom of the page opens — the admin must explicitly click Replace
+  // before we demote the existing class teacher. Null = dialog closed.
+  const [replacePayload, setReplacePayload] =
+    React.useState<ReplaceClassTeacherPayload | null>(null);
+  const [isReplacing, setIsReplacing] = React.useState(false);
 
   const getBestErrorMessage = React.useCallback((err: unknown, fallback: string): string => {
     if (!(err instanceof ApiError)) return fallback;
@@ -168,8 +191,19 @@ export default function AdminClassDetailPage(): React.ReactElement {
       return;
     }
 
+    // If the admin is assigning a new class teacher while one already exists,
+    // surface the confirmation dialog instead of failing silently. The
+    // backend supports atomic replacement (demotes the old class teacher to
+    // subject teacher in the same request), but we never want that to happen
+    // without explicit admin consent.
     if (markAsClassTeacher && classTeacher) {
-      setAssignError("This class already has a class teacher assigned. Unassign the current class teacher first.");
+      const incomingTeacher = teachers?.items.find((t) => t.id === selectedTeacherId);
+      setReplacePayload({
+        kind: "assign",
+        teacherId: selectedTeacherId,
+        teacherName: incomingTeacher?.name ?? "the selected teacher",
+        subject: selectedSubject,
+      });
       return;
     }
 
@@ -204,8 +238,11 @@ export default function AdminClassDetailPage(): React.ReactElement {
     setError("");
     setSuccessMessage("");
 
-    if (classTeacher) {
-      setError("This class already has a class teacher assigned. Unassign the current class teacher first.");
+    // When a class teacher already exists, route through the confirmation
+    // dialog instead of blocking. The dialog's Replace action will call the
+    // promote endpoint, which demotes the existing class teacher atomically.
+    if (classTeacher && classTeacher.assignmentId !== assignment.assignmentId) {
+      setReplacePayload({ kind: "promote", assignment });
       setActionAssignmentId(null);
       return;
     }
@@ -220,6 +257,54 @@ export default function AdminClassDetailPage(): React.ReactElement {
       setError(getBestErrorMessage(err, "Failed to update class teacher."));
     } finally {
       setActionAssignmentId(null);
+    }
+  };
+
+  const confirmReplaceClassTeacher = async (): Promise<void> => {
+    if (!replacePayload) return;
+    setIsReplacing(true);
+    setError("");
+    setAssignError("");
+    setSuccessMessage("");
+
+    try {
+      if (replacePayload.kind === "assign") {
+        const body: AssignClassRequest = {
+          classId,
+          subject: replacePayload.subject,
+          isClassTeacher: true,
+        };
+        const res = await apiPost<TeacherMutationResponse>(
+          `${API_ENDPOINTS.teachers}/${replacePayload.teacherId}/assignments`,
+          body
+        );
+        setSuccessMessage(res.message);
+        // Reset the assign form so the admin lands on a clean slate.
+        setShowAssignForm(false);
+        setTeacherSearch("");
+        setSelectedTeacherId("");
+        setSelectedSubject("");
+        setMarkAsClassTeacher(false);
+      } else {
+        const a = replacePayload.assignment;
+        const res = await apiPut<MutationResponse>(
+          `${API_ENDPOINTS.teachers}/${a.teacherId}/assignments/${a.assignmentId}/class-teacher`
+        );
+        setSuccessMessage(res.message);
+      }
+      setReplacePayload(null);
+      await fetchAll();
+    } catch (err) {
+      const msg = getBestErrorMessage(err, "Failed to replace class teacher.");
+      // Route the error to whichever banner is visually closest to the
+      // control the admin started from.
+      if (replacePayload.kind === "assign") {
+        setAssignError(msg);
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setIsReplacing(false);
     }
   };
 
@@ -422,13 +507,17 @@ export default function AdminClassDetailPage(): React.ReactElement {
                       type="checkbox"
                       checked={markAsClassTeacher}
                       onChange={(e) => setMarkAsClassTeacher(e.target.checked)}
-                      disabled={isAssigning || !!classTeacher}
+                      // Only disable during the request itself — if this class
+                      // already has a class teacher, the checkbox remains
+                      // interactive and the admin will be prompted to
+                      // confirm replacement on submit.
+                      disabled={isAssigning}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                     />
                     Mark this assignment as the class teacher
-                    {classTeacher ? (
+                    {classTeacher && markAsClassTeacher ? (
                       <span className="ml-auto text-xs text-muted-foreground">
-                        (already assigned)
+                        will replace {classTeacher.teacherName}
                       </span>
                     ) : null}
                   </label>
@@ -531,7 +620,11 @@ export default function AdminClassDetailPage(): React.ReactElement {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => void handlePromote(a)}
-                                disabled={!!classTeacher || actionAssignmentId === a.assignmentId}
+                                // Stay enabled even when a class teacher
+                                // already exists — clicking will surface the
+                                // replacement-confirmation dialog rather than
+                                // silently failing.
+                                disabled={actionAssignmentId === a.assignmentId}
                               >
                                 {actionAssignmentId === a.assignmentId ? (
                                   <Spinner size="sm" />
@@ -655,6 +748,75 @@ export default function AdminClassDetailPage(): React.ReactElement {
           </div>
           {editError && <StatusBanner variant="error">{editError}</StatusBanner>}
         </form>
+      </Dialog>
+
+      <Dialog
+        open={!!replacePayload}
+        onOpenChange={(next) => {
+          // Don't let a click-outside / ESC close the dialog mid-request — we
+          // don't know the server state until the in-flight replace resolves.
+          if (isReplacing) return;
+          if (!next) setReplacePayload(null);
+        }}
+        title="Replace class teacher?"
+        description="This class already has a class teacher assigned."
+        disableBackdropClose={isReplacing}
+        disableEscClose={isReplacing}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setReplacePayload(null)}
+              disabled={isReplacing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmReplaceClassTeacher()}
+              disabled={isReplacing}
+            >
+              {isReplacing ? <Spinner size="sm" /> : "Replace"}
+            </Button>
+          </>
+        }
+      >
+        {replacePayload && classTeacher ? (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-[16px] border border-border/70 bg-card/72 p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Current class teacher
+              </p>
+              <p className="mt-1 font-semibold">{classTeacher.teacherName}</p>
+              <p className="text-xs text-muted-foreground">
+                {classTeacher.subject}
+              </p>
+            </div>
+            <div className="rounded-[16px] border border-border/70 bg-card/72 p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                New class teacher
+              </p>
+              <p className="mt-1 font-semibold">
+                {replacePayload.kind === "assign"
+                  ? replacePayload.teacherName
+                  : replacePayload.assignment.teacherName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {replacePayload.kind === "assign"
+                  ? replacePayload.subject
+                  : replacePayload.assignment.subject}
+              </p>
+            </div>
+            <p className="text-muted-foreground">
+              {classTeacher.teacherName} will remain assigned to this class as
+              the {classTeacher.subject} teacher but will lose the class
+              teacher role. This does not remove any attendance or homework
+              records.
+            </p>
+          </div>
+        ) : null}
       </Dialog>
     </PageShell>
   );
