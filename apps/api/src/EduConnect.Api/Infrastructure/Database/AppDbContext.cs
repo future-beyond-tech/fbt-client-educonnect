@@ -36,6 +36,7 @@ public class AppDbContext : DbContext
     public DbSet<LeaveApplicationEntity> LeaveApplications { get; set; }
     public DbSet<RefreshTokenEntity> RefreshTokens { get; set; }
     public DbSet<AuthResetTokenEntity> AuthResetTokens { get; set; }
+    public DbSet<UserPushSubscriptionEntity> UserPushSubscriptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,9 @@ public class AppDbContext : DbContext
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       (entity.User != null && entity.User.SchoolId == _currentUserService.SchoolId));
         modelBuilder.Entity<AuthResetTokenEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
+                                      entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<UserPushSubscriptionEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       entity.SchoolId == _currentUserService.SchoolId);
 

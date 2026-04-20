@@ -84,3 +84,91 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 });
+
+// --- Web Push -------------------------------------------------------------
+//
+// Server sends a JSON payload shaped as PushPayload on the API side:
+//   { title, body, url, type, entityId, entityType }
+// We render it via the Notifications API and, on tap, focus or open a tab at
+// the payload's `url` so the user lands on the relevant screen.
+
+const PUSH_FALLBACK_ICON = "/icon-192x192.png";
+const PUSH_FALLBACK_BADGE = "/icon-72x72.png";
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {
+      title: "EduConnect",
+      body: event.data ? event.data.text() : "",
+    };
+  }
+
+  const title = payload.title || "EduConnect";
+  const options = {
+    body: payload.body || "",
+    icon: PUSH_FALLBACK_ICON,
+    badge: PUSH_FALLBACK_BADGE,
+    tag: payload.type || "educonnect-general",
+    renotify: true,
+    data: {
+      url: payload.url || "/notifications",
+      type: payload.type,
+      entityId: payload.entityId,
+      entityType: payload.entityType,
+    },
+  };
+
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      // Nudge any open tabs so they can refresh their inbox/badge without a
+      // full reload. Pages opt-in by listening for navigator.serviceWorker.
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((clients) => {
+          for (const client of clients) {
+            client.postMessage({ type: "push-received", payload });
+          }
+        }),
+    ])
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target =
+    (event.notification.data && event.notification.data.url) || "/";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          const clientUrl = new URL(client.url);
+          const targetUrl = new URL(target, self.registration.scope);
+          if (clientUrl.origin === targetUrl.origin && "focus" in client) {
+            client.navigate(targetUrl.toString()).catch(() => {});
+            return client.focus();
+          }
+        }
+        return self.clients.openWindow(target);
+      })
+  );
+});
+
+// Browser-initiated resubscribe (VAPID rotation etc.). Page code should
+// listen for this and POST the new subscription to the server.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: "pushsubscriptionchange" });
+        }
+      })
+  );
+});

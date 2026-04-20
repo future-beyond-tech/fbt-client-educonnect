@@ -85,6 +85,24 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDateTimeProvider, DateTimeProvider>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+// Web Push (VAPID). Overridable via env vars so secrets stay out of appsettings.
+var webPushOptions = builder.Configuration.GetSection(WebPushOptions.SectionName).Get<WebPushOptions>() ?? new WebPushOptions();
+webPushOptions.PublicKey = builder.Configuration["VAPID_PUBLIC_KEY"] ?? webPushOptions.PublicKey;
+webPushOptions.PrivateKey = builder.Configuration["VAPID_PRIVATE_KEY"] ?? webPushOptions.PrivateKey;
+webPushOptions.Subject = builder.Configuration["VAPID_SUBJECT"] ?? webPushOptions.Subject;
+builder.Services.AddSingleton<IOptions<WebPushOptions>>(Options.Create(webPushOptions));
+
+if (webPushOptions.Enabled &&
+    !string.IsNullOrWhiteSpace(webPushOptions.PublicKey) &&
+    !string.IsNullOrWhiteSpace(webPushOptions.PrivateKey))
+{
+    builder.Services.AddScoped<IPushSender, WebPushSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IPushSender, NullPushSender>();
+}
+
 var storageOptions = builder.Configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>() ?? new StorageOptions();
 storageOptions.BucketName =
     builder.Configuration["S3_BUCKET_NAME"] ??

@@ -28,6 +28,7 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.402.7" />
+    <PackageReference Include="WebPush" Version="1.0.12" />
   </ItemGroup>
 
   <ItemGroup>

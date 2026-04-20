@@ -56,6 +56,9 @@ using EduConnect.Api.Features.Notifications.GetNotificationsForUser;
 using EduConnect.Api.Features.Notifications.GetUnreadCount;
 using EduConnect.Api.Features.Notifications.MarkNotificationRead;
 using EduConnect.Api.Features.Notifications.MarkAllNotificationsRead;
+using EduConnect.Api.Features.Push.GetVapidPublicKey;
+using EduConnect.Api.Features.Push.RegisterPushSubscription;
+using EduConnect.Api.Features.Push.UnregisterPushSubscription;
 using EduConnect.Api.Features.Attachments.RequestUploadUrl;
 using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
@@ -78,6 +81,7 @@ public static class EndpointRouteBuilderExtensions
         app.MapTeacherEndpoints();
         app.MapSubjectEndpoints();
         app.MapNotificationEndpoints();
+        app.MapPushEndpoints();
         app.MapAttachmentEndpoints();
     }
 
@@ -197,6 +201,23 @@ public static class EndpointRouteBuilderExtensions
         group.MapGet("/unread-count", GetUnreadCountEndpoint.Handle).WithName("GetUnreadCount");
         group.MapPut("/{id}/read", MarkNotificationReadEndpoint.Handle).WithName("MarkNotificationRead");
         group.MapPut("/read-all", MarkAllNotificationsReadEndpoint.Handle).WithName("MarkAllNotificationsRead");
+    }
+
+    private static void MapPushEndpoints(this WebApplication app)
+    {
+        var group = app.MapGroup("/api/push").WithTags("Push");
+
+        group.MapGet("/vapid-public-key", GetVapidPublicKeyEndpoint.Handle)
+            .WithName("GetVapidPublicKey")
+            .AllowAnonymous();
+
+        group.MapPost("/subscriptions", RegisterPushSubscriptionEndpoint.Handle)
+            .WithName("RegisterPushSubscription")
+            .RequireAuthorization();
+
+        group.MapDelete("/subscriptions", UnregisterPushSubscriptionEndpoint.Handle)
+            .WithName("UnregisterPushSubscription")
+            .RequireAuthorization();
     }
 
     private static void MapAttachmentEndpoints(this WebApplication app)
