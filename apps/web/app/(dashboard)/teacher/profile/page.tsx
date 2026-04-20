@@ -12,6 +12,7 @@ import { PageHeader, PageSection, PageShell } from "@/components/shared/page-she
 import { BookOpen, Mail, Phone, UserCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { TeacherProfile, TeacherAssignment } from "@/lib/types/teacher";
+import { EnableNotificationsButton } from "@/components/push/EnableNotificationsButton";
 
 export default function TeacherProfilePage(): React.ReactElement {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -122,6 +123,9 @@ export default function TeacherProfilePage(): React.ReactElement {
       />
 
       <PageSection className="space-y-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <EnableNotificationsButton />
+        </div>
         {/* Teacher identity card — always renders, even while the profile
             detail fetch is in flight, by falling back to JWT-derived values.
             This is the fix for the "teacher name not displayed" bug. */}
