@@ -4,6 +4,9 @@ namespace EduConnect.Api.Features.Students.GetStudentsByClass;
 
 public record GetStudentsByClassQuery(
     Guid? ClassId = null,
+    string? ClassIds = null,
+    string? Status = null,
+    string? SortBy = null,
     string? Search = null,
     int Page = 1,
     int PageSize = 20) : IRequest<PagedResult<StudentListDto>>;
@@ -16,4 +19,5 @@ public record StudentListDto(
     string ClassName,
     string Section,
     bool IsActive,
-    DateOnly? DateOfBirth);
+    DateOnly? DateOfBirth,
+    DateTimeOffset CreatedAt);
