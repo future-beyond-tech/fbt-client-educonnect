@@ -15,13 +15,23 @@ public static class RefreshTokenEndpoint
             return Results.Unauthorized();
         }
 
-        var result = await mediator.Send(new RefreshTokenCommand(), cancellationToken);
-        var refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(7);
+        // ?noRotate=true is used only by the Next.js Server Actions path
+        // (see apps/web/docs/server-actions.md). It mints a fresh access
+        // token without revoking the presented refresh token so concurrent
+        // server actions don't trigger reuse-detection against themselves.
+        var noRotate =
+            string.Equals(context.Request.Query["noRotate"].ToString(), "true", StringComparison.OrdinalIgnoreCase);
 
-        context.Response.Cookies.Append(
-            "refresh_token",
-            result.NewRefreshToken,
-            RefreshTokenCookieOptions.Create(context.Request, refreshTokenExpiresAt));
+        var result = await mediator.Send(new RefreshTokenCommand(noRotate), cancellationToken);
+
+        if (!noRotate && result.NewRefreshToken is not null)
+        {
+            var refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(7);
+            context.Response.Cookies.Append(
+                "refresh_token",
+                result.NewRefreshToken,
+                RefreshTokenCookieOptions.Create(context.Request, refreshTokenExpiresAt));
+        }
 
         return Results.Ok(new
         {

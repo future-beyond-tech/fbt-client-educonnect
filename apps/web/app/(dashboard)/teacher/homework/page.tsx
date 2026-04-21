@@ -1,8 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import {
+  approveHomeworkAction,
+  createHomeworkAction,
+  rejectHomeworkAction,
+  submitHomeworkForApprovalAction,
+  updateHomeworkAction,
+} from "@/lib/actions/homework-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,15 +54,6 @@ interface HomeworkItem {
   canSubmitForApproval: boolean;
   canApproveOrReject: boolean;
   publishedAt: string;
-}
-
-interface CreateHomeworkResponse {
-  homeworkId: string;
-  message: string;
-}
-
-interface UpdateHomeworkResponse {
-  message: string;
 }
 
 export default function TeacherHomeworkPage(): React.ReactElement {
@@ -270,14 +268,22 @@ export default function TeacherHomeworkPage(): React.ReactElement {
 
     setIsCreating(true);
     try {
-      const response = await apiPost<CreateHomeworkResponse>(API_ENDPOINTS.homework, {
+      const result = await createHomeworkAction({
         classId: createClassId,
         subject: createSubject,
         title: createTitle,
         description: createDescription,
         dueDate: createDueDate,
       });
-      setSuccessMessage(response.message);
+      if (!result.ok) {
+        setCreateError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to create homework.",
+        );
+        return;
+      }
+      setSuccessMessage("Homework created.");
       setShowCreateForm(false);
       setCreateClassId("");
       setCreateSubject("");
@@ -285,11 +291,11 @@ export default function TeacherHomeworkPage(): React.ReactElement {
       setCreateDescription("");
       setCreateDueDate("");
       // Show attachment uploader for the newly created homework
-      setNewHomeworkId(response.homeworkId);
+      setNewHomeworkId(result.data.homeworkId);
       setNewHomeworkAttachments([]);
       fetchHomework();
-    } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "Failed to create homework.");
+    } catch {
+      setCreateError("Failed to create homework.");
     } finally {
       setIsCreating(false);
     }
@@ -313,20 +319,25 @@ export default function TeacherHomeworkPage(): React.ReactElement {
 
     setIsUpdating(true);
     try {
-      const response = await apiPut<UpdateHomeworkResponse>(
-        `${API_ENDPOINTS.homework}/${editingId}`,
-        {
-          homeworkId: editingId,
-          title: editTitle,
-          description: editDescription,
-          dueDate: editDueDate,
-        }
-      );
-      setSuccessMessage(response.message);
+      const result = await updateHomeworkAction({
+        homeworkId: editingId,
+        title: editTitle,
+        description: editDescription,
+        dueDate: editDueDate,
+      });
+      if (!result.ok) {
+        setEditError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to update homework.",
+        );
+        return;
+      }
+      setSuccessMessage(result.data.message);
       setEditingId(null);
       fetchHomework();
-    } catch (err) {
-      setEditError(err instanceof ApiError ? err.message : "Failed to update homework.");
+    } catch {
+      setEditError("Failed to update homework.");
     } finally {
       setIsUpdating(false);
     }
@@ -371,11 +382,15 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     setActionSuccess("");
     setActionHomeworkId(id);
     try {
-      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/submit`, {});
-      setActionSuccess(response.message);
+      const result = await submitHomeworkForApprovalAction(id);
+      if (!result.ok) {
+        setActionError(result.formError ?? "Failed to submit homework for approval.");
+        return;
+      }
+      setActionSuccess(result.data.message);
       fetchHomework();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Failed to submit homework for approval.");
+    } catch {
+      setActionError("Failed to submit homework for approval.");
     } finally {
       setActionHomeworkId(null);
     }
@@ -386,11 +401,15 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     setActionSuccess("");
     setActionHomeworkId(id);
     try {
-      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/approve`, {});
-      setActionSuccess(response.message);
+      const result = await approveHomeworkAction(id);
+      if (!result.ok) {
+        setActionError(result.formError ?? "Failed to approve homework.");
+        return;
+      }
+      setActionSuccess(result.data.message);
       fetchHomework();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Failed to approve homework.");
+    } catch {
+      setActionError("Failed to approve homework.");
     } finally {
       setActionHomeworkId(null);
     }
@@ -403,13 +422,19 @@ export default function TeacherHomeworkPage(): React.ReactElement {
     setActionSuccess("");
     setActionHomeworkId(id);
     try {
-      const response = await apiPut<{ message: string }>(`${API_ENDPOINTS.homework}/${id}/reject`, {
-        reason,
-      });
-      setActionSuccess(response.message);
+      const result = await rejectHomeworkAction({ homeworkId: id, reason });
+      if (!result.ok) {
+        setActionError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to reject homework.",
+        );
+        return;
+      }
+      setActionSuccess(result.data.message);
       fetchHomework();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Failed to reject homework.");
+    } catch {
+      setActionError("Failed to reject homework.");
     } finally {
       setActionHomeworkId(null);
     }
