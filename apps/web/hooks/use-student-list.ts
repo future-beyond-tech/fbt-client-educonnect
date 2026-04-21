@@ -34,11 +34,10 @@ export function useStudentList(
   pageSize = DEFAULT_PAGE_SIZE
 ): UseStudentListReturn {
   // Gate all fetches on the auth provider having finished its initial
-  // session-restore pass. Without this, the list fetch can race the token
-  // refresh that AuthProvider kicks off on mount and fail with a
-  // "Network error: Failed to fetch" on the very first load (it then works
-  // on browser refresh because the token is already stable in localStorage).
-  // This mirrors the idiom used in teacher/profile, teacher/attendance, and
+  // session-restore pass. The AuthProvider calls /auth/refresh on mount to
+  // mint a fresh access token from the HttpOnly refresh cookie — list
+  // fetches that race that call would otherwise 401 on the first render.
+  // Mirrors the idiom used in teacher/profile, teacher/attendance, and
   // parent/attendance.
   const { token, isLoading: isAuthLoading } = useAuth();
 

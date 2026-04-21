@@ -8,148 +8,145 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { AuthUser } from "@/lib/auth/jwt";
-import { decodeJwtPayload, getUserFromToken } from "@/lib/auth/jwt";
-import { clearAccessToken, getAccessToken, setAccessToken } from "@/lib/auth/session";
+import { getUserFromToken, secondsUntilExpiry } from "@/lib/auth/jwt";
+import { tokenStore } from "@/lib/auth/token-store";
+import { refreshAccessToken } from "@/lib/api-client";
 
 interface AuthContextType {
   token: string | null;
   user: AuthUser | null;
   isLoading: boolean;
-  login: (token: string) => void;
+  // Accepts a token from /api/auth/login or /api/auth/login-parent.
+  // expiresInSeconds is optional — falls back to decoding the JWT exp claim
+  // so existing callers don't have to change signature.
+  login: (token: string, expiresInSeconds?: number) => void;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_CHANNEL_NAME = "educonnect-auth";
+type AuthBroadcastMessage = { type: "logout" };
+
+function subscribeToTokenStore(listener: () => void): () => void {
+  return tokenStore.subscribe(listener);
+}
+
+function getSnapshot(): string | null {
+  return tokenStore.get();
+}
+
+function getServerSnapshot(): string | null {
+  // SSR never has an in-memory token — hydration always starts unauthenticated.
+  return null;
+}
+
 export function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  // Token state is mirrored from the module-scoped tokenStore via
+  // useSyncExternalStore. Writes from anywhere (login, logout, 401-retry
+  // refresh inside api-client) propagate here without needing a setState call
+  // threaded through.
+  const token = useSyncExternalStore(subscribeToTokenStore, getSnapshot, getServerSnapshot);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // True only while the initial session-restore refresh is in-flight.
-  // Used to prevent a failing restore from wiping a concurrent manual login.
-  const isInitialRefreshRef = useRef<boolean>(true);
+  const user = useMemo<AuthUser | null>(
+    () => (token ? getUserFromToken(token) : null),
+    [token]
+  );
 
-  const clearAuthState = useCallback((): void => {
-    clearAccessToken();
-    setToken(null);
-    setUser(null);
-  }, []);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
 
-  const login = useCallback((newToken: string): void => {
+  const login = useCallback((newToken: string, expiresInSeconds?: number): void => {
     const nextUser = getUserFromToken(newToken);
-    if (!nextUser) {
-      return;
-    }
-
-    setAccessToken(newToken);
-    setToken(newToken);
-    setUser(nextUser);
+    if (!nextUser) return;
+    const ttl = expiresInSeconds ?? secondsUntilExpiry(newToken) ?? 0;
+    if (ttl <= 0) return;
+    tokenStore.set(newToken, ttl);
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
+    // Best-effort server logout; local state still cleared on failure.
+    const bearer = tokenStore.get();
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            }
+        headers: bearer
+          ? { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" }
           : { "Content-Type": "application/json" },
       });
     } catch {
-      // Logout API failure should not prevent local cleanup
+      // Ignore — we still clean up locally.
     }
 
-    clearAuthState();
-  }, [clearAuthState, token]);
+    tokenStore.clear();
+
+    // Tell peer tabs their session is gone too.
+    broadcastRef.current?.postMessage({ type: "logout" } satisfies AuthBroadcastMessage);
+  }, []);
 
   const refreshToken = useCallback(async (): Promise<void> => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    await refreshAccessToken();
+  }, []);
 
-      if (!response.ok) {
-        // Guard: if this is the initial session restore and the user manually
-        // logged in while the request was in-flight, do not wipe their session.
-        if (!isInitialRefreshRef.current || !getAccessToken()) {
-          clearAuthState();
-        }
-        return;
-      }
-
-      const data = (await response.json()) as { accessToken: string };
-      login(data.accessToken);
-    } catch {
-      if (!isInitialRefreshRef.current || !getAccessToken()) {
-        clearAuthState();
-      }
-    }
-  }, [clearAuthState, login]);
-
+  // Bootstrap: on mount, ask the server for a fresh access token using the
+  // HttpOnly refresh cookie. If the cookie is missing/invalid the call
+  // returns null and the user stays logged out.
   useEffect(() => {
-    // Attempt to restore session from a persisted access token (localStorage).
-    // This prevents the user from being logged out on every page refresh while
-    // the background token-refresh request is still in-flight.
-    const storedToken = getAccessToken();
-    if (storedToken) {
-      const payload = decodeJwtPayload(storedToken);
-      const now = Math.floor(Date.now() / 1000);
-      if (payload && payload.exp > now) {
-        // Token is still valid — hydrate React state immediately.
-        const restoredUser = getUserFromToken(storedToken);
-        if (restoredUser) {
-          setToken(storedToken);
-          setUser(restoredUser);
-        }
-      } else {
-        // Token has expired — remove it so the refresh call starts clean.
-        clearAccessToken();
-      }
-    }
+    let cancelled = false;
+    (async (): Promise<void> => {
+      await refreshAccessToken();
+      if (!cancelled) setIsLoading(false);
+    })();
+    return (): void => {
+      cancelled = true;
+    };
+  }, []);
 
-    // Always attempt a background refresh so we get a fresh token (and honour
-    // the HTTP-only refresh-token cookie when available).
-    refreshToken().finally(() => {
-      isInitialRefreshRef.current = false;
-      setIsLoading(false);
-    });
-  }, [refreshToken]);
-
+  // Pre-emptive refresh: schedule a refresh 120s before expiry so the token
+  // is fresh when the user clicks something.
   useEffect(() => {
     if (!token) return;
+    const remaining = secondsUntilExpiry(token);
+    if (remaining === null) return;
 
-    const payload = decodeJwtPayload(token);
-    if (!payload) return;
-
-    const now = Math.floor(Date.now() / 1000);
-    const timeUntilExpiry = payload.exp - now;
-    const refreshAt = Math.max((timeUntilExpiry - 120) * 1000, 0);
-
+    const refreshAtMs = Math.max((remaining - 120) * 1000, 0);
     const timer = setTimeout(() => {
-      refreshToken();
-    }, refreshAt);
+      void refreshAccessToken();
+    }, refreshAtMs);
 
     return (): void => {
       clearTimeout(timer);
     };
-  }, [token, refreshToken]);
+  }, [token]);
+
+  // Cross-tab logout: if another tab logs out (or its refresh fails), clear
+  // this tab's token too. BroadcastChannel isn't available on every browser
+  // the app supports — the null check keeps older runtimes working.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
+      return undefined;
+    }
+    const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    broadcastRef.current = channel;
+    channel.onmessage = (event: MessageEvent<AuthBroadcastMessage>): void => {
+      if (event.data?.type === "logout") {
+        tokenStore.clear();
+      }
+    };
+    return (): void => {
+      channel.close();
+      broadcastRef.current = null;
+    };
+  }, []);
 
   const value: AuthContextType = useMemo(
     () => ({

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { headers } from "next/headers";
 import { APP_NAME } from "@/lib/constants";
 import { validateEnv } from "@/lib/validate-env";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -86,15 +87,17 @@ const themeScript = `
   })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}): React.ReactElement {
+}): Promise<React.ReactElement> {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${manrope.variable} ${spaceGrotesk.variable} antialiased`}>
         <ThemeProvider>

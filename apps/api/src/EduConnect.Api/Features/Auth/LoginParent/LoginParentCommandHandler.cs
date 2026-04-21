@@ -69,7 +69,7 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
             user.SchoolId,
             user.Role,
             user.Name,
-            15,
+            JwtTokenService.AccessTokenLifetimeMinutes,
             user.MustChangePassword);
         var refreshTokenId = Guid.NewGuid();
         var refreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
@@ -101,6 +101,9 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
 
         _logger.LogInformation("Parent user {UserId} logged in successfully", user.Id);
 
-        return new LoginParentResponse(accessToken, user.MustChangePassword);
+        return new LoginParentResponse(
+            accessToken,
+            JwtTokenService.AccessTokenLifetimeSeconds,
+            user.MustChangePassword);
     }
 }

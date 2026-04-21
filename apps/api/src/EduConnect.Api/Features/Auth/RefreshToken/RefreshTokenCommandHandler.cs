@@ -38,25 +38,28 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             throw new UnauthorizedException("Refresh token is missing.");
         }
 
+        // Reuse detection: we look up by ID (and verify the secret hash)
+        // WITHOUT filtering on IsRevoked, so a replay of an already-rotated
+        // token is observable. Handled below.
         Infrastructure.Database.Entities.RefreshTokenEntity? storedToken = null;
 
         if (_jwtTokenService.TryParseRefreshToken(refreshToken, out var refreshTokenId, out var refreshTokenSecret))
         {
             storedToken = await _context.RefreshTokens
                 .Include(rt => rt.User)
-                .FirstOrDefaultAsync(rt =>
-                    rt.Id == refreshTokenId &&
-                    !rt.IsRevoked &&
-                    rt.ExpiresAt > DateTimeOffset.UtcNow,
-                    cancellationToken);
+                .FirstOrDefaultAsync(rt => rt.Id == refreshTokenId, cancellationToken);
 
             if (storedToken != null && !BCrypt.Net.BCrypt.EnhancedVerify(refreshTokenSecret, storedToken.TokenHash))
             {
+                // Token ID matched but the secret didn't — treat as unknown.
                 storedToken = null;
             }
         }
         else
         {
+            // Legacy format without the id.secret split. Fall back to linear
+            // scan on active tokens only (reuse detection isn't possible in
+            // this branch because no id is presented).
             var activeTokens = await _context.RefreshTokens
                 .Include(rt => rt.User)
                 .Where(rt => !rt.IsRevoked && rt.ExpiresAt > DateTimeOffset.UtcNow)
@@ -68,7 +71,39 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
 
         if (storedToken == null)
         {
-            _logger.LogWarning("No matching active refresh token found in database");
+            _logger.LogWarning("Refresh attempted with unknown token");
+            throw new UnauthorizedException("Invalid or expired refresh token.");
+        }
+
+        // Replay of an already-rotated or manually-revoked token: assume the
+        // cookie has been stolen and burn down the whole family so the
+        // attacker's session and any concurrent legitimate sessions must
+        // re-authenticate through login.
+        if (storedToken.IsRevoked)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var familyTokens = await _context.RefreshTokens
+                .Where(rt => rt.UserId == storedToken.UserId && !rt.IsRevoked && rt.ExpiresAt > now)
+                .ToListAsync(cancellationToken);
+
+            foreach (var rt in familyTokens)
+            {
+                rt.IsRevoked = true;
+                rt.RevokedAt = now;
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "Refresh token reuse detected for user {UserId}; revoked {FamilySize} active token(s)",
+                storedToken.UserId,
+                familyTokens.Count);
+
+            throw new UnauthorizedException("Invalid or expired refresh token.");
+        }
+
+        if (storedToken.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            _logger.LogWarning("Refresh attempted with expired token {TokenId}", storedToken.Id);
             throw new UnauthorizedException("Invalid or expired refresh token.");
         }
 
@@ -90,8 +125,8 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             user.SchoolId,
             user.Role,
             user.Name,
-            15,
-            mustChange);
+            JwtTokenService.AccessTokenLifetimeMinutes,
+            user.MustChangePassword);
         var newRefreshTokenId = Guid.NewGuid();
         var newRefreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var newRefreshToken = _jwtTokenService.BuildRefreshToken(newRefreshTokenId, newRefreshTokenSecret);
@@ -116,6 +151,10 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
 
         _logger.LogInformation("Refresh token rotated for user {UserId}", user.Id);
 
-        return new RefreshTokenResponse(newAccessToken, newRefreshToken, mustChange);
+        return new RefreshTokenResponse(
+            newAccessToken,
+            JwtTokenService.AccessTokenLifetimeSeconds,
+            newRefreshToken,
+            user.MustChangePassword);
     }
 }
