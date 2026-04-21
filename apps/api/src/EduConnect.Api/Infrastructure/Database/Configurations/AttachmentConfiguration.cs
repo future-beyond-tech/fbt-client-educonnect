@@ -12,7 +12,7 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
         {
             tableBuilder.HasCheckConstraint(
                 "chk_attachment_entity_type",
-                "entity_type IS NULL OR entity_type IN ('homework', 'notice')");
+                "entity_type IS NULL OR entity_type IN ('homework', 'notice', 'homework_submission')");
             tableBuilder.HasCheckConstraint(
                 "chk_attachment_content_type",
                 "content_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')");

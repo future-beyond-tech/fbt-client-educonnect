@@ -26,6 +26,10 @@ using EduConnect.Api.Features.Homework.UpdateHomework;
 using EduConnect.Api.Features.Homework.SubmitHomeworkForApproval;
 using EduConnect.Api.Features.Homework.ApproveHomework;
 using EduConnect.Api.Features.Homework.RejectHomework;
+using EduConnect.Api.Features.HomeworkSubmissions.SubmitHomework;
+using EduConnect.Api.Features.HomeworkSubmissions.GradeHomeworkSubmission;
+using EduConnect.Api.Features.HomeworkSubmissions.GetSubmissionsByHomework;
+using EduConnect.Api.Features.HomeworkSubmissions.GetMySubmissions;
 using EduConnect.Api.Features.Notices.CreateNotice;
 using EduConnect.Api.Features.Notices.PublishNotice;
 using EduConnect.Api.Features.Notices.GetNotices;
@@ -85,6 +89,7 @@ public static class EndpointRouteBuilderExtensions
         app.MapAuthEndpoints();
         app.MapAttendanceEndpoints();
         app.MapHomeworkEndpoints();
+        app.MapHomeworkSubmissionEndpoints();
         app.MapNoticeEndpoints();
         app.MapStudentEndpoints();
         app.MapParentEndpoints();
@@ -141,6 +146,24 @@ public static class EndpointRouteBuilderExtensions
         group.MapPut("/{id}/submit", SubmitHomeworkForApprovalEndpoint.Handle).WithName("SubmitHomeworkForApproval");
         group.MapPut("/{id}/approve", ApproveHomeworkEndpoint.Handle).WithName("ApproveHomework");
         group.MapPut("/{id}/reject", RejectHomeworkEndpoint.Handle).WithName("RejectHomework");
+    }
+
+    private static void MapHomeworkSubmissionEndpoints(this WebApplication app)
+    {
+        // Student-submission surface lives at /homework/{id}/submissions so it
+        // doesn't collide with the teacher→admin "/{id}/submit" approval
+        // route (different verb + URL).
+        var homework = app.MapGroup("/api/homework").WithTags("HomeworkSubmissions").RequireAuthorization();
+        homework.MapPost("/{id}/submissions", SubmitHomeworkEndpoint.Handle)
+            .WithName("SubmitHomework");
+        homework.MapGet("/{id}/submissions", GetSubmissionsByHomeworkEndpoint.Handle)
+            .WithName("GetSubmissionsByHomework");
+
+        var submissions = app.MapGroup("/api/homework-submissions").WithTags("HomeworkSubmissions").RequireAuthorization();
+        submissions.MapPut("/{id}/grade", GradeHomeworkSubmissionEndpoint.Handle)
+            .WithName("GradeHomeworkSubmission");
+        submissions.MapGet("/mine", GetMySubmissionsEndpoint.Handle)
+            .WithName("GetMyHomeworkSubmissions");
     }
 
     private static void MapNoticeEndpoints(this WebApplication app)
