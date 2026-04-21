@@ -62,13 +62,26 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             throw new UnauthorizedException("Invalid phone or password.");
         }
 
+        // A staff user is forced through the change-password flow if their
+        // account is already flagged OR if their password pre-dates the
+        // current policy — see PasswordPolicy.PolicyEnforcedAt.
+        var mustChange = user.MustChangePassword
+            || PasswordPolicy.IsLegacyPassword(user.PasswordUpdatedAt);
+
+        if (mustChange && !user.MustChangePassword)
+        {
+            _logger.LogInformation(
+                "User {UserId} flagged for forced password rotation (legacy password pre-dates policy cutoff)",
+                user.Id);
+        }
+
         var accessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
             user.SchoolId,
             user.Role,
             user.Name,
             15,
-            user.MustChangePassword);
+            mustChange);
         var refreshTokenId = Guid.NewGuid();
         var refreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var refreshToken = _jwtTokenService.BuildRefreshToken(refreshTokenId, refreshTokenSecret);
@@ -99,6 +112,6 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
         _logger.LogInformation("User {UserId} logged in successfully", user.Id);
 
-        return new LoginResponse(accessToken, user.MustChangePassword);
+        return new LoginResponse(accessToken, mustChange);
     }
 }

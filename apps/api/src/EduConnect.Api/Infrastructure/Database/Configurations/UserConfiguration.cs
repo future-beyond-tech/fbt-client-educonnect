@@ -24,6 +24,7 @@ public class UserConfiguration : IEntityTypeConfiguration<UserEntity>
         builder.Property(x => x.PinHash).HasMaxLength(500);
         builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.MustChangePassword).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.PasswordUpdatedAt);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
         builder.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
 

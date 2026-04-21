@@ -79,6 +79,7 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
             });
         }
 
+        var now = DateTimeOffset.UtcNow;
         var teacher = new UserEntity
         {
             Id = Guid.NewGuid(),
@@ -90,8 +91,9 @@ public class CreateTeacherCommandHandler : IRequestHandler<CreateTeacherCommand,
             PasswordHash = _passwordHasher.HashPassword(request.Password),
             IsActive = true,
             MustChangePassword = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            PasswordUpdatedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         _context.Users.Add(teacher);

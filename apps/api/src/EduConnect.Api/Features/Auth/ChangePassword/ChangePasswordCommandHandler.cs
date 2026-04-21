@@ -58,9 +58,11 @@ public class ChangePasswordCommandHandler : IRequestHandler<ChangePasswordComman
             throw new UnauthorizedException("Current password is incorrect.");
         }
 
+        var now = DateTimeOffset.UtcNow;
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         user.MustChangePassword = false;
-        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.PasswordUpdatedAt = now;
+        user.UpdatedAt = now;
 
         // Revoke all active refresh tokens for this user (force re-login everywhere).
         var activeRefreshTokens = await _context.RefreshTokens
