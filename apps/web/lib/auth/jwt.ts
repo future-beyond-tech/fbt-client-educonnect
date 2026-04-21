@@ -60,3 +60,12 @@ export function getUserFromToken(token: string): AuthUser | null {
     mustChangePassword: mustChange,
   };
 }
+
+/** Seconds until the access token expires, or null if unparseable/expired. */
+export function secondsUntilExpiry(token: string): number | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = payload.exp - now;
+  return remaining > 0 ? remaining : null;
+}

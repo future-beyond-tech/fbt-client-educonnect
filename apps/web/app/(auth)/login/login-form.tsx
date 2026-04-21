@@ -21,6 +21,7 @@ import { StatusBanner } from "@/components/shared/status-banner";
 
 interface LoginResponse {
   accessToken: string;
+  expiresIn?: number;
   mustChangePassword?: boolean;
 }
 
@@ -110,7 +111,7 @@ export function LoginForm(): React.ReactElement {
           : { phone, password };
 
       const response = await apiPost<LoginResponse>(endpoint, payload);
-      login(response.accessToken);
+      login(response.accessToken, response.expiresIn);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || "Login failed. Please try again.");

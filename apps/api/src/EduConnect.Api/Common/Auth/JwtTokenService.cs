@@ -7,6 +7,9 @@ namespace EduConnect.Api.Common.Auth;
 
 public class JwtTokenService
 {
+    public const int AccessTokenLifetimeMinutes = 15;
+    public const int AccessTokenLifetimeSeconds = AccessTokenLifetimeMinutes * 60;
+
     private readonly string _jwtSecret;
     private readonly string _jwtIssuer;
     private readonly string _jwtAudience;

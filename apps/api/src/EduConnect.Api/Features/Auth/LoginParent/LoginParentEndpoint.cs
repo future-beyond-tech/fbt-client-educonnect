@@ -13,6 +13,7 @@ public static class LoginParentEndpoint
         return Results.Ok(new
         {
             accessToken = response.AccessToken,
+            expiresIn = response.ExpiresIn,
             mustChangePassword = response.MustChangePassword
         });
     }

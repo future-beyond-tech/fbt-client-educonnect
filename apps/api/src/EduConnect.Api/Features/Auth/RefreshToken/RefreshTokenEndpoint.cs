@@ -26,6 +26,7 @@ public static class RefreshTokenEndpoint
         return Results.Ok(new
         {
             accessToken = result.AccessToken,
+            expiresIn = result.ExpiresIn,
             mustChangePassword = result.MustChangePassword
         });
     }
