@@ -40,19 +40,26 @@ function buildFakeAdminJwt(): string {
   return `${header}.${payload}.signature`;
 }
 
+// The access token is held in-memory only (see lib/auth/token-store.ts), so
+// we can't seed it via localStorage any more. Instead we stub the refresh
+// endpoint to return a fake-but-parseable JWT; the AuthProvider calls
+// /api/auth/refresh on mount and populates tokenStore from the response.
 async function primeAuth(page: Page): Promise<void> {
   const token = buildFakeAdminJwt();
-  await page.addInitScript((t) => {
-    window.localStorage.setItem("auth_access_token", t);
-  }, token);
+  await page.route("**/api/auth/refresh", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        accessToken: token,
+        expiresIn: 60 * 60,
+        mustChangePassword: false,
+      }),
+    });
+  });
 }
 
 async function stubApi(page: Page): Promise<void> {
-  // Refresh endpoint: 401 during the initial session restore keeps the
-  // pre-seeded token intact (the AuthProvider guards against wiping on first refresh).
-  await page.route("**/api/auth/refresh", async (route) => {
-    await route.fulfill({ status: 401, body: "" });
-  });
 
   await page.route("**/api/teachers/filter-metadata", async (route) => {
     await route.fulfill({

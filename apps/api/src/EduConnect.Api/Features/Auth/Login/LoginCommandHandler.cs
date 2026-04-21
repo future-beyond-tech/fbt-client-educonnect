@@ -67,7 +67,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             user.SchoolId,
             user.Role,
             user.Name,
-            15,
+            JwtTokenService.AccessTokenLifetimeMinutes,
             user.MustChangePassword);
         var refreshTokenId = Guid.NewGuid();
         var refreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
@@ -99,6 +99,9 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
         _logger.LogInformation("User {UserId} logged in successfully", user.Id);
 
-        return new LoginResponse(accessToken, user.MustChangePassword);
+        return new LoginResponse(
+            accessToken,
+            JwtTokenService.AccessTokenLifetimeSeconds,
+            user.MustChangePassword);
     }
 }
