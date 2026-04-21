@@ -77,7 +77,7 @@ public class AppDbContext : DbContext
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated || entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<RefreshTokenEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
-                                      (entity.User != null && entity.User.SchoolId == _currentUserService.SchoolId));
+                                      entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<AuthResetTokenEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       entity.SchoolId == _currentUserService.SchoolId);

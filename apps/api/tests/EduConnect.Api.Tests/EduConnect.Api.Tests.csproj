@@ -17,6 +17,10 @@
     </PackageReference>
     <PackageReference Include="FluentAssertions" Version="6.12.1" />
     <PackageReference Include="Moq" Version="4.20.70" />
+    <!-- SkippableFact lets RLS tests skip at runtime when the connection
+         role bypasses RLS (BYPASSRLS/SUPERUSER), which can't be detected
+         in the [Fact] attribute constructor. -->
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.23" />
   </ItemGroup>
 
   <ItemGroup>
