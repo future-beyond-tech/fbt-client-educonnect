@@ -11,8 +11,11 @@ public class LoginCommandValidator : AbstractValidator<LoginCommand>
             .NotEmpty().WithMessage("Phone number is required.")
             .Must(JapanPhoneNumber.IsValidInput).WithMessage(JapanPhoneNumber.ValidationMessage);
 
+        // Login only enforces non-empty. Length/strength checks live in
+        // PasswordPolicyValidator and are applied when passwords are SET, not
+        // verified — users with pre-policy passwords must still be able to
+        // sign in so the legacy-rotation flow can force them to change.
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(6).WithMessage("Password must be at least 6 characters.");
+            .NotEmpty().WithMessage("Password is required.");
     }
 }

@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.PhoneNumbers;
 using FluentValidation;
 
@@ -23,9 +24,7 @@ public class CreateTeacherCommandValidator : AbstractValidator<CreateTeacherComm
             .MaximumLength(256).WithMessage("Email cannot exceed 256 characters.");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .MaximumLength(128).WithMessage("Password must be 128 characters or fewer.");
+            .SetValidator(new PasswordPolicyValidator());
 
         RuleFor(x => x.Role)
             .NotEmpty().WithMessage("Role is required.")

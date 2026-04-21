@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/validation/password";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBanner } from "@/components/shared/status-banner";
@@ -54,8 +55,9 @@ export function ChangePasswordForm(): React.ReactElement {
       setError("Please enter your current temporary password.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters.");
+    const policy = validatePassword(newPassword);
+    if (!policy.valid) {
+      setError(policy.message);
       return;
     }
     if (newPassword === currentPassword) {
@@ -181,7 +183,7 @@ export function ChangePasswordForm(): React.ReactElement {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            At least 8 characters. Choose something only you would know.
+            {PASSWORD_POLICY_MESSAGE} Choose something only you would know.
           </p>
         </div>
 

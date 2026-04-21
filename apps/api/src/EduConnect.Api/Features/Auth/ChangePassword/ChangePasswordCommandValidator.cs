@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.Auth;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Auth.ChangePassword;
@@ -8,12 +9,10 @@ public class ChangePasswordCommandValidator : AbstractValidator<ChangePasswordCo
     {
         RuleFor(x => x.CurrentPassword)
             .NotEmpty().WithMessage("Current password is required.")
-            .MaximumLength(128).WithMessage("Current password is invalid.");
+            .MaximumLength(PasswordPolicy.MaxLength).WithMessage("Current password is invalid.");
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty().WithMessage("New password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .MaximumLength(128).WithMessage("Password must be 128 characters or fewer.")
+            .SetValidator(new PasswordPolicyValidator())
             .NotEqual(x => x.CurrentPassword)
                 .WithMessage("New password must be different from the current password.");
 

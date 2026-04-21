@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/validation/password";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBanner } from "@/components/shared/status-banner";
@@ -38,8 +39,9 @@ export function ResetPasswordForm(): React.ReactElement {
       setError("Reset link is missing or invalid.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const policy = validatePassword(newPassword);
+    if (!policy.valid) {
+      setError(policy.message);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -121,7 +123,7 @@ export function ResetPasswordForm(): React.ReactElement {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            At least 8 characters.
+            {PASSWORD_POLICY_MESSAGE}
           </p>
         </div>
 
