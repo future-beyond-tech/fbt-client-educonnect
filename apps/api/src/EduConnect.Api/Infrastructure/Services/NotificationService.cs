@@ -139,6 +139,8 @@ public class NotificationService : INotificationService
             ("homework", { } id) => $"/homework/{id}",
             ("attendance", _) => "/attendance",
             ("leave_application", { } id) => $"/leaves/{id}",
+            ("exam_schedule", { } id) => $"/exams/{id}",
+            ("exam_result", { } id) => $"/exams/{id}/results",
             _ => "/notifications",
         };
     }
