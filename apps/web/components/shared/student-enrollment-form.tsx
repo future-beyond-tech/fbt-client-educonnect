@@ -142,6 +142,13 @@ export function StudentEnrollmentForm({
   // When the caller provides a scoped classes list (teacher flow), we use it
   // as the source of truth; otherwise fall back to the school-wide fetch.
   const classes = classesProp ?? fetchedClasses;
+  // We need a loading sentinel for the school-wide fetch so the empty-state
+  // warning doesn't flash on first render before the classes request
+  // resolves. Teacher flow passes `classesProp` eagerly, so it's never
+  // loading from this component's perspective.
+  const [isLoadingClasses, setIsLoadingClasses] = React.useState<boolean>(
+    classesProp === undefined
+  );
 
   const [name, setName] = React.useState("");
   const [rollNumber, setRollNumber] = React.useState("");
@@ -243,15 +250,27 @@ export function StudentEnrollmentForm({
     // Only auto-fetch when the caller didn't supply a scoped list.
     if (classesProp) return;
 
+    let cancelled = false;
+
     const fetchClasses = async (): Promise<void> => {
       try {
         const data = await apiGet<ClassItem[]>(API_ENDPOINTS.classes);
+        if (cancelled) return;
         setFetchedClasses(data);
       } catch {
+        if (cancelled) return;
         setError("Failed to load classes.");
+      } finally {
+        if (!cancelled) {
+          setIsLoadingClasses(false);
+        }
       }
     };
     void fetchClasses();
+
+    return () => {
+      cancelled = true;
+    };
   }, [classesProp]);
 
   const handleSearchExistingParent = async (): Promise<void> => {
@@ -473,7 +492,7 @@ export function StudentEnrollmentForm({
             </div>
           ) : (
           <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
-            {classes.length === 0 && (
+            {classes.length === 0 && !isLoadingClasses && (
               <StatusBanner variant="warning">
                 {emptyClassesMessage ??
                   "No classes are available yet. Create a class first, then return here to enroll the student."}
@@ -762,19 +781,29 @@ export function StudentEnrollmentForm({
             <div className="flex gap-2 pt-2">
               <Button
                 type="submit"
-                disabled={isSubmitting || classes.length === 0}
+                disabled={
+                  isSubmitting ||
+                  isLoadingClasses ||
+                  classes.length === 0
+                }
               >
-                {isSubmitting ? <Spinner size="sm" /> : "Enroll Student"}
+                {isSubmitting || isLoadingClasses ? (
+                  <Spinner size="sm" />
+                ) : (
+                  "Enroll Student"
+                )}
               </Button>
-              {classes.length === 0 && manageClassesHref && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push(manageClassesHref)}
-                >
-                  Manage Classes
-                </Button>
-              )}
+              {classes.length === 0 &&
+                !isLoadingClasses &&
+                manageClassesHref && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.push(manageClassesHref)}
+                  >
+                    Manage Classes
+                  </Button>
+                )}
               <Button
                 type="button"
                 variant="outline"
