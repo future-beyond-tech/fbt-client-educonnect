@@ -253,6 +253,8 @@ var app = builder.Build();
     }
 }
 
+app.UseSecurityHeaders();
+
 app.UseRouting();
 
 if (app.Environment.IsDevelopment())
