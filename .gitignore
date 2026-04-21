@@ -50,3 +50,4 @@ pnpm-debug.log*
 
 # Sentry
 .sentryclirc
+/graphify-out
