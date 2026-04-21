@@ -64,7 +64,7 @@ public sealed class AttachmentScanWorker : BackgroundService
         }
     }
 
-    private async Task ScanOneAsync(Guid attachmentId, CancellationToken ct)
+    internal async Task ScanOneAsync(Guid attachmentId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -94,16 +94,66 @@ public sealed class AttachmentScanWorker : BackgroundService
             return;
         }
 
-        ScanResult result;
+        // Buffer so the magic-byte pre-check can read a prefix without
+        // depriving ClamAV of any bytes. 10 MB file cap (see
+        // StorageOptions.MaxFileSizeBytes) keeps the memory budget bounded.
+        await using var buffered = new MemoryStream();
         try
         {
-            await using var stream = await storage.OpenObjectReadStreamAsync(attachment.StorageKey, ct);
-            result = await scanner.ScanAsync(stream, ct);
+            await using var source = await storage.OpenObjectReadStreamAsync(attachment.StorageKey, ct);
+            await source.CopyToAsync(buffered, ct);
+            buffered.Position = 0;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Could not stream attachment {AttachmentId} from storage for scanning",
+                attachmentId);
+            attachment.Status = AttachmentStatus.ScanFailed;
+            attachment.ScannedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
+        var prefixLength = (int)Math.Min(buffered.Length, 64);
+        var prefix = new byte[prefixLength];
+        _ = await buffered.ReadAsync(prefix.AsMemory(0, prefixLength), ct);
+        buffered.Position = 0;
+
+        if (!MimeSignatureValidator.IsConsistent(prefix, attachment.ContentType))
+        {
+            _logger.LogWarning(
+                "Attachment {AttachmentId} declared {ContentType} but magic bytes don't match; marking Infected (MIME_MISMATCH).",
+                attachmentId, attachment.ContentType);
+
+            attachment.Status = AttachmentStatus.Infected;
+            attachment.ThreatName = "MIME_MISMATCH";
+            attachment.ScannedAt = DateTimeOffset.UtcNow;
+
+            try
+            {
+                await storage.DeleteObjectAsync(attachment.StorageKey, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to delete MIME-mismatch object {Key}; DB row will stay Infected for operator cleanup",
+                    attachment.StorageKey);
+            }
+
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
+        ScanResult result;
+        try
+        {
+            result = await scanner.ScanAsync(buffered, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Scanner threw for attachment {AttachmentId}",
                 attachmentId);
             attachment.Status = AttachmentStatus.ScanFailed;
             attachment.ScannedAt = DateTimeOffset.UtcNow;
