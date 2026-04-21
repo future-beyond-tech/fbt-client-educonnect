@@ -44,6 +44,7 @@ using EduConnect.Api.Features.Classes.GetClassAssignments;
 using EduConnect.Api.Features.Classes.CreateClass;
 using EduConnect.Api.Features.Classes.UpdateClass;
 using EduConnect.Api.Features.Teachers.GetTeachersBySchool;
+using EduConnect.Api.Features.Teachers.GetTeacherFilterMetadata;
 using EduConnect.Api.Features.Teachers.GetTeacherProfile;
 using EduConnect.Api.Features.Teachers.GetClassesForTeacher;
 using EduConnect.Api.Features.Teachers.CreateTeacher;
@@ -64,6 +65,16 @@ using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
+using EduConnect.Api.Features.Exams.CreateExam;
+using EduConnect.Api.Features.Exams.UpdateExam;
+using EduConnect.Api.Features.Exams.DeleteExam;
+using EduConnect.Api.Features.Exams.GetExams;
+using EduConnect.Api.Features.Exams.GetExamById;
+using EduConnect.Api.Features.Exams.PublishExamSchedule;
+using EduConnect.Api.Features.Exams.UpsertExamResults;
+using EduConnect.Api.Features.Exams.UploadExamResultsCsv;
+using EduConnect.Api.Features.Exams.GetExamResults;
+using EduConnect.Api.Features.Exams.FinalizeExamResults;
 
 namespace EduConnect.Api.Common.Extensions;
 
@@ -83,6 +94,7 @@ public static class EndpointRouteBuilderExtensions
         app.MapNotificationEndpoints();
         app.MapPushEndpoints();
         app.MapAttachmentEndpoints();
+        app.MapExamEndpoints();
     }
 
     private static void MapAuthEndpoints(this WebApplication app)
@@ -177,6 +189,7 @@ public static class EndpointRouteBuilderExtensions
         var group = app.MapGroup("/api/teachers").WithTags("Teachers").RequireAuthorization();
 
         group.MapGet("/", GetTeachersBySchoolEndpoint.Handle).WithName("GetTeachersBySchool");
+        group.MapGet("/filter-metadata", GetTeacherFilterMetadataEndpoint.Handle).WithName("GetTeacherFilterMetadata");
         group.MapGet("/my-classes", GetClassesForTeacherEndpoint.Handle).WithName("GetClassesForTeacher");
         group.MapGet("/{id}", GetTeacherProfileEndpoint.Handle).WithName("GetTeacherProfile");
         group.MapPost("/", CreateTeacherEndpoint.Handle).WithName("CreateTeacher");
@@ -229,5 +242,25 @@ public static class EndpointRouteBuilderExtensions
         group.MapPost("/attach", AttachFileToEntityEndpoint.Handle).WithName("AttachFileToEntity");
         group.MapGet("/", GetAttachmentsForEntityEndpoint.Handle).WithName("GetAttachmentsForEntity");
         group.MapDelete("/{id}", DeleteAttachmentEndpoint.Handle).WithName("DeleteAttachment");
+    }
+
+    private static void MapExamEndpoints(this WebApplication app)
+    {
+        var group = app.MapGroup("/api/exams").WithTags("Exams").RequireAuthorization();
+
+        group.MapPost("/", CreateExamEndpoint.Handle).WithName("CreateExam");
+        group.MapGet("/", GetExamsEndpoint.Handle).WithName("GetExams");
+        group.MapGet("/{id}", GetExamByIdEndpoint.Handle).WithName("GetExamById");
+        group.MapPut("/{id}", UpdateExamEndpoint.Handle).WithName("UpdateExam");
+        group.MapDelete("/{id}", DeleteExamEndpoint.Handle).WithName("DeleteExam");
+        group.MapPut("/{id}/publish-schedule", PublishExamScheduleEndpoint.Handle).WithName("PublishExamSchedule");
+
+        group.MapGet("/{id}/results", GetExamResultsForClassEndpoint.Handle).WithName("GetExamResultsForClass");
+        group.MapGet("/{id}/results/{studentId}", GetExamResultsForStudentEndpoint.Handle).WithName("GetExamResultsForStudent");
+        group.MapPut("/{id}/results", UpsertExamResultsEndpoint.Handle).WithName("UpsertExamResults");
+        group.MapPost("/{id}/results/upload", UploadExamResultsCsvEndpoint.Handle)
+            .WithName("UploadExamResultsCsv")
+            .DisableAntiforgery();
+        group.MapPut("/{id}/finalize-results", FinalizeExamResultsEndpoint.Handle).WithName("FinalizeExamResults");
     }
 }

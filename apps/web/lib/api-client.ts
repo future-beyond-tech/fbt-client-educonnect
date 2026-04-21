@@ -138,3 +138,58 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
     method: "DELETE",
   });
 }
+
+/**
+ * Multipart/form-data POST. Used for CSV uploads — we drop the JSON
+ * Content-Type so the browser can pick a boundary for the FormData body.
+ */
+export async function apiPostMultipart<T>(
+  endpoint: string,
+  formData: FormData
+): Promise<T> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!baseUrl) {
+    throw new Error("NEXT_PUBLIC_API_URL is not defined");
+  }
+
+  const url = `${baseUrl}${endpoint}`;
+  const token = getAccessToken();
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+    credentials: "include",
+  });
+
+  const contentType = response.headers.get("content-type");
+  const isJson = contentType?.includes("application/json");
+
+  if (!response.ok) {
+    let problemDetails: ProblemDetails | undefined;
+    if (isJson) {
+      try {
+        const errorBody = (await response.json()) as Record<string, unknown>;
+        if ("title" in errorBody && "status" in errorBody) {
+          problemDetails = errorBody as unknown as ProblemDetails;
+        }
+      } catch {
+        // ignored
+      }
+    }
+    const errorMessage =
+      problemDetails?.detail ?? problemDetails?.title ?? response.statusText;
+    throw new ApiError(response.status, errorMessage, problemDetails);
+  }
+
+  if (response.status === 204 || !isJson) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}

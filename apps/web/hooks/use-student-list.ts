@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiGet } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import type {
@@ -32,6 +33,15 @@ export interface UseStudentListReturn {
 export function useStudentList(
   pageSize = DEFAULT_PAGE_SIZE
 ): UseStudentListReturn {
+  // Gate all fetches on the auth provider having finished its initial
+  // session-restore pass. Without this, the list fetch can race the token
+  // refresh that AuthProvider kicks off on mount and fail with a
+  // "Network error: Failed to fetch" on the very first load (it then works
+  // on browser refresh because the token is already stable in localStorage).
+  // This mirrors the idiom used in teacher/profile, teacher/attendance, and
+  // parent/attendance.
+  const { token, isLoading: isAuthLoading } = useAuth();
+
   const [students, setStudents] = React.useState<StudentListItem[]>([]);
   const [totalCount, setTotalCount] = React.useState(0);
   const [totalPages, setTotalPages] = React.useState(0);
@@ -53,6 +63,9 @@ export function useStudentList(
   }, [search]);
 
   React.useEffect(() => {
+    if (isAuthLoading) return;
+    if (!token) return;
+
     const fetchClasses = async (): Promise<void> => {
       try {
         const data = await apiGet<ClassItem[]>(API_ENDPOINTS.classes);
@@ -63,7 +76,7 @@ export function useStudentList(
     };
 
     void fetchClasses();
-  }, []);
+  }, [isAuthLoading, token]);
 
   const fetchStudents = React.useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -93,8 +106,10 @@ export function useStudentList(
   }, [debouncedSearch, page, pageSize, selectedClassId]);
 
   React.useEffect(() => {
+    if (isAuthLoading) return;
+    if (!token) return;
     void fetchStudents();
-  }, [fetchStudents]);
+  }, [fetchStudents, isAuthLoading, token]);
 
   const handleClassChange = React.useCallback((classId: string): void => {
     setSelectedClassId(classId);

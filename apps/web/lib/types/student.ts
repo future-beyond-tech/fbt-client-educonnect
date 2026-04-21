@@ -7,6 +7,7 @@ export interface StudentListItem {
   section: string;
   isActive: boolean;
   dateOfBirth: string | null;
+  createdAt: string;
 }
 
 export interface PagedResult<T> {

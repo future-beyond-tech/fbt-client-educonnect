@@ -297,6 +297,256 @@ namespace EduConnect.Api.Migrations
                     b.ToTable("classes", (string)null);
                 });
 
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AcademicYear")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("academic_year");
+
+                    b.Property<Guid>("ClassId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsResultsFinalized")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_results_finalized");
+
+                    b.Property<bool>("IsSchedulePublished")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_schedule_published");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("ResultsFinalizedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("results_finalized_at");
+
+                    b.Property<DateTimeOffset?>("SchedulePublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("schedule_published_at");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("school_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exams");
+
+                    b.HasIndex("ClassId")
+                        .HasDatabaseName("ix_exams_class_id");
+
+                    b.HasIndex("CreatedById")
+                        .HasDatabaseName("ix_exams_created_by_id");
+
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("ix_exams_school_id");
+
+                    b.HasIndex("SchoolId", "ClassId", "IsDeleted")
+                        .HasDatabaseName("ix_exams_school_id_class_id_is_deleted")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("exams", (string)null);
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamResultEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<Guid>("ExamSubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_subject_id");
+
+                    b.Property<string>("Grade")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("grade");
+
+                    b.Property<bool>("IsAbsent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_absent");
+
+                    b.Property<decimal?>("MarksObtained")
+                        .HasColumnType("numeric(6,2)")
+                        .HasColumnName("marks_obtained");
+
+                    b.Property<Guid>("RecordedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_id");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("remarks");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("school_id");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("student_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exam_results");
+
+                    b.HasIndex("ExamId")
+                        .HasDatabaseName("ix_exam_results_exam_id");
+
+                    b.HasIndex("RecordedById")
+                        .HasDatabaseName("ix_exam_results_recorded_by_id");
+
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("ix_exam_results_school_id");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("ix_exam_results_student_id");
+
+                    b.HasIndex("ExamSubjectId", "StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_exam_results_exam_subject_id_student_id");
+
+                    b.ToTable("exam_results", null, t =>
+                        {
+                            t.HasCheckConstraint("chk_exam_results_absent_marks", "(is_absent = true AND marks_obtained IS NULL) OR is_absent = false");
+
+                            t.HasCheckConstraint("chk_exam_results_has_score", "is_absent = true OR marks_obtained IS NOT NULL OR grade IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamSubjectEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<DateOnly>("ExamDate")
+                        .HasColumnType("date")
+                        .HasColumnName("exam_date");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<decimal>("MaxMarks")
+                        .HasColumnType("numeric(6,2)")
+                        .HasColumnName("max_marks");
+
+                    b.Property<string>("Room")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("room");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("school_id");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("start_time");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exam_subjects");
+
+                    b.HasIndex("ExamId")
+                        .HasDatabaseName("ix_exam_subjects_exam_id");
+
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("ix_exam_subjects_school_id");
+
+                    b.HasIndex("ExamId", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ix_exam_subjects_exam_id_subject");
+
+                    b.ToTable("exam_subjects", null, t =>
+                        {
+                            t.HasCheckConstraint("chk_exam_subjects_max_marks_positive", "max_marks > 0");
+
+                            t.HasCheckConstraint("chk_exam_subjects_time_order", "end_time > start_time");
+                        });
+                });
+
             modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.HomeworkEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1309,6 +1559,105 @@ namespace EduConnect.Api.Migrations
                     b.Navigation("School");
                 });
 
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamEntity", b =>
+                {
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.ClassEntity", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exams_classes_class_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.UserEntity", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_exams_users_created_by_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.SchoolEntity", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exams_schools_school_id");
+
+                    b.Navigation("Class");
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("School");
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamResultEntity", b =>
+                {
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.ExamEntity", "Exam")
+                        .WithMany("Results")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_results_exams_exam_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.ExamSubjectEntity", "ExamSubject")
+                        .WithMany("Results")
+                        .HasForeignKey("ExamSubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_results_exam_subjects_exam_subject_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.UserEntity", "RecordedBy")
+                        .WithMany()
+                        .HasForeignKey("RecordedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_results_users_recorded_by_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.SchoolEntity", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_results_schools_school_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.StudentEntity", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_results_students_student_id");
+
+                    b.Navigation("Exam");
+
+                    b.Navigation("ExamSubject");
+
+                    b.Navigation("RecordedBy");
+
+                    b.Navigation("School");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamSubjectEntity", b =>
+                {
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.ExamEntity", "Exam")
+                        .WithMany("Subjects")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_subjects_exams_exam_id");
+
+                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.SchoolEntity", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exam_subjects_schools_school_id");
+
+                    b.Navigation("Exam");
+
+                    b.Navigation("School");
+                });
+
             modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.HomeworkEntity", b =>
                 {
                     b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.UserEntity", "ApprovedBy")
@@ -1628,6 +1977,18 @@ namespace EduConnect.Api.Migrations
                     b.Navigation("Students");
 
                     b.Navigation("TeacherClassAssignments");
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamEntity", b =>
+                {
+                    b.Navigation("Results");
+
+                    b.Navigation("Subjects");
+                });
+
+            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.ExamSubjectEntity", b =>
+                {
+                    b.Navigation("Results");
                 });
 
             modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.NoticeEntity", b =>

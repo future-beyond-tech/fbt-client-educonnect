@@ -8,6 +8,7 @@ import {
   BookMarked,
   BookOpen,
   CheckCircle,
+  GraduationCap,
   School,
   Users,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BookMarked,
   BookOpen,
   CheckCircle,
+  GraduationCap,
   School,
   Users,
 };

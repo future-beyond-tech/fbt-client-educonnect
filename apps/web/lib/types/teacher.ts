@@ -8,6 +8,7 @@ export interface TeacherListItem {
   isActive: boolean;
   assignedClassCount: number;
   subjects: string[];
+  createdAt: string;
 }
 
 export type TeacherPagedResult = PagedResult<TeacherListItem>;

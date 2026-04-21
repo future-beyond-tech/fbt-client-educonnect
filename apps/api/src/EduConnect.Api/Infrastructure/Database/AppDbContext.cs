@@ -37,6 +37,9 @@ public class AppDbContext : DbContext
     public DbSet<RefreshTokenEntity> RefreshTokens { get; set; }
     public DbSet<AuthResetTokenEntity> AuthResetTokens { get; set; }
     public DbSet<UserPushSubscriptionEntity> UserPushSubscriptions { get; set; }
+    public DbSet<ExamEntity> Exams { get; set; }
+    public DbSet<ExamSubjectEntity> ExamSubjects { get; set; }
+    public DbSet<ExamResultEntity> ExamResults { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +82,15 @@ public class AppDbContext : DbContext
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       entity.SchoolId == _currentUserService.SchoolId);
         modelBuilder.Entity<UserPushSubscriptionEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
+                                      entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<ExamEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
+                                      entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<ExamSubjectEntity>()
+            .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
+                                      entity.SchoolId == _currentUserService.SchoolId);
+        modelBuilder.Entity<ExamResultEntity>()
             .HasQueryFilter(entity => !_currentUserService.IsAuthenticated ||
                                       entity.SchoolId == _currentUserService.SchoolId);
 

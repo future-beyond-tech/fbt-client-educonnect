@@ -46,6 +46,7 @@ export const API_ENDPOINTS = {
   attachments: "/api/attachments",
   leaveApplications: "/api/attendance/leave",
   parents: "/api/parents",
+  exams: "/api/exams",
 } as const;
 
 export const navigationByRole: Record<RoleType, NavItem[]> = {
@@ -53,10 +54,12 @@ export const navigationByRole: Record<RoleType, NavItem[]> = {
     { label: "Attendance", href: "/parent/attendance", icon: "CheckCircle" },
     { label: "Homework", href: "/parent/homework", icon: "BookMarked" },
     { label: "Notices", href: "/parent/notices", icon: "Bell" },
+    { label: "Exams", href: "/parent/exams", icon: "GraduationCap" },
   ],
   Teacher: [
     { label: "Homework", href: "/teacher/homework", icon: "BookMarked" },
     { label: "Attendance", href: "/teacher/attendance", icon: "CheckCircle" },
+    { label: "Exams", href: "/teacher/exams", icon: "GraduationCap" },
     { label: "Students", href: "/teacher/students", icon: "Users" },
     { label: "Profile", href: "/teacher/profile", icon: "BookOpen" },
   ],

@@ -62,6 +62,14 @@ export function Dialog({
     setMounted(true);
   }, []);
 
+  // Keep the latest onOpenChange in a ref so the effect below does not
+  // re-run (and re-steal focus) whenever the parent passes a new inline
+  // callback on re-render.
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  React.useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
   // ESC + focus management + scroll lock.
   React.useEffect(() => {
     if (!open) return undefined;
@@ -86,7 +94,7 @@ export function Dialog({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape" && !disableEscClose) {
         event.stopPropagation();
-        onOpenChange(false);
+        onOpenChangeRef.current(false);
         return;
       }
       if (event.key === "Tab") {
@@ -126,7 +134,7 @@ export function Dialog({
         toFocus.focus();
       }
     };
-  }, [open, onOpenChange, disableEscClose]);
+  }, [open, disableEscClose]);
 
   if (!mounted || !open) return null;
 
