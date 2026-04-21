@@ -127,6 +127,25 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             user.Name,
             JwtTokenService.AccessTokenLifetimeMinutes,
             user.MustChangePassword);
+
+        // No-rotate path (Next.js Server Actions): issue a fresh access
+        // token without revoking the presented refresh token so a burst of
+        // parallel server-side actions can't trigger reuse-detection against
+        // itself. The rotating browser path (client-side single-flight in
+        // api-client.ts) keeps reuse protection for cookie theft.
+        if (request.NoRotate)
+        {
+            _logger.LogDebug(
+                "Non-rotating access token minted for user {UserId} (server-action path)",
+                user.Id);
+
+            return new RefreshTokenResponse(
+                newAccessToken,
+                JwtTokenService.AccessTokenLifetimeSeconds,
+                null,
+                user.MustChangePassword);
+        }
+
         var newRefreshTokenId = Guid.NewGuid();
         var newRefreshTokenSecret = _jwtTokenService.GenerateRefreshToken();
         var newRefreshToken = _jwtTokenService.BuildRefreshToken(newRefreshTokenId, newRefreshTokenSecret);

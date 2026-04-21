@@ -165,18 +165,20 @@ export async function loginAction(
 
 /**
  * Mints a short-lived backend access token inside a Server Action context
- * by calling /api/auth/refresh with the browser's HttpOnly refresh cookie.
- * Proxies the rotated refresh cookie back to the browser.
+ * by calling /api/auth/refresh?noRotate=true with the browser's HttpOnly
+ * refresh cookie. The noRotate flag instructs the backend to issue a fresh
+ * access token WITHOUT rotating the refresh token — so two Server Actions
+ * firing at the same moment don't race their rotations and trigger the
+ * Phase 3 reuse-detection against themselves.
  *
- * Used by Phase 7 waves 2-5: every non-auth server action calls this to
- * get a bearer before hitting the .NET API. Returns null if the refresh
- * cookie is missing / invalid — the caller should then surface a 401 to
- * the browser so the AuthProvider can bounce to /login.
+ * Security posture: the rotating path in api-client.ts (browser-side
+ * single-flight) continues to provide reuse-detection for cookie-theft
+ * scenarios. noRotate is available only to the server-action trust
+ * boundary where rotations would cause self-inflicted churn.
  *
- * KNOWN LIMITATION: two Server Actions that mint concurrently present the
- * same refresh cookie; the backend's reuse-detection (Phase 3) will revoke
- * the family and log everyone out. If this bites in practice, the backend
- * needs a non-rotating mint variant (tracked as a Wave 2 decision).
+ * Returns null if the refresh cookie is missing / invalid — the caller
+ * should surface a 401 to the browser so the AuthProvider can bounce to
+ * /login.
  */
 export async function mintBackendAccessToken(): Promise<string | null> {
   const cookieHeader = await forwardedRefreshCookieHeader();
@@ -184,7 +186,7 @@ export async function mintBackendAccessToken(): Promise<string | null> {
 
   let response: Response;
   try {
-    response = await fetch(`${apiBase()}/api/auth/refresh`, {
+    response = await fetch(`${apiBase()}/api/auth/refresh?noRotate=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -203,7 +205,7 @@ export async function mintBackendAccessToken(): Promise<string | null> {
     return null;
   }
 
-  await proxyRefreshCookie(response);
+  // noRotate mode doesn't emit a new Set-Cookie — nothing to proxy.
   const data = (await response.json()) as { accessToken: string };
   return data.accessToken;
 }
