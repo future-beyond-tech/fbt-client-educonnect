@@ -164,7 +164,8 @@ public class HomeworkAttachmentFlowTests
                     ContentType = "application/pdf",
                     SizeBytes = 1024,
                     UploadedById = teacherId,
-                    UploadedAt = DateTimeOffset.UtcNow
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
                 }
             ]);
 
@@ -248,7 +249,8 @@ public class HomeworkAttachmentFlowTests
                     ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     SizeBytes = 4096,
                     UploadedById = teacherId,
-                    UploadedAt = DateTimeOffset.UtcNow
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
                 }
             ]);
 
@@ -318,7 +320,8 @@ public class HomeworkAttachmentFlowTests
                     ContentType = "application/pdf",
                     SizeBytes = 1024,
                     UploadedById = teacherId,
-                    UploadedAt = DateTimeOffset.UtcNow
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
                 }
             ]);
 
@@ -377,7 +380,8 @@ public class HomeworkAttachmentFlowTests
                     ContentType = "application/pdf",
                     SizeBytes = 1024,
                     UploadedById = teacherId,
-                    UploadedAt = DateTimeOffset.UtcNow
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
                 }
             ]);
 

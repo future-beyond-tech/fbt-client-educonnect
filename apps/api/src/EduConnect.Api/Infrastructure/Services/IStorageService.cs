@@ -26,4 +26,11 @@ public interface IStorageService
     /// Deletes an object from storage.
     /// </summary>
     Task DeleteObjectAsync(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Opens a read stream directly from storage. Caller owns the stream and
+    /// must dispose it. Used by the virus-scan pipeline to hand the object
+    /// body to the scanner without a staging round-trip through disk.
+    /// </summary>
+    Task<Stream> OpenObjectReadStreamAsync(string key, CancellationToken cancellationToken = default);
 }

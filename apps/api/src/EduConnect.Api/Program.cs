@@ -154,6 +154,40 @@ else
 }
 builder.Services.AddScoped<IStorageService, S3StorageService>();
 
+// Phase 5 — virus-scan pipeline. NoOp by default so dev uploads still flow;
+// Production sets ClamAv:Enabled=true plus Host/Port at a running clamd.
+var scannerOptions = builder.Configuration
+    .GetSection(EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerOptions.SectionName)
+    .Get<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerOptions>()
+    ?? new EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerOptions();
+scannerOptions.Enabled =
+    bool.TryParse(builder.Configuration["CLAMAV_ENABLED"], out var clamEnabled) ? clamEnabled : scannerOptions.Enabled;
+scannerOptions.Host = builder.Configuration["CLAMAV_HOST"] ?? scannerOptions.Host;
+if (int.TryParse(builder.Configuration["CLAMAV_PORT"], out var clamPort))
+{
+    scannerOptions.Port = clamPort;
+}
+if (int.TryParse(builder.Configuration["CLAMAV_TIMEOUT_SECONDS"], out var clamTimeout))
+{
+    scannerOptions.TimeoutSeconds = clamTimeout;
+}
+builder.Services.AddSingleton<IOptions<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerOptions>>(
+    Options.Create(scannerOptions));
+
+if (scannerOptions.Enabled)
+{
+    builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanner,
+        EduConnect.Api.Infrastructure.Services.Scanning.ClamAvAttachmentScanner>();
+}
+else
+{
+    builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanner,
+        EduConnect.Api.Infrastructure.Services.Scanning.NoOpAttachmentScanner>();
+}
+builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanQueue,
+    EduConnect.Api.Infrastructure.Services.Scanning.ChannelAttachmentScanQueue>();
+builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanWorker>();
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

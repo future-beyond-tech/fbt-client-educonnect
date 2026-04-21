@@ -92,4 +92,17 @@ public class S3StorageService : IStorageService
 
         _logger.LogInformation("Deleted object with key {Key}", key);
     }
+
+    public async Task<Stream> OpenObjectReadStreamAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var response = await _s3Client.GetObjectAsync(new GetObjectRequest
+        {
+            BucketName = _storageOptions.BucketName,
+            Key = key,
+        }, cancellationToken);
+
+        // Caller disposes — wrapping ensures the S3 response is released
+        // when the stream is closed.
+        return response.ResponseStream;
+    }
 }
