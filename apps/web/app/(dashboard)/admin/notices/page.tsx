@@ -9,6 +9,8 @@ import type {
   CreateNoticeResponse,
   NoticeItem,
   PublishNoticeResponse,
+  UpdateNoticeRequest,
+  UpdateNoticeResponse,
 } from "@/lib/types/notice";
 import type { ClassItem } from "@/lib/types/student";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +31,7 @@ import {
 import { StatusBanner } from "@/components/shared/status-banner";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
-import { Bell, Check, Paperclip, Plus, Search, Send, X } from "lucide-react";
+import { Bell, Check, Paperclip, Pencil, Plus, Search, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NoticeTargetAudience = "All" | "Class" | "Section";
@@ -66,8 +68,10 @@ export default function AdminNoticesPage(): React.ReactElement {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
-  // Dialog state for create
+  // Dialog state for create / edit. Same form backs both: when
+  // `editingNoticeId` is null we POST (create), otherwise we PUT (edit draft).
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [editingNoticeId, setEditingNoticeId] = React.useState<string | null>(null);
   const [createTitle, setCreateTitle] = React.useState("");
   const [createBody, setCreateBody] = React.useState("");
   const [createTargetAudience, setCreateTargetAudience] =
@@ -291,6 +295,7 @@ export default function AdminNoticesPage(): React.ReactElement {
     setCreateTargetSectionIds([]);
     setCreateExpiresAt("");
     setCreateError("");
+    setEditingNoticeId(null);
   }, []);
 
   const openCreateDialog = (): void => {
@@ -302,6 +307,56 @@ export default function AdminNoticesPage(): React.ReactElement {
   const closeCreateDialog = (): void => {
     setCreateDialogOpen(false);
     resetCreateForm();
+  };
+
+  // Convert an ISO-with-TZ string (as returned by the API) into the
+  // local-time format expected by `<input type="datetime-local">`:
+  // "yyyy-MM-ddTHH:mm". Returns "" when the source is null/invalid so the
+  // control renders empty.
+  const toDateTimeLocalValue = (isoValue: string | null): string => {
+    if (!isoValue) return "";
+    const parsed = new Date(isoValue);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const pad = (value: number): string => value.toString().padStart(2, "0");
+    const year = parsed.getFullYear();
+    const month = pad(parsed.getMonth() + 1);
+    const day = pad(parsed.getDate());
+    const hours = pad(parsed.getHours());
+    const minutes = pad(parsed.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const openEditDialog = (notice: NoticeItem): void => {
+    setSuccessMessage("");
+    setError("");
+    setCreateError("");
+    setEditingNoticeId(notice.noticeId);
+    setCreateTitle(notice.title);
+    setCreateBody(notice.body);
+    setCreateTargetAudience(notice.targetAudience);
+    setCreateExpiresAt(toDateTimeLocalValue(notice.expiresAt));
+
+    // Reconstruct the class-group + section selection from the notice's
+    // stored target classes. All targetClasses for a given notice share the
+    // same (className, academicYear) pair — that invariant is enforced on
+    // the API side when the draft was created, so we can seed from the first
+    // entry and trust the rest.
+    const firstTargetClass = notice.targetClasses[0];
+    if (notice.targetAudience === "All" || !firstTargetClass) {
+      setCreateClassGroupKey("");
+      setCreateTargetSectionIds([]);
+    } else {
+      const groupKey = buildClassGroupKey({
+        name: firstTargetClass.className,
+        academicYear: firstTargetClass.academicYear,
+      });
+      setCreateClassGroupKey(groupKey);
+      setCreateTargetSectionIds(
+        notice.targetClasses.map((targetClass) => targetClass.classId)
+      );
+    }
+
+    setCreateDialogOpen(true);
   };
 
   const closeAttachDialog = (): void => {
@@ -336,7 +391,9 @@ export default function AdminNoticesPage(): React.ReactElement {
       return;
     }
 
-    const body: CreateNoticeRequest = {
+    const isEditing = editingNoticeId !== null;
+
+    const requestBody: CreateNoticeRequest | UpdateNoticeRequest = {
       title: createTitle.trim(),
       body: createBody.trim(),
       targetAudience: createTargetAudience,
@@ -347,18 +404,39 @@ export default function AdminNoticesPage(): React.ReactElement {
 
     setIsCreating(true);
     try {
-      const response = await apiPost<CreateNoticeResponse>(API_ENDPOINTS.notices, body);
-      setSuccessMessage(response.message);
+      let savedNoticeId: string;
+      let savedMessage: string;
+
+      if (isEditing && editingNoticeId) {
+        const response = await apiPut<UpdateNoticeResponse>(
+          `${API_ENDPOINTS.notices}/${editingNoticeId}`,
+          requestBody
+        );
+        savedNoticeId = response.noticeId;
+        savedMessage = response.message;
+      } else {
+        const response = await apiPost<CreateNoticeResponse>(
+          API_ENDPOINTS.notices,
+          requestBody
+        );
+        savedNoticeId = response.noticeId;
+        savedMessage = response.message;
+      }
+
+      setSuccessMessage(savedMessage);
       setCreateDialogOpen(false);
       resetCreateForm();
-      setNewNoticeId(response.noticeId);
+      // Reopen the Attach dialog so the admin can revise files in the same
+      // flow (create or edit).
+      setNewNoticeId(savedNoticeId);
       setNewNoticeAttachments([]);
       setAttachDialogOpen(true);
       void fetchNotices();
     } catch (err) {
-      setCreateError(
-        err instanceof ApiError ? err.message : "Failed to create notice."
-      );
+      const fallback = isEditing
+        ? "Failed to update notice."
+        : "Failed to create notice.";
+      setCreateError(err instanceof ApiError ? err.message : fallback);
     } finally {
       setIsCreating(false);
     }
@@ -589,6 +667,16 @@ export default function AdminNoticesPage(): React.ReactElement {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => openEditDialog(notice)}
+                          aria-label={`Edit draft ${notice.title}`}
+                          disabled={isPublishing === notice.noticeId}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => {
                             setSuccessMessage("");
                             setNewNoticeId(notice.noticeId);
@@ -688,15 +776,19 @@ export default function AdminNoticesPage(): React.ReactElement {
         </PageSection>
       )}
 
-      {/* Create Notice dialog */}
+      {/* Create / Edit notice dialog */}
       <Dialog
         open={createDialogOpen}
         onOpenChange={(next) => {
           if (!next) closeCreateDialog();
           else setCreateDialogOpen(true);
         }}
-        title="New notice"
-        description="Draft the announcement, choose an audience, and save. Files can be attached after the draft is created."
+        title={editingNoticeId ? "Edit draft" : "New notice"}
+        description={
+          editingNoticeId
+            ? "Update the draft's content, audience, or expiry. Files can be revised after saving."
+            : "Draft the announcement, choose an audience, and save. Files can be attached after the draft is created."
+        }
         size="lg"
         footer={
           <>
@@ -709,7 +801,13 @@ export default function AdminNoticesPage(): React.ReactElement {
               Cancel
             </Button>
             <Button type="submit" form="notice-form" disabled={isCreating}>
-              {isCreating ? <Spinner size="sm" /> : "Create draft"}
+              {isCreating ? (
+                <Spinner size="sm" />
+              ) : editingNoticeId ? (
+                "Save changes"
+              ) : (
+                "Create draft"
+              )}
             </Button>
           </>
         }

@@ -30,6 +30,19 @@ export interface CreateNoticeResponse {
   message: string;
 }
 
+export interface UpdateNoticeRequest {
+  title: string;
+  body: string;
+  targetAudience: "All" | "Class" | "Section";
+  targetClassIds: string[] | null;
+  expiresAt: string | null;
+}
+
+export interface UpdateNoticeResponse {
+  noticeId: string;
+  message: string;
+}
+
 export interface PublishNoticeResponse {
   message: string;
 }

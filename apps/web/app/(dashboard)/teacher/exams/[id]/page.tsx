@@ -43,6 +43,15 @@ function toRows(exam: ExamDetail): SubjectRow[] {
   }));
 }
 
+// .NET's default TimeOnly JSON converter requires "HH:mm:ss". <input type="time">
+// emits "HH:mm", so pad on submit to keep the body parser from rejecting the
+// whole command with "Failed to read parameter ... as JSON."
+function toApiTime(value: string): string {
+  if (!value) return value;
+  if (value.length >= 8) return value;
+  return `${value}:00`;
+}
+
 function newSubjectRow(): SubjectRow {
   return {
     _key: crypto.randomUUID(),
@@ -155,6 +164,8 @@ export default function TeacherExamDetailPage(): React.ReactElement {
       subjects: editRows.map(({ _key, ...rest }) => ({
         ...rest,
         subject: rest.subject.trim(),
+        startTime: toApiTime(rest.startTime),
+        endTime: toApiTime(rest.endTime),
         room: rest.room?.trim() || null,
       })),
     };

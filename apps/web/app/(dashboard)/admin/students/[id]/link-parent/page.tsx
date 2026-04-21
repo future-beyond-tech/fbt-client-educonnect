@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  createParentAction,
+  linkParentToStudentAction,
+} from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import {
   isValidJapanPhone,
@@ -21,13 +25,7 @@ import { PageHeader, PageSection, PageShell } from "@/components/shared/page-she
 import { StatusBanner } from "@/components/shared/status-banner";
 import { TemporaryCredentialCard } from "@/components/shared/temporary-credential-card";
 import { ArrowLeft, Search, UserCheck } from "lucide-react";
-import type {
-  ParentSearchResult,
-  CreateParentRequest,
-  ParentMutationResponse,
-  LinkParentRequest,
-  MutationResponse,
-} from "@/lib/types/student";
+import type { ParentSearchResult } from "@/lib/types/student";
 
 export default function LinkParentPage(): React.ReactElement {
   const params = useParams();
@@ -102,25 +100,26 @@ export default function LinkParentPage(): React.ReactElement {
     setIsLinking(true);
     setError("");
     try {
-      const body: LinkParentRequest = {
+      const result = await linkParentToStudentAction({
+        studentId,
         parentId: selectedParent.id,
         relationship,
-      };
-      const result = await apiPost<MutationResponse>(
-        `${API_ENDPOINTS.students}/${studentId}/parent-links`,
-        body
-      );
-      setSuccessMessage(result.message);
+      });
+      if (!result.ok) {
+        setError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to link parent.",
+        );
+        return;
+      }
+      setSuccessMessage(result.data.message);
       setSelectedParent(null);
       setSearchResults([]);
       setPhone("");
       setHasSearched(false);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Failed to link parent.");
-      }
+    } catch {
+      setError("Failed to link parent.");
     } finally {
       setIsLinking(false);
     }
@@ -162,37 +161,42 @@ export default function LinkParentPage(): React.ReactElement {
     let createdParentId: string | undefined;
 
     try {
-      const parentBody: CreateParentRequest = {
+      const parentResult = await createParentAction({
         name: trimmedName,
         phone: trimmedPhone,
         email: trimmedEmail,
         pin: newParentPin,
-      };
-
-      const parentResult = await apiPost<ParentMutationResponse>(
-        API_ENDPOINTS.parents,
-        parentBody
-      );
-      createdParentId = parentResult.parentId;
+      });
+      if (!parentResult.ok) {
+        throw new Error(
+          parentResult.formError ??
+            Object.values(parentResult.fieldErrors ?? {})[0] ??
+            "Parent creation failed.",
+        );
+      }
+      createdParentId = parentResult.data.parentId;
 
       if (!createdParentId) {
         throw new Error("Parent creation did not return an ID.");
       }
 
-      const linkBody: LinkParentRequest = {
+      const linkResult = await linkParentToStudentAction({
+        studentId,
         parentId: createdParentId,
         relationship: newRelationship,
-      };
+      });
+      if (!linkResult.ok) {
+        throw new Error(
+          linkResult.formError ??
+            Object.values(linkResult.fieldErrors ?? {})[0] ??
+            "Failed to link parent.",
+        );
+      }
 
-      const linkResult = await apiPost<MutationResponse>(
-        `${API_ENDPOINTS.students}/${studentId}/parent-links`,
-        linkBody
-      );
-
-      setSuccessMessage(`Parent created and linked successfully. ${linkResult.message}`);
+      setSuccessMessage(`Parent created and linked successfully. ${linkResult.data.message}`);
       setNewParentCredential({
         name: trimmedName,
-        pin: parentResult.temporaryPin ?? newParentPin,
+        pin: parentResult.data.temporaryPin ?? newParentPin,
       });
       setSearchResults([]);
       setHasSearched(false);

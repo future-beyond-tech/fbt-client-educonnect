@@ -3,8 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ApiError, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet, apiPut } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import {
+  assignClassToTeacherAction,
+  promoteClassTeacherAction,
+} from "@/lib/actions/users-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +30,7 @@ import type {
   UpdateClassRequest,
 } from "@/lib/types/student";
 import type {
-  AssignClassRequest,
   SubjectItem,
-  TeacherMutationResponse,
   TeacherPagedResult,
 } from "@/lib/types/teacher";
 import type { ClassAssignmentItem } from "@/lib/types/class-assignments";
@@ -209,25 +211,29 @@ export default function AdminClassDetailPage(): React.ReactElement {
 
     setIsAssigning(true);
     try {
-      const body: AssignClassRequest = {
+      const result = await assignClassToTeacherAction({
+        teacherId: selectedTeacherId,
         classId,
         subject: selectedSubject,
         isClassTeacher: markAsClassTeacher,
-      };
-
-      const res = await apiPost<TeacherMutationResponse>(
-        `${API_ENDPOINTS.teachers}/${selectedTeacherId}/assignments`,
-        body
-      );
-      setSuccessMessage(res.message);
+      });
+      if (!result.ok) {
+        setAssignError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to assign teacher.",
+        );
+        return;
+      }
+      setSuccessMessage(result.data.message);
       setShowAssignForm(false);
       setTeacherSearch("");
       setSelectedTeacherId("");
       setSelectedSubject("");
       setMarkAsClassTeacher(false);
       await fetchAll();
-    } catch (err) {
-      setAssignError(getBestErrorMessage(err, "Failed to assign teacher."));
+    } catch {
+      setAssignError("Failed to assign teacher.");
     } finally {
       setIsAssigning(false);
     }
@@ -248,13 +254,18 @@ export default function AdminClassDetailPage(): React.ReactElement {
     }
 
     try {
-      const res = await apiPut<MutationResponse>(
-        `${API_ENDPOINTS.teachers}/${assignment.teacherId}/assignments/${assignment.assignmentId}/class-teacher`
+      const result = await promoteClassTeacherAction(
+        assignment.teacherId,
+        assignment.assignmentId,
       );
-      setSuccessMessage(res.message);
+      if (!result.ok) {
+        setError(result.formError ?? "Failed to update class teacher.");
+        return;
+      }
+      setSuccessMessage(result.data.message);
       await fetchAll();
-    } catch (err) {
-      setError(getBestErrorMessage(err, "Failed to update class teacher."));
+    } catch {
+      setError("Failed to update class teacher.");
     } finally {
       setActionAssignmentId(null);
     }
@@ -269,16 +280,20 @@ export default function AdminClassDetailPage(): React.ReactElement {
 
     try {
       if (replacePayload.kind === "assign") {
-        const body: AssignClassRequest = {
+        const result = await assignClassToTeacherAction({
+          teacherId: replacePayload.teacherId,
           classId,
           subject: replacePayload.subject,
           isClassTeacher: true,
-        };
-        const res = await apiPost<TeacherMutationResponse>(
-          `${API_ENDPOINTS.teachers}/${replacePayload.teacherId}/assignments`,
-          body
-        );
-        setSuccessMessage(res.message);
+        });
+        if (!result.ok) {
+          throw new Error(
+            result.formError ??
+              Object.values(result.fieldErrors ?? {})[0] ??
+              "Failed to replace class teacher.",
+          );
+        }
+        setSuccessMessage(result.data.message);
         // Reset the assign form so the admin lands on a clean slate.
         setShowAssignForm(false);
         setTeacherSearch("");
@@ -287,10 +302,11 @@ export default function AdminClassDetailPage(): React.ReactElement {
         setMarkAsClassTeacher(false);
       } else {
         const a = replacePayload.assignment;
-        const res = await apiPut<MutationResponse>(
-          `${API_ENDPOINTS.teachers}/${a.teacherId}/assignments/${a.assignmentId}/class-teacher`
-        );
-        setSuccessMessage(res.message);
+        const result = await promoteClassTeacherAction(a.teacherId, a.assignmentId);
+        if (!result.ok) {
+          throw new Error(result.formError ?? "Failed to replace class teacher.");
+        }
+        setSuccessMessage(result.data.message);
       }
       setReplacePayload(null);
       await fetchAll();
