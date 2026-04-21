@@ -174,16 +174,10 @@ if (int.TryParse(builder.Configuration["CLAMAV_TIMEOUT_SECONDS"], out var clamTi
 builder.Services.AddSingleton<IOptions<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerOptions>>(
     Options.Create(scannerOptions));
 
-if (scannerOptions.Enabled)
-{
-    builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanner,
-        EduConnect.Api.Infrastructure.Services.Scanning.ClamAvAttachmentScanner>();
-}
-else
-{
-    builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanner,
-        EduConnect.Api.Infrastructure.Services.Scanning.NoOpAttachmentScanner>();
-}
+EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerRegistration.AddAttachmentScanner(
+    builder.Services,
+    scannerOptions,
+    builder.Environment);
 builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanQueue,
     EduConnect.Api.Infrastructure.Services.Scanning.ChannelAttachmentScanQueue>();
 builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanWorker>();
