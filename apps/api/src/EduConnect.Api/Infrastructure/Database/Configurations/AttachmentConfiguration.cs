@@ -19,6 +19,9 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
             tableBuilder.HasCheckConstraint(
                 "chk_attachment_size",
                 "size_bytes > 0 AND size_bytes <= 10485760");
+            tableBuilder.HasCheckConstraint(
+                "chk_attachment_status",
+                "status IN ('Pending', 'Available', 'Infected', 'ScanFailed')");
         });
 
         builder.HasKey(x => x.Id);
@@ -30,6 +33,17 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
         builder.Property(x => x.ContentType).IsRequired().HasMaxLength(100);
         builder.Property(x => x.SizeBytes).IsRequired();
         builder.Property(x => x.UploadedAt).HasDefaultValueSql("NOW()");
+
+        builder.Property(x => x.Status)
+            .IsRequired()
+            .HasMaxLength(16)
+            .HasDefaultValue("Pending");
+        builder.Property(x => x.ScannedAt);
+        builder.Property(x => x.ThreatName).HasMaxLength(256);
+
+        builder.HasIndex(x => x.Status)
+            .HasDatabaseName("ix_attachments_status")
+            .HasFilter("status <> 'Available'");
 
         builder.HasIndex(x => new { x.EntityId, x.EntityType })
             .HasDatabaseName("ix_attachments_entity");
