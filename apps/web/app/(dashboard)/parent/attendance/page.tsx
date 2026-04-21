@@ -2,16 +2,18 @@
 
 import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api-client";
+import { apiGet, ApiError } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import {
+  applyLeaveAction,
+  cancelLeaveAction,
+  updateLeaveAction,
+} from "@/lib/actions/attendance-actions";
 import { useParentChildren } from "@/hooks/use-parent-children";
 import { ALL_CHILDREN_VALUE } from "@/lib/parent-children";
 import type {
   AttendanceRecord,
   LeaveApplication,
-  ApplyLeaveRequest,
-  ApplyLeaveResponse,
-  UpdateLeaveRequest,
   GetLeaveApplicationsResponse,
 } from "@/lib/types/attendance";
 import type { ParentChildItem } from "@/lib/types/student";
@@ -169,23 +171,40 @@ function LeaveApplicationForm({
     setIsSubmitting(true);
     try {
       if (isEditing && initialLeave?.id) {
-        const payload: UpdateLeaveRequest = { startDate, endDate, reason };
-        await apiPut(`${API_ENDPOINTS.leaveApplications}/${initialLeave.id}`, payload);
+        const result = await updateLeaveAction({
+          leaveApplicationId: initialLeave.id,
+          startDate,
+          endDate,
+          reason,
+        });
+        if (!result.ok) {
+          setError(
+            result.formError ??
+              Object.values(result.fieldErrors ?? {})[0] ??
+              "Failed to submit leave application.",
+          );
+          return;
+        }
       } else {
-        const payload: ApplyLeaveRequest = {
+        const result = await applyLeaveAction({
           studentIds: selectedStudentIds,
           startDate,
           endDate,
           reason,
-        };
-        await apiPost<ApplyLeaveResponse>(API_ENDPOINTS.leaveApplications, payload);
+        });
+        if (!result.ok) {
+          setError(
+            result.formError ??
+              Object.values(result.fieldErrors ?? {})[0] ??
+              "Failed to submit leave application.",
+          );
+          return;
+        }
       }
       onSuccess();
       onClose();
-    } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : "Failed to submit leave application.";
-      setError(message);
+    } catch {
+      setError("Failed to submit leave application.");
     } finally {
       setIsSubmitting(false);
     }
@@ -494,11 +513,15 @@ export default function ParentAttendancePage(): React.ReactElement {
     if (!ok) return;
 
     try {
-      await apiDelete(`${API_ENDPOINTS.leaveApplications}/${leaveId}`);
+      const result = await cancelLeaveAction(leaveId);
+      if (!result.ok) {
+        setLeavesError(result.formError ?? "Failed to cancel leave application.");
+        return;
+      }
       fetchLeaves();
-    } catch (err) {
+    } catch {
       setLeavesError(
-        err instanceof ApiError ? err.message : "Failed to cancel leave application."
+        "Failed to cancel leave application."
       );
     }
   };
