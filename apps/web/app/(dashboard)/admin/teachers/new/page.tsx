@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
+import { createTeacherAction } from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import {
   isValidJapanPhone,
@@ -22,11 +23,7 @@ import { TemporaryCredentialCard } from "@/components/shared/temporary-credentia
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/validation/password";
-import type {
-  CreateTeacherRequest,
-  SubjectItem,
-  TeacherMutationResponse,
-} from "@/lib/types/teacher";
+import type { SubjectItem } from "@/lib/types/teacher";
 import type { ClassItem } from "@/lib/types/student";
 
 export default function CreateTeacherPage(): React.ReactElement {
@@ -123,7 +120,7 @@ export default function CreateTeacherPage(): React.ReactElement {
 
     setIsSubmitting(true);
     try {
-      const body: CreateTeacherRequest = {
+      const input = {
         name: name.trim(),
         phone,
         email: email.trim().toLowerCase(),
@@ -137,25 +134,30 @@ export default function CreateTeacherPage(): React.ReactElement {
             }
           : {}),
       };
-      const result = await apiPost<TeacherMutationResponse>(
-        API_ENDPOINTS.teachers,
-        body
-      );
+      const result = await createTeacherAction(input);
+      if (!result.ok) {
+        setError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to create staff account.",
+        );
+        return;
+      }
       // Hold the admin on-screen so they can capture the temporary password —
       // the API never echoes it back again. They'll navigate to the profile
       // from the confirmation card.
-      if (result.teacherId) {
+      if (result.data.teacherId) {
         setCreatedTeacher({
-          teacherId: result.teacherId,
-          name: body.name,
+          teacherId: result.data.teacherId,
+          name: input.name,
           role,
-          temporaryPassword: result.temporaryPassword ?? password,
+          temporaryPassword: result.data.temporaryPassword ?? password,
         });
       } else {
         router.push("/admin/teachers");
       }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create staff account.");
+    } catch {
+      setError("Failed to create staff account.");
     } finally {
       setIsSubmitting(false);
     }

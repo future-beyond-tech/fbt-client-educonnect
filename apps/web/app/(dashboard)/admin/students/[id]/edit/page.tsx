@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ApiError, apiGet, apiPut } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
+import { updateStudentAction } from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +17,6 @@ import { ArrowLeft } from "lucide-react";
 import type {
   StudentDetail,
   ClassItem,
-  UpdateStudentRequest,
-  MutationResponse,
 } from "@/lib/types/student";
 
 export default function EditStudentPage(): React.ReactElement {
@@ -79,22 +78,23 @@ export default function EditStudentPage(): React.ReactElement {
 
     setIsSubmitting(true);
     try {
-      const body: UpdateStudentRequest = {
+      const result = await updateStudentAction({
+        id: studentId,
         name: name.trim(),
         classId,
         dateOfBirth: dateOfBirth || null,
-      };
-      await apiPut<MutationResponse>(
-        `${API_ENDPOINTS.students}/${studentId}`,
-        body
-      );
-      router.push(`/admin/students/${studentId}`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Failed to update student.");
+      });
+      if (!result.ok) {
+        setError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to update student.",
+        );
+        return;
       }
+      router.push(`/admin/students/${studentId}`);
+    } catch {
+      setError("Failed to update student.");
     } finally {
       setIsSubmitting(false);
     }
