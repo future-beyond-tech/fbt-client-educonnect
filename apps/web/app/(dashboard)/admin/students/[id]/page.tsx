@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ApiError, apiGet, apiPut, apiDelete } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  deactivateStudentAction,
+  unlinkParentFromStudentAction,
+} from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +21,7 @@ import {
   UserMinus,
   Link as LinkIcon,
 } from "lucide-react";
-import type { StudentDetail, MutationResponse } from "@/lib/types/student";
+import type { StudentDetail } from "@/lib/types/student";
 
 export default function AdminStudentDetailPage(): React.ReactElement {
   const params = useParams();
@@ -58,15 +62,15 @@ export default function AdminStudentDetailPage(): React.ReactElement {
     setIsDeactivating(true);
     setSuccessMessage("");
     try {
-      const result = await apiPut<MutationResponse>(
-        `${API_ENDPOINTS.students}/${studentId}/deactivate`
-      );
-      setSuccessMessage(result.message);
+      const result = await deactivateStudentAction(studentId);
+      if (!result.ok) {
+        setError(result.formError ?? "Failed to deactivate student.");
+        return;
+      }
+      setSuccessMessage(result.data.message);
       fetchStudent();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to deactivate student."
-      );
+    } catch {
+      setError("Failed to deactivate student.");
     } finally {
       setIsDeactivating(false);
     }
@@ -81,15 +85,15 @@ export default function AdminStudentDetailPage(): React.ReactElement {
     setIsUnlinking(linkId);
     setSuccessMessage("");
     try {
-      await apiDelete<MutationResponse>(
-        `${API_ENDPOINTS.students}/${studentId}/parent-links/${linkId}`
-      );
+      const result = await unlinkParentFromStudentAction(studentId, linkId);
+      if (!result.ok) {
+        setError(result.formError ?? "Failed to unlink parent.");
+        return;
+      }
       setSuccessMessage("Parent unlinked successfully.");
       fetchStudent();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to unlink parent."
-      );
+    } catch {
+      setError("Failed to unlink parent.");
     } finally {
       setIsUnlinking(null);
     }

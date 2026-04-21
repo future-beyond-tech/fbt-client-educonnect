@@ -2,8 +2,13 @@
 
 import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
+import {
+  approveLeaveAction,
+  rejectLeaveAction,
+  submitAttendanceTakeAction,
+} from "@/lib/actions/attendance-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,13 +57,6 @@ interface TakeContextResponse {
   exceptions: TakeException[];
   approvedLeaves: TakeLeave[];
   pendingLeaves: TakeLeave[];
-}
-
-interface SubmitAttendanceResponse {
-  createdCount: number;
-  updatedCount: number;
-  clearedCount: number;
-  message: string;
 }
 
 // How many days back a teacher is allowed to mark attendance for. Kept in
@@ -254,11 +252,22 @@ export default function TeacherAttendancePage(): React.ReactElement {
         reason: (reasonByStudentId[s.id] ?? "").trim() || null,
       }));
 
-      const res = await apiPost<SubmitAttendanceResponse>(`${API_ENDPOINTS.attendance}/take`, {
+      const actionResult = await submitAttendanceTakeAction({
         classId: context.classId,
         date: context.date,
         items,
       });
+
+      if (!actionResult.ok) {
+        setActionError(
+          actionResult.formError ??
+            Object.values(actionResult.fieldErrors ?? {})[0] ??
+            "Failed to save attendance.",
+        );
+        return;
+      }
+
+      const res = actionResult.data;
 
       // Lock the UI IMMEDIATELY on a successful POST. Previously we waited
       // for the follow-up refetch to succeed before calling setHasSaved(true)
@@ -322,14 +331,15 @@ export default function TeacherAttendancePage(): React.ReactElement {
     setActionError("");
     setActionSuccess("");
     try {
-      const res = await apiPut<{ message: string }>(
-        `${API_ENDPOINTS.leaveApplications}/${leaveId}/approve`,
-        {}
-      );
-      setActionSuccess(res.message);
+      const result = await approveLeaveAction(leaveId);
+      if (!result.ok) {
+        setActionError(result.formError ?? "Failed to approve leave.");
+        return;
+      }
+      setActionSuccess(result.data.message);
       await fetchContext();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Failed to approve leave.");
+    } catch {
+      setActionError("Failed to approve leave.");
     } finally {
       setLeaveActionId(null);
     }
@@ -343,14 +353,19 @@ export default function TeacherAttendancePage(): React.ReactElement {
     setActionError("");
     setActionSuccess("");
     try {
-      const res = await apiPut<{ message: string }>(
-        `${API_ENDPOINTS.leaveApplications}/${leaveId}/reject`,
-        { reviewNote: note }
-      );
-      setActionSuccess(res.message);
+      const result = await rejectLeaveAction({ leaveApplicationId: leaveId, reviewNote: note });
+      if (!result.ok) {
+        setActionError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to reject leave.",
+        );
+        return;
+      }
+      setActionSuccess(result.data.message);
       await fetchContext();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Failed to reject leave.");
+    } catch {
+      setActionError("Failed to reject leave.");
     } finally {
       setLeaveActionId(null);
     }

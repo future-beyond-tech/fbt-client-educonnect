@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ApiError,
   apiGet,
-  apiPost,
   type ProblemDetails,
 } from "@/lib/api-client";
+import { enrollStudentAction } from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import {
   isValidJapanPhone,
@@ -33,8 +33,6 @@ import { TemporaryCredentialCard } from "@/components/shared/temporary-credentia
 import { ArrowLeft, Search, UserCheck } from "lucide-react";
 import type {
   ClassItem,
-  EnrollStudentRequest,
-  MutationResponse,
   ParentSearchResult,
 } from "@/lib/types/student";
 
@@ -379,44 +377,54 @@ export function StudentEnrollmentForm({
 
     setIsSubmitting(true);
     try {
-      const body: EnrollStudentRequest = {
+      const input = {
         name: name.trim(),
         rollNumber: rollNumber.trim(),
         classId,
         dateOfBirth: dateOfBirth || null,
+        parent:
+          parentMode === "new"
+            ? {
+                kind: "new" as const,
+                name: parentName.trim(),
+                phone: parentPhone.trim(),
+                email: parentEmail.trim().toLowerCase(),
+                pin: parentPin,
+                relationship,
+              }
+            : parentMode === "existing" && selectedExistingParent
+              ? {
+                  kind: "existing" as const,
+                  parentId: selectedExistingParent.id,
+                  relationship: existingRelationship,
+                }
+              : { kind: "none" as const },
       };
 
-      if (parentMode === "new") {
-        body.parent = {
-          name: parentName.trim(),
-          phone: parentPhone.trim(),
-          email: parentEmail.trim().toLowerCase(),
-          pin: parentPin,
-          relationship,
-        };
-      }
+      const result = await enrollStudentAction(input);
 
-      if (parentMode === "existing" && selectedExistingParent) {
-        body.existingParent = {
-          parentId: selectedExistingParent.id,
-          relationship: existingRelationship,
-        };
+      if (!result.ok) {
+        if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+        setError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to enroll student.",
+        );
+        return;
       }
-
-      const result = await apiPost<MutationResponse>(API_ENDPOINTS.students, body);
 
       // If we created an inline parent, hold the user on-screen so they can
       // capture the temporary PIN before navigating away. For other modes,
       // there's nothing to surface — go straight to the profile.
-      if (parentMode === "new" && result.studentId) {
+      if (parentMode === "new" && result.data.studentId) {
         setEnrolled({
-          studentId: result.studentId,
+          studentId: result.data.studentId,
           studentName: name.trim(),
           parentName: parentName.trim(),
-          temporaryPin: result.temporaryPin ?? parentPin,
+          temporaryPin: result.data.temporaryPin ?? parentPin,
         });
-      } else if (result.studentId) {
-        router.push(profileHref(result.studentId));
+      } else if (result.data.studentId) {
+        router.push(profileHref(result.data.studentId));
       }
     } catch (err) {
       if (err instanceof ApiError) {

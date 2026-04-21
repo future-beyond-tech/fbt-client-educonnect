@@ -2,7 +2,12 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ApiError, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  assignClassToTeacherAction,
+  promoteClassTeacherAction,
+  removeTeacherAssignmentAction,
+} from "@/lib/actions/users-actions";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +18,8 @@ import { PageHeader, PageSection, PageShell } from "@/components/shared/page-she
 import { Select } from "@/components/ui/select";
 import { StatusBanner } from "@/components/shared/status-banner";
 import { ArrowLeft, Plus, UserMinus } from "lucide-react";
-import type {
-  TeacherProfile,
-  AssignClassRequest,
-  TeacherMutationResponse,
-} from "@/lib/types/teacher";
-import type { ClassItem, MutationResponse } from "@/lib/types/student";
+import type { TeacherProfile } from "@/lib/types/teacher";
+import type { ClassItem } from "@/lib/types/student";
 import type { SubjectItem } from "@/lib/types/teacher";
 
 export default function AdminTeacherDetailPage(): React.ReactElement {
@@ -89,23 +90,28 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
 
     setIsAssigning(true);
     try {
-      const body: AssignClassRequest = {
+      const result = await assignClassToTeacherAction({
+        teacherId,
         classId: assignClassId,
         subject: assignSubject,
         isClassTeacher: assignIsClassTeacher,
-      };
-      const result = await apiPost<TeacherMutationResponse>(
-        `${API_ENDPOINTS.teachers}/${teacherId}/assignments`,
-        body
-      );
-      setSuccessMessage(result.message);
+      });
+      if (!result.ok) {
+        setAssignError(
+          result.formError ??
+            Object.values(result.fieldErrors ?? {})[0] ??
+            "Failed to assign.",
+        );
+        return;
+      }
+      setSuccessMessage(result.data.message);
       setShowAssignForm(false);
       setAssignClassId("");
       setAssignSubject("");
       setAssignIsClassTeacher(false);
       fetchTeacher();
-    } catch (err) {
-      setAssignError(getBestErrorMessage(err, "Failed to assign."));
+    } catch {
+      setAssignError("Failed to assign.");
     } finally {
       setIsAssigning(false);
     }
@@ -120,13 +126,15 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
     setIsRemoving(assignmentId);
     setSuccessMessage("");
     try {
-      await apiDelete<MutationResponse>(
-        `${API_ENDPOINTS.teachers}/${teacherId}/assignments/${assignmentId}`
-      );
+      const result = await removeTeacherAssignmentAction(teacherId, assignmentId);
+      if (!result.ok) {
+        setError(result.formError ?? "Failed to remove assignment.");
+        return;
+      }
       setSuccessMessage("Assignment removed.");
       fetchTeacher();
-    } catch (err) {
-      setError(getBestErrorMessage(err, "Failed to remove assignment."));
+    } catch {
+      setError("Failed to remove assignment.");
     } finally {
       setIsRemoving(null);
     }
@@ -137,13 +145,15 @@ export default function AdminTeacherDetailPage(): React.ReactElement {
     setError("");
     setSuccessMessage("");
     try {
-      const result = await apiPut<MutationResponse>(
-        `${API_ENDPOINTS.teachers}/${teacherId}/assignments/${assignmentId}/class-teacher`
-      );
-      setSuccessMessage(result.message);
+      const result = await promoteClassTeacherAction(teacherId, assignmentId);
+      if (!result.ok) {
+        setError(result.formError ?? "Failed to update class teacher.");
+        return;
+      }
+      setSuccessMessage(result.data.message);
       fetchTeacher();
-    } catch (err) {
-      setError(getBestErrorMessage(err, "Failed to update class teacher."));
+    } catch {
+      setError("Failed to update class teacher.");
     } finally {
       setIsPromoting(null);
     }

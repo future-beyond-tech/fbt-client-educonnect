@@ -31,6 +31,7 @@ using EduConnect.Api.Features.HomeworkSubmissions.GradeHomeworkSubmission;
 using EduConnect.Api.Features.HomeworkSubmissions.GetSubmissionsByHomework;
 using EduConnect.Api.Features.HomeworkSubmissions.GetMySubmissions;
 using EduConnect.Api.Features.Notices.CreateNotice;
+using EduConnect.Api.Features.Notices.UpdateNotice;
 using EduConnect.Api.Features.Notices.PublishNotice;
 using EduConnect.Api.Features.Notices.GetNotices;
 using EduConnect.Api.Features.Students.GetStudentsByClass;
@@ -172,6 +173,7 @@ public static class EndpointRouteBuilderExtensions
 
         group.MapPost("/", CreateNoticeEndpoint.Handle).WithName("CreateNotice");
         group.MapGet("/", GetNoticesEndpoint.Handle).WithName("GetNotices");
+        group.MapPut("/{id}", UpdateNoticeEndpoint.Handle).WithName("UpdateNotice");
         group.MapPut("/{id}/publish", PublishNoticeEndpoint.Handle).WithName("PublishNotice");
     }
 
