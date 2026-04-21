@@ -114,6 +114,12 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             throw new UnauthorizedException("User is inactive.");
         }
 
+        // Same legacy-rotation check as login: mirror the effective flag so a
+        // rotated access token still carries must_change_password when the
+        // user's password pre-dates the policy cutoff.
+        var mustChange = user.MustChangePassword
+            || PasswordPolicy.IsLegacyPassword(user.PasswordUpdatedAt);
+
         var newAccessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
             user.SchoolId,

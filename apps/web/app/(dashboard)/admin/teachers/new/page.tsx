@@ -21,6 +21,7 @@ import { StatusBanner } from "@/components/shared/status-banner";
 import { TemporaryCredentialCard } from "@/components/shared/temporary-credential-card";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "@/lib/validation/password";
 import type {
   CreateTeacherRequest,
   SubjectItem,
@@ -94,7 +95,8 @@ export default function CreateTeacherPage(): React.ReactElement {
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       nextErrors.email = "Enter a valid email address.";
     }
-    if (password.length < 8) nextErrors.password = "Password must be at least 8 characters.";
+    const policy = validatePassword(password);
+    if (!policy.valid) nextErrors.password = policy.message;
 
     if (role === "Teacher") {
       const hasClass = Boolean(assignClassId);
@@ -283,7 +285,7 @@ export default function CreateTeacherPage(): React.ReactElement {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isSubmitting}
-                  placeholder="At least 8 characters"
+                  placeholder={PASSWORD_POLICY_MESSAGE}
                   autoComplete="new-password"
                   aria-invalid={!!fieldErrors.password}
                   aria-describedby={fieldErrors.password ? passwordErrorId : undefined}

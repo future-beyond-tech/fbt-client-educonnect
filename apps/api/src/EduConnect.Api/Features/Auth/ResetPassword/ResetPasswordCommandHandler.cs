@@ -67,10 +67,13 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             throw new UnauthorizedException("Reset link is invalid or has expired.");
         }
 
+        var now = DateTimeOffset.UtcNow;
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
-        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.MustChangePassword = false;
+        user.PasswordUpdatedAt = now;
+        user.UpdatedAt = now;
 
-        resetToken.UsedAt = DateTimeOffset.UtcNow;
+        resetToken.UsedAt = now;
 
         // Revoke all active refresh tokens for this user (force re-login everywhere).
         var activeRefreshTokens = await _context.RefreshTokens

@@ -1,3 +1,4 @@
+using EduConnect.Api.Common.Auth;
 using FluentValidation;
 
 namespace EduConnect.Api.Features.Auth.ResetPassword;
@@ -11,9 +12,7 @@ public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordComm
             .MaximumLength(256).WithMessage("Reset token is invalid.");
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty().WithMessage("New password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .MaximumLength(128).WithMessage("Password must be 128 characters or fewer.");
+            .SetValidator(new PasswordPolicyValidator());
 
         RuleFor(x => x.ConfirmPassword)
             .NotEmpty().WithMessage("Confirm password is required.")
