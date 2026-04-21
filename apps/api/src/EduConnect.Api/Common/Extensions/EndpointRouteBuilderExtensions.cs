@@ -44,6 +44,7 @@ using EduConnect.Api.Features.Classes.GetClassAssignments;
 using EduConnect.Api.Features.Classes.CreateClass;
 using EduConnect.Api.Features.Classes.UpdateClass;
 using EduConnect.Api.Features.Teachers.GetTeachersBySchool;
+using EduConnect.Api.Features.Teachers.GetTeacherFilterMetadata;
 using EduConnect.Api.Features.Teachers.GetTeacherProfile;
 using EduConnect.Api.Features.Teachers.GetClassesForTeacher;
 using EduConnect.Api.Features.Teachers.CreateTeacher;
@@ -177,6 +178,7 @@ public static class EndpointRouteBuilderExtensions
         var group = app.MapGroup("/api/teachers").WithTags("Teachers").RequireAuthorization();
 
         group.MapGet("/", GetTeachersBySchoolEndpoint.Handle).WithName("GetTeachersBySchool");
+        group.MapGet("/filter-metadata", GetTeacherFilterMetadataEndpoint.Handle).WithName("GetTeacherFilterMetadata");
         group.MapGet("/my-classes", GetClassesForTeacherEndpoint.Handle).WithName("GetClassesForTeacher");
         group.MapGet("/{id}", GetTeacherProfileEndpoint.Handle).WithName("GetTeacherProfile");
         group.MapPost("/", CreateTeacherEndpoint.Handle).WithName("CreateTeacher");
