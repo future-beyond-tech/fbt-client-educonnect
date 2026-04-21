@@ -4,7 +4,7 @@ namespace EduConnect.Api.Features.Attachments.AttachFileToEntity;
 
 public class AttachFileToEntityCommandValidator : AbstractValidator<AttachFileToEntityCommand>
 {
-    private static readonly string[] AllowedEntityTypes = { "homework", "notice" };
+    private static readonly string[] AllowedEntityTypes = { "homework", "homework_submission", "notice" };
 
     public AttachFileToEntityCommandValidator()
     {
@@ -17,6 +17,6 @@ public class AttachFileToEntityCommandValidator : AbstractValidator<AttachFileTo
         RuleFor(x => x.EntityType)
             .NotEmpty().WithMessage("Entity type is required.")
             .Must(et => AllowedEntityTypes.Contains(et))
-            .WithMessage("Entity type must be 'homework' or 'notice'.");
+            .WithMessage("Entity type must be 'homework', 'homework_submission', or 'notice'.");
     }
 }

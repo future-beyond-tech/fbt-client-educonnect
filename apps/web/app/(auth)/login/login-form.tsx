@@ -3,29 +3,28 @@
 import * as React from "react";
 import Link from "next/link";
 import { Eye, EyeOff, KeyRound, UserRound } from "lucide-react";
+import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { ApiError, apiPost } from "@/lib/api-client";
-import { API_ENDPOINTS, defaultRouteByRole } from "@/lib/constants";
+import { defaultRouteByRole } from "@/lib/constants";
 import {
-  isValidJapanPhone,
   JAPAN_PHONE_COUNTRY_CODE,
   JAPAN_PHONE_COUNTRY_LABEL,
   JAPAN_PHONE_LOCAL_DIGITS,
-  JAPAN_PHONE_VALIDATION_MESSAGE,
   normalizeJapanPhoneInput,
 } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBanner } from "@/components/shared/status-banner";
-
-interface LoginResponse {
-  accessToken: string;
-  expiresIn?: number;
-  mustChangePassword?: boolean;
-}
+import {
+  loginAction,
+  type ActionResult,
+  type LoginSuccessData,
+} from "@/lib/actions/auth-actions";
 
 type LoginMode = "parent" | "staff";
+
+const initialState: ActionResult<LoginSuccessData> | null = null;
 
 export function LoginForm(): React.ReactElement {
   const router = useRouter();
@@ -34,13 +33,14 @@ export function LoginForm(): React.ReactElement {
   const [phone, setPhone] = React.useState<string>("");
   const [pin, setPin] = React.useState<string>("");
   const [password, setPassword] = React.useState<string>("");
-  const [error, setError] = React.useState<string>("");
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
   const phoneRef = React.useRef<HTMLInputElement | null>(null);
   const secureFieldClassName =
     "focus-ring flex min-h-12 w-full rounded-[20px] border border-input/90 bg-card/85 px-4 py-3 text-sm text-foreground shadow-[0_12px_30px_-28px_rgba(15,40,69,0.38)] ring-offset-background backdrop-blur-sm placeholder:text-muted-foreground/90 focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60";
 
+  const [state, formAction, isPending] = useActionState(loginAction, initialState);
+
+  // Redirect an already-authenticated visitor to their dashboard.
   React.useEffect(() => {
     if (isAuthLoading || !user) return;
     if (user.mustChangePassword) {
@@ -50,22 +50,23 @@ export function LoginForm(): React.ReactElement {
     router.replace(defaultRouteByRole[user.role]);
   }, [isAuthLoading, router, user]);
 
+  // Promote a successful server-action login to in-memory token state so
+  // subsequent api-client requests carry the bearer.
+  React.useEffect(() => {
+    if (state?.ok) {
+      login(state.data.accessToken, state.data.expiresIn);
+    }
+  }, [state, login]);
+
   const handlePhoneChange = (value: string): void => {
     setPhone(normalizeJapanPhoneInput(value));
-    setError("");
   };
 
   const handlePinChange = (value: string): void => {
     const cleaned = value.replace(/\D/g, "");
     if (cleaned.length <= 6) {
       setPin(cleaned);
-      setError("");
     }
-  };
-
-  const handlePasswordChange = (value: string): void => {
-    setPassword(value);
-    setError("");
   };
 
   const handleModeSwitch = (newMode: LoginMode): void => {
@@ -73,55 +74,13 @@ export function LoginForm(): React.ReactElement {
     setPhone("");
     setPin("");
     setPassword("");
-    setError("");
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    setError("");
-
-    if (mode === "parent") {
-      if (!isValidJapanPhone(phone)) {
-        setError(JAPAN_PHONE_VALIDATION_MESSAGE);
-        return;
-      }
-      if (pin.length < 4 || pin.length > 6) {
-        setError("PIN must be 4-6 digits");
-        return;
-      }
-    } else {
-      if (!isValidJapanPhone(phone)) {
-        setError(JAPAN_PHONE_VALIDATION_MESSAGE);
-        return;
-      }
-      if (!password) {
-        setError("Password is required");
-        return;
-      }
-    }
-
-    setIsLoading(true);
-
-    try {
-      const endpoint =
-        mode === "parent" ? API_ENDPOINTS.loginParent : API_ENDPOINTS.login;
-      const payload =
-        mode === "parent"
-          ? { phone, pin }
-          : { phone, password };
-
-      const response = await apiPost<LoginResponse>(endpoint, payload);
-      login(response.accessToken, response.expiresIn);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message || "Login failed. Please try again.");
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const formError = state && !state.ok ? state.formError : undefined;
+  const fieldErrors = state && !state.ok ? state.fieldErrors ?? {} : {};
+  const phoneError = fieldErrors.phone;
+  const passwordError = fieldErrors.password;
+  const pinError = fieldErrors.pin;
 
   return (
     <div className="space-y-6">
@@ -143,7 +102,7 @@ export function LoginForm(): React.ReactElement {
               role="tab"
               aria-selected={mode === "parent"}
               onClick={() => handleModeSwitch("parent")}
-              disabled={isLoading || isAuthLoading}
+              disabled={isPending || isAuthLoading}
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "parent"
@@ -159,7 +118,7 @@ export function LoginForm(): React.ReactElement {
               role="tab"
               aria-selected={mode === "staff"}
               onClick={() => handleModeSwitch("staff")}
-              disabled={isLoading || isAuthLoading}
+              disabled={isPending || isAuthLoading}
               className={[
                 "focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-[18px] px-3 text-sm font-semibold transition",
                 mode === "staff"
@@ -179,7 +138,9 @@ export function LoginForm(): React.ReactElement {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form action={formAction} className="space-y-4">
+        <input type="hidden" name="mode" value={mode} />
+
         <div className="space-y-2">
           <label htmlFor="phone" className="block text-sm font-medium text-foreground">
             Phone number
@@ -197,13 +158,14 @@ export function LoginForm(): React.ReactElement {
             </span>
             <input
               id="phone"
+              name="phone"
               type="tel"
               placeholder="Enter 11-digit number"
               value={phone}
               onChange={(e): void => handlePhoneChange(e.target.value)}
-              disabled={isLoading || isAuthLoading}
-              aria-invalid={!!error}
-              aria-describedby={error ? "form-error" : mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
+              disabled={isPending || isAuthLoading}
+              aria-invalid={!!(formError || phoneError)}
+              aria-describedby={phoneError ? "phone-error" : mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
               maxLength={JAPAN_PHONE_LOCAL_DIGITS}
               inputMode="numeric"
               pattern="[0-9]*"
@@ -213,14 +175,18 @@ export function LoginForm(): React.ReactElement {
               className="w-full flex-1 bg-transparent py-3 text-sm font-semibold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/90"
             />
           </div>
-          <p
-            id={mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
-            className="text-xs text-muted-foreground"
-          >
-            {mode === "parent"
-              ? "Use the phone number linked to your parent account."
-              : "Use the 11-digit number registered with the school."}
-          </p>
+          {phoneError ? (
+            <p id="phone-error" className="text-xs text-destructive">{phoneError}</p>
+          ) : (
+            <p
+              id={mode === "parent" ? "parent-phone-hint" : "staff-phone-hint"}
+              className="text-xs text-muted-foreground"
+            >
+              {mode === "parent"
+                ? "Use the phone number linked to your parent account."
+                : "Use the 11-digit number registered with the school."}
+            </p>
+          )}
         </div>
 
         {mode === "parent" ? (
@@ -230,20 +196,25 @@ export function LoginForm(): React.ReactElement {
             </label>
             <input
               id="pin"
+              name="pin"
               type="password"
               inputMode="numeric"
               placeholder="••••"
               value={pin}
               onChange={(e): void => handlePinChange(e.target.value)}
-              disabled={isLoading || isAuthLoading}
-              aria-invalid={!!error}
-              aria-describedby={error ? "form-error" : undefined}
+              disabled={isPending || isAuthLoading}
+              aria-invalid={!!(formError || pinError)}
+              aria-describedby={pinError ? "pin-error" : undefined}
               maxLength={6}
               pattern="[0-9]*"
               autoComplete="current-password"
               className={secureFieldClassName}
             />
-            <p className="text-xs text-muted-foreground">4–6 digits</p>
+            {pinError ? (
+              <p id="pin-error" className="text-xs text-destructive">{pinError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">4–6 digits</p>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -256,20 +227,21 @@ export function LoginForm(): React.ReactElement {
             <div className="relative">
               <input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e): void => handlePasswordChange(e.target.value)}
-                disabled={isLoading || isAuthLoading}
-                aria-invalid={!!error}
-                aria-describedby={error ? "form-error" : "staff-password-hint"}
+                onChange={(e): void => setPassword(e.target.value)}
+                disabled={isPending || isAuthLoading}
+                aria-invalid={!!(formError || passwordError)}
+                aria-describedby={passwordError ? "password-error" : "staff-password-hint"}
                 autoComplete="current-password"
                 className={secureFieldClassName}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                disabled={isLoading || isAuthLoading}
+                disabled={isPending || isAuthLoading}
                 className="focus-ring tap-target absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full px-3 text-sm font-semibold text-muted-foreground hover:bg-card/60 hover:text-foreground disabled:opacity-50"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -286,25 +258,29 @@ export function LoginForm(): React.ReactElement {
                 )}
               </button>
             </div>
-            <p id="staff-password-hint" className="text-xs text-muted-foreground">
-              Use your staff account password.
-            </p>
+            {passwordError ? (
+              <p id="password-error" className="text-xs text-destructive">{passwordError}</p>
+            ) : (
+              <p id="staff-password-hint" className="text-xs text-muted-foreground">
+                Use your staff account password.
+              </p>
+            )}
           </div>
         )}
 
-        {error && (
+        {formError && (
           <StatusBanner id="form-error" variant="error">
-            {error}
+            {formError}
           </StatusBanner>
         )}
 
         <Button
           type="submit"
           className="h-12 min-h-12 w-full"
-          disabled={isLoading || isAuthLoading}
+          disabled={isPending || isAuthLoading}
           size="default"
         >
-          {isLoading ? (
+          {isPending ? (
             <>
               <Spinner size="sm" />
               <span>Logging in...</span>

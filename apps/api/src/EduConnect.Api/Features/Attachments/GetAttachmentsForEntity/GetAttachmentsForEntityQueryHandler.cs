@@ -35,11 +35,17 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
             await EnsureNoticeAccessAsync(request.EntityId, cancellationToken);
         }
 
+        // Phase 5 — only expose attachments that passed the virus scan.
+        // Pending / Infected / ScanFailed rows are filtered out here so no
+        // code path downstream can hand out a presigned URL for an
+        // unscanned (or infected) object. Admin review of blocked
+        // attachments is a follow-up surface.
         var attachments = await _context.Attachments
             .Where(a =>
                 a.EntityId == request.EntityId &&
                 a.EntityType == request.EntityType &&
-                a.SchoolId == _currentUserService.SchoolId)
+                a.SchoolId == _currentUserService.SchoolId &&
+                a.Status == AttachmentStatus.Available)
             .OrderBy(a => a.UploadedAt)
             .ToListAsync(cancellationToken);
 

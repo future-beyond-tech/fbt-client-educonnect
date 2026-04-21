@@ -2,6 +2,8 @@ using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Features.Attachments;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
+using EduConnect.Api.Infrastructure.Database.Entities;
+using EduConnect.Api.Infrastructure.Services.Scanning;
 using MediatR;
 
 namespace EduConnect.Api.Features.Attachments.AttachFileToEntity;
@@ -10,15 +12,18 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
 {
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
+    private readonly IAttachmentScanQueue _scanQueue;
     private readonly ILogger<AttachFileToEntityCommandHandler> _logger;
 
     public AttachFileToEntityCommandHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
+        IAttachmentScanQueue scanQueue,
         ILogger<AttachFileToEntityCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _scanQueue = scanQueue;
         _logger = logger;
     }
 
@@ -111,6 +116,17 @@ public class AttachFileToEntityCommandHandler : IRequestHandler<AttachFileToEnti
         attachment.EntityType = request.EntityType;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Phase 5 — only enqueue a scan for attachments that haven't been
+        // processed yet. Re-attaching a previously-Available file (e.g. the
+        // client retries) must not reset state back to Pending.
+        if (attachment.Status == AttachmentStatus.Pending)
+        {
+            await _scanQueue.EnqueueAsync(attachment.Id, cancellationToken);
+            _logger.LogInformation(
+                "Attachment {AttachmentId} enqueued for virus scan",
+                attachment.Id);
+        }
 
         _logger.LogInformation(
             "Attachment {AttachmentId} linked to {EntityType} {EntityId}",

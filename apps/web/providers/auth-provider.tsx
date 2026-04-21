@@ -14,6 +14,7 @@ import type { AuthUser } from "@/lib/auth/jwt";
 import { getUserFromToken, secondsUntilExpiry } from "@/lib/auth/jwt";
 import { tokenStore } from "@/lib/auth/token-store";
 import { refreshAccessToken } from "@/lib/api-client";
+import { logoutAction } from "@/lib/actions/auth-actions";
 
 interface AuthContextType {
   token: string | null;
@@ -73,16 +74,11 @@ export function AuthProvider({
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    // Best-effort server logout; local state still cleared on failure.
-    const bearer = tokenStore.get();
+    // Server action: revokes refresh tokens on the backend and deletes the
+    // HttpOnly refresh cookie server-side. Best-effort — local state is
+    // still cleared below if the action throws.
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: bearer
-          ? { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" }
-          : { "Content-Type": "application/json" },
-      });
+      await logoutAction();
     } catch {
       // Ignore — we still clean up locally.
     }

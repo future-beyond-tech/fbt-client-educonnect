@@ -3,6 +3,7 @@ using System;
 using EduConnect.Api.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EduConnect.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260421155354_AddAttachmentScanStatus")]
+    partial class AddAttachmentScanStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -708,96 +711,6 @@ namespace EduConnect.Api.Migrations
                     b.ToTable("homework", null, t =>
                         {
                             t.HasCheckConstraint("chk_homework_status", "status IN ('Draft', 'PendingApproval', 'Published', 'Rejected')");
-                        });
-                });
-
-            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.HomeworkSubmissionEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("BodyText")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("body_text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("Feedback")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("feedback");
-
-                    b.Property<string>("Grade")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("grade");
-
-                    b.Property<DateTimeOffset?>("GradedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("graded_at");
-
-                    b.Property<Guid?>("GradedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("graded_by_id");
-
-                    b.Property<Guid>("HomeworkId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("homework_id");
-
-                    b.Property<Guid>("SchoolId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("school_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("StudentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("student_id");
-
-                    b.Property<DateTimeOffset>("SubmittedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("submitted_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.HasKey("Id")
-                        .HasName("pk_homework_submissions");
-
-                    b.HasIndex("GradedById")
-                        .HasDatabaseName("ix_homework_submissions_graded_by_id");
-
-                    b.HasIndex("HomeworkId")
-                        .HasDatabaseName("ix_homework_submissions_homework_id");
-
-                    b.HasIndex("SchoolId")
-                        .HasDatabaseName("ix_homework_submissions_school_id");
-
-                    b.HasIndex("StudentId")
-                        .HasDatabaseName("ix_homework_submissions_student_id");
-
-                    b.HasIndex("HomeworkId", "StudentId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_homework_submissions_homework_student");
-
-                    b.ToTable("homework_submissions", null, t =>
-                        {
-                            t.HasCheckConstraint("chk_homework_submission_status", "status IN ('Submitted', 'Late', 'Graded', 'Returned')");
                         });
                 });
 
@@ -1826,44 +1739,6 @@ namespace EduConnect.Api.Migrations
                     b.Navigation("RejectedBy");
 
                     b.Navigation("School");
-                });
-
-            modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.HomeworkSubmissionEntity", b =>
-                {
-                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.UserEntity", "GradedBy")
-                        .WithMany()
-                        .HasForeignKey("GradedById")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_homework_submissions_users_graded_by_id");
-
-                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.HomeworkEntity", "Homework")
-                        .WithMany()
-                        .HasForeignKey("HomeworkId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_homework_submissions_homework_homework_id");
-
-                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.SchoolEntity", "School")
-                        .WithMany()
-                        .HasForeignKey("SchoolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_homework_submissions_schools_school_id");
-
-                    b.HasOne("EduConnect.Api.Infrastructure.Database.Entities.StudentEntity", "Student")
-                        .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_homework_submissions_students_student_id");
-
-                    b.Navigation("GradedBy");
-
-                    b.Navigation("Homework");
-
-                    b.Navigation("School");
-
-                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("EduConnect.Api.Infrastructure.Database.Entities.LeaveApplicationEntity", b =>
