@@ -1,14 +1,25 @@
 namespace EduConnect.Api.Infrastructure.Services.Scanning;
 
 /// <summary>
-/// Dev/CI stand-in for a real virus scanner. Consumes the stream (so
-/// callers can't tell the difference from a real scan) and returns Clean.
-/// Logs at Warning so production never silently runs with this scanner
-/// enabled without leaving evidence.
+/// Dev/CI stand-in for a real virus scanner. Drains the stream (so callers
+/// can't distinguish it from a real scan) and returns an Error verdict
+/// with threat name <see cref="NoOpThreatName"/>.
+///
+/// Fail-closed: every file routed through this scanner lands in
+/// <c>AttachmentStatus.ScanFailed</c> via the worker's error branch, so no
+/// presigned URL is ever handed out for an unscanned object. Developers
+/// must provision clamd (or stand up the docker-compose scanner) to clear
+/// uploads for download. Startup registration refuses to wire this scanner
+/// in a Production environment — see <c>AttachmentScannerRegistration</c>.
 /// </summary>
 public sealed class NoOpAttachmentScanner : IAttachmentScanner
 {
     public const string EngineName = "noop";
+
+    // Surfaces on the attachment row's ThreatName column and in logs so
+    // operators can distinguish a real ClamAV error from a dev-environment
+    // misconfiguration.
+    public const string NoOpThreatName = "NOOP_SCANNER_DISABLED";
 
     private readonly ILogger<NoOpAttachmentScanner> _logger;
 
@@ -26,9 +37,9 @@ public sealed class NoOpAttachmentScanner : IAttachmentScanner
         }
 
         _logger.LogWarning(
-            "NoOpAttachmentScanner is active — uploaded content was NOT scanned. " +
-            "Set ClamAv:Enabled=true in production.");
+            "NoOpAttachmentScanner is active — no virus scan performed. " +
+            "File will be marked ScanFailed. Set ClamAv:Enabled=true to clear uploads.");
 
-        return new ScanResult(ScanVerdict.Clean, EngineName);
+        return new ScanResult(ScanVerdict.Error, EngineName, NoOpThreatName);
     }
 }

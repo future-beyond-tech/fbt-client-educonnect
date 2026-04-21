@@ -34,6 +34,10 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
         {
             await EnsureNoticeAccessAsync(request.EntityId, cancellationToken);
         }
+        else if (request.EntityType == "homework_submission")
+        {
+            await EnsureHomeworkSubmissionAccessAsync(request.EntityId, cancellationToken);
+        }
 
         // Phase 5 — only expose attachments that passed the virus scan.
         // Pending / Infected / ScanFailed rows are filtered out here so no
@@ -211,5 +215,75 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
         }
 
         throw new ForbiddenException("You do not have access to these notice attachments.");
+    }
+
+    private async Task EnsureHomeworkSubmissionAccessAsync(Guid submissionId, CancellationToken cancellationToken)
+    {
+        var submission = await _context.HomeworkSubmissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                s => s.Id == submissionId &&
+                     s.SchoolId == _currentUserService.SchoolId,
+                cancellationToken);
+
+        if (submission is null)
+        {
+            throw new NotFoundException("HomeworkSubmission", submissionId.ToString());
+        }
+
+        if (_currentUserService.Role == "Admin")
+        {
+            return;
+        }
+
+        if (_currentUserService.Role == "Parent")
+        {
+            var isLinked = await _context.ParentStudentLinks
+                .AnyAsync(link =>
+                    link.SchoolId == _currentUserService.SchoolId &&
+                    link.ParentId == _currentUserService.UserId &&
+                    link.StudentId == submission.StudentId,
+                    cancellationToken);
+
+            if (isLinked)
+            {
+                return;
+            }
+
+            throw new ForbiddenException("You do not have access to these submission attachments.");
+        }
+
+        if (_currentUserService.Role == "Teacher")
+        {
+            var homework = await _context.Homeworks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    h => h.Id == submission.HomeworkId &&
+                         h.SchoolId == _currentUserService.SchoolId,
+                    cancellationToken);
+
+            if (homework is not null)
+            {
+                if (homework.AssignedById == _currentUserService.UserId)
+                {
+                    return;
+                }
+
+                var assignedClassIds = await _context.TeacherClassAssignments
+                    .Where(assignment =>
+                        assignment.SchoolId == _currentUserService.SchoolId &&
+                        assignment.TeacherId == _currentUserService.UserId)
+                    .Select(assignment => assignment.ClassId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
+                if (assignedClassIds.Contains(homework.ClassId))
+                {
+                    return;
+                }
+            }
+        }
+
+        throw new ForbiddenException("You do not have access to these submission attachments.");
     }
 }
