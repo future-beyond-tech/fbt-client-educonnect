@@ -35,6 +35,17 @@ function newSubjectRow(): SubjectRow {
   };
 }
 
+// .NET's default System.Text.Json TimeOnly converter expects "HH:mm:ss".
+// <input type="time"> emits "HH:mm", which makes the API body parse fail with
+// "Failed to read parameter ... as JSON." Pad on submit to keep the form UX
+// simple while staying compatible with the API contract.
+function toApiTime(value: string): string {
+  if (!value) return value;
+  // Already "HH:mm:ss" or longer (some browsers include seconds)
+  if (value.length >= 8) return value;
+  return `${value}:00`;
+}
+
 function defaultAcademicYear(): string {
   // House convention is "2025-26". April onwards is a new academic year in
   // Indian schools, so roll over after March.
@@ -158,6 +169,8 @@ export default function TeacherExamCreatePage(): React.ReactElement {
       subjects: rows.map(({ _key, ...rest }) => ({
         ...rest,
         subject: rest.subject.trim(),
+        startTime: toApiTime(rest.startTime),
+        endTime: toApiTime(rest.endTime),
         room: rest.room?.trim() || null,
       })),
     };
