@@ -81,6 +81,7 @@ public class LoginParentCommandHandler : IRequestHandler<LoginParentCommand, Log
         {
             Id = refreshTokenId,
             UserId = user.Id,
+            SchoolId = user.SchoolId,
             TokenHash = refreshTokenHash,
             ExpiresAt = refreshTokenExpiresAt,
             IsRevoked = false,

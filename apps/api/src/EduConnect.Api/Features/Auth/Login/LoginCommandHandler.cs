@@ -79,6 +79,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
         {
             Id = refreshTokenId,
             UserId = user.Id,
+            SchoolId = user.SchoolId,
             TokenHash = refreshTokenHash,
             ExpiresAt = refreshTokenExpiresAt,
             IsRevoked = false,

@@ -133,6 +133,7 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
         {
             Id = newRefreshTokenId,
             UserId = user.Id,
+            SchoolId = user.SchoolId,
             TokenHash = newRefreshTokenHash,
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
             IsRevoked = false,

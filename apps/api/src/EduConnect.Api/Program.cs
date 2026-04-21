@@ -61,11 +61,14 @@ var jwtAudience = builder.Configuration["JWT_AUDIENCE"];
 var databaseConnectionString = DatabaseConnectionStringResolver.Resolve(databaseUrl);
 
 builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Database.Interceptors.AuditableEntityInterceptor>();
+builder.Services.AddScoped<EduConnect.Api.Infrastructure.Database.Interceptors.TenantConnectionInterceptor>();
 
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 {
     options.UseNpgsql(databaseConnectionString);
-    options.AddInterceptors(sp.GetRequiredService<EduConnect.Api.Infrastructure.Database.Interceptors.AuditableEntityInterceptor>());
+    options.AddInterceptors(
+        sp.GetRequiredService<EduConnect.Api.Infrastructure.Database.Interceptors.AuditableEntityInterceptor>(),
+        sp.GetRequiredService<EduConnect.Api.Infrastructure.Database.Interceptors.TenantConnectionInterceptor>());
 });
 
 builder.Services.AddMediatR(cfg =>
