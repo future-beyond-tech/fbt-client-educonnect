@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { FilterChip } from "@/components/ui/active-filter-chips";
 
 /**
  * Single source of truth for the staff filter bar.
@@ -121,3 +122,59 @@ export const teacherSortLabels: Record<TeacherSort, string> = {
   classesAsc: "Fewest classes",
   createdDesc: "Recently added",
 };
+
+export interface TeacherChipRemovalHandlers {
+  removeSearch: () => void;
+  removeRole: () => void;
+  removeSubject: (subject: string) => void;
+  removeLoad: () => void;
+  removeSort: () => void;
+}
+
+/**
+ * Projects the current filter into the list of chips rendered by
+ * `<ActiveFilterChips />`. Keeping the chip build logic in the schema file
+ * so the filter shape and its chip presentation stay co-located.
+ */
+export function buildTeacherFilterChips(
+  filter: TeacherFilter,
+  handlers: TeacherChipRemovalHandlers
+): FilterChip[] {
+  const chips: FilterChip[] = [];
+  if (filter.q.trim()) {
+    chips.push({
+      key: "search",
+      label: `Search: ${filter.q.trim()}`,
+      onRemove: handlers.removeSearch,
+    });
+  }
+  if (filter.role !== "all") {
+    chips.push({
+      key: "role",
+      label: `Role: ${filter.role === "teacher" ? "Teachers" : "Admins"}`,
+      onRemove: handlers.removeRole,
+    });
+  }
+  for (const subject of filter.subjects) {
+    chips.push({
+      key: `subject:${subject}`,
+      label: `Subject: ${subject}`,
+      onRemove: () => handlers.removeSubject(subject),
+    });
+  }
+  if (filter.load) {
+    chips.push({
+      key: "load",
+      label: `Class-load: ${teacherClassLoadLabels[filter.load]}`,
+      onRemove: handlers.removeLoad,
+    });
+  }
+  if (filter.sort !== "nameAsc") {
+    chips.push({
+      key: "sort",
+      label: `Sort: ${teacherSortLabels[filter.sort]}`,
+      onRemove: handlers.removeSort,
+    });
+  }
+  return chips;
+}

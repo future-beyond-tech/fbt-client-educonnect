@@ -5,15 +5,26 @@ import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface SubjectMultiSelectProps {
-  /** All subjects available in the tenant, sorted alphabetically. */
-  options: readonly string[];
-  /** Currently selected subjects (subset of options). */
+export interface MultiSelectOption {
+  /** Value stored in the `value` array and returned via `onChange`. */
+  value: string;
+  /** Human-readable label shown in the list. */
+  label: string;
+}
+
+export interface MultiSelectPopoverProps {
+  /** Available options, sorted in the order they should appear. */
+  options: readonly MultiSelectOption[];
+  /** Currently selected option values (subset of `options[].value`). */
   value: readonly string[];
-  /** Called with the new value whenever selection changes. */
+  /** Called with the new value array whenever selection changes (sorted by label). */
   onChange: (next: string[]) => void;
   /** Visible label on the trigger button when nothing is selected. */
   placeholder?: string;
+  /** Placeholder shown inside the in-menu search input. */
+  searchPlaceholder?: string;
+  /** Custom ARIA label; defaults to `placeholder`. */
+  ariaLabel?: string;
   /** Disable when the options list is still loading. */
   disabled?: boolean;
 }
@@ -30,13 +41,15 @@ export interface SubjectMultiSelectProps {
  * The visible search input filters the option list; the currently focused
  * option is tracked with a roving tabindex on the options list below.
  */
-export function SubjectMultiSelect({
+export function MultiSelectPopover({
   options,
   value,
   onChange,
-  placeholder = "Subjects",
+  placeholder = "Select",
+  searchPlaceholder = "Search...",
+  ariaLabel,
   disabled,
-}: SubjectMultiSelectProps): React.ReactElement {
+}: MultiSelectPopoverProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [activeIndex, setActiveIndex] = React.useState(0);
@@ -45,7 +58,7 @@ export function SubjectMultiSelect({
   const filtered = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return options;
-    return options.filter((o) => o.toLowerCase().includes(needle));
+    return options.filter((o) => o.label.toLowerCase().includes(needle));
   }, [options, query]);
 
   // Keep activeIndex in range when the filter shrinks the list.
@@ -56,13 +69,18 @@ export function SubjectMultiSelect({
   }, [filtered.length, activeIndex]);
 
   const toggle = React.useCallback(
-    (subject: string): void => {
+    (optionValue: string): void => {
       const set = new Set(value);
-      if (set.has(subject)) set.delete(subject);
-      else set.add(subject);
-      onChange(Array.from(set).sort());
+      if (set.has(optionValue)) set.delete(optionValue);
+      else set.add(optionValue);
+      // Preserve the option order defined by the caller (sorted-by-label
+      // upstream). Sorting the raw value strings would break label ordering.
+      const ordered = options
+        .map((o) => o.value)
+        .filter((v) => set.has(v));
+      onChange(ordered);
     },
-    [value, onChange]
+    [value, options, onChange]
   );
 
   const clear = React.useCallback((): void => {
@@ -91,7 +109,7 @@ export function SubjectMultiSelect({
       case "Enter":
       case " ":
         event.preventDefault();
-        toggle(filtered[activeIndex]!);
+        toggle(filtered[activeIndex]!.value);
         break;
       default:
         break;
@@ -150,7 +168,7 @@ export function SubjectMultiSelect({
             // Focus the search input, not the content root.
             e.preventDefault();
             const input = (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>(
-              "input[data-subject-search]"
+              "input[data-ms-search]"
             );
             input?.focus();
           }}
@@ -162,13 +180,13 @@ export function SubjectMultiSelect({
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               />
               <input
-                data-subject-search
+                data-ms-search
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onSearchKeyDown}
-                placeholder="Search subjects..."
-                aria-label="Search subjects"
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
                 className="focus-ring h-9 w-full rounded-[14px] border border-border/60 bg-card/70 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -177,28 +195,28 @@ export function SubjectMultiSelect({
             ref={listRef}
             tabIndex={-1}
             role="listbox"
-            aria-label={placeholder}
+            aria-label={ariaLabel ?? placeholder}
             aria-multiselectable="true"
             onKeyDown={onListKeyDown}
             className="max-h-72 overflow-y-auto p-1 focus:outline-none"
           >
             {filtered.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                No subjects match &ldquo;{query}&rdquo;.
+                No matches for &ldquo;{query}&rdquo;.
               </p>
             ) : (
-              filtered.map((subject, index) => {
-                const isSelected = value.includes(subject);
+              filtered.map((option, index) => {
+                const isSelected = value.includes(option.value);
                 const isActive = index === activeIndex;
                 return (
                   <button
-                    key={subject}
+                    key={option.value}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
                     tabIndex={-1}
                     onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => toggle(subject)}
+                    onClick={() => toggle(option.value)}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors",
                       isActive
@@ -217,7 +235,7 @@ export function SubjectMultiSelect({
                     >
                       {isSelected && <Check className="h-3 w-3" />}
                     </span>
-                    <span className="truncate">{subject}</span>
+                    <span className="truncate">{option.label}</span>
                   </button>
                 );
               })

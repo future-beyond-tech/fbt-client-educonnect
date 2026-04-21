@@ -6,16 +6,17 @@ import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import {
+  buildTeacherFilterChips,
   defaultTeacherFilter,
   type TeacherFilter,
   type TeacherRoleFilter,
 } from "@/lib/teachers/filter-schema";
 import { cn } from "@/lib/utils";
-import { ActiveFilterChips } from "./active-filter-chips";
+import { ActiveFilterChips } from "@/components/ui/active-filter-chips";
+import { MultiSelectPopover } from "@/components/ui/multi-select-popover";
 import { ClassLoadSelect } from "./class-load-select";
 import { RolePills } from "./role-pills";
 import { SortSelect } from "./sort-select";
-import { SubjectMultiSelect } from "./subject-multi-select";
 
 export interface TeacherFilterBarProps {
   filters: TeacherFilter;
@@ -109,11 +110,12 @@ export function TeacherFilterBar({
     <>
       <RolePills value={filters.role} onChange={setRole} counts={roleCounts} />
       <div className="flex flex-wrap items-center gap-2">
-        <SubjectMultiSelect
-          options={subjectOptions}
+        <MultiSelectPopover
+          options={subjectOptions.map((s) => ({ value: s, label: s }))}
           value={filters.subjects}
           onChange={setSubjects}
           placeholder="Subjects"
+          searchPlaceholder="Search subjects..."
           disabled={subjectOptionsLoading && subjectOptions.length === 0}
         />
         <ClassLoadSelect value={filters.load} onChange={setLoad} />
@@ -162,17 +164,17 @@ export function TeacherFilterBar({
       </div>
 
       <ActiveFilterChips
-        filters={filters}
-        onRemoveSearch={() => {
-          onSearchChange("");
-          onFilterChange("q", "");
-        }}
-        onRemoveRole={() => onFilterChange("role", defaultTeacherFilter.role)}
-        onRemoveSubject={(subject) =>
-          setSubjects(filters.subjects.filter((s) => s !== subject))
-        }
-        onRemoveLoad={() => onFilterChange("load", null)}
-        onRemoveSort={() => onFilterChange("sort", defaultTeacherFilter.sort)}
+        chips={buildTeacherFilterChips(filters, {
+          removeSearch: () => {
+            onSearchChange("");
+            onFilterChange("q", "");
+          },
+          removeRole: () => onFilterChange("role", defaultTeacherFilter.role),
+          removeSubject: (subject) =>
+            setSubjects(filters.subjects.filter((s) => s !== subject)),
+          removeLoad: () => onFilterChange("load", null),
+          removeSort: () => onFilterChange("sort", defaultTeacherFilter.sort),
+        })}
         onClearAll={() => {
           onSearchChange("");
           onClearAll();
