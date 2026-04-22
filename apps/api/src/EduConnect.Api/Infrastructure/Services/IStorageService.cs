@@ -3,6 +3,24 @@ namespace EduConnect.Api.Infrastructure.Services;
 public interface IStorageService
 {
     /// <summary>
+    /// Verifies the configured upload target is reachable before the API
+    /// hands a presigned browser-upload URL back to the client.
+    /// </summary>
+    Task EnsureUploadTargetAvailableAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads an object body to storage from the server side. Used as a
+    /// same-origin fallback when browsers cannot PUT to presigned URLs
+    /// because the storage origin is blocked by CORS or similar policy.
+    /// </summary>
+    Task UploadObjectAsync(
+        string key,
+        Stream content,
+        string contentType,
+        long sizeBytes,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Generates a presigned URL for uploading a file directly to storage.
     /// The signed request pins <c>Content-Length</c> to <paramref name="sizeBytes"/>
     /// so the storage backend rejects uploads whose actual body size

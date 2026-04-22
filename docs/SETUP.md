@@ -120,6 +120,7 @@ The current startup contract is split across the frontend and backend.
 | `S3_SERVICE_URL` | API | Use for S3-compatible storage such as R2 or MinIO |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | API | Used with `S3_SERVICE_URL` |
 | `AWS_REGION` | API | Used when talking to AWS S3 directly; defaults to `ap-south-1` |
+| `NEXT_PUBLIC_ATTACHMENT_UPLOAD_ORIGINS` | web build | Comma-separated storage origins allowed by CSP for presigned browser uploads; useful when the web build cannot read `S3_SERVICE_URL` directly |
 
 Notes:
 

@@ -31,6 +31,10 @@ export interface RequestUploadUrlResponse {
   attachmentId: string;
 }
 
+export interface UploadAttachmentContentResponse {
+  message: string;
+}
+
 export interface AttachFileRequest {
   attachmentId: string;
   entityId: string;
