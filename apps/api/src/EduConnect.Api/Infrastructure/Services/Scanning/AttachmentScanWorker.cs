@@ -92,6 +92,7 @@ public sealed class AttachmentScanWorker : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storage = scope.ServiceProvider.GetRequiredService<IStorageService>();
         var scanner = scope.ServiceProvider.GetRequiredService<IAttachmentScanner>();
+        var blockedNotifier = scope.ServiceProvider.GetRequiredService<IAttachmentBlockedNotifier>();
 
         // IgnoreQueryFilters: we don't have a tenant context in the worker
         // scope, so the EF global query filter would otherwise return
@@ -132,8 +133,10 @@ public sealed class AttachmentScanWorker : BackgroundService
                 "Could not stream attachment {AttachmentId} from storage for scanning",
                 attachmentId);
             attachment.Status = AttachmentStatus.ScanFailed;
+            attachment.ThreatName = "storage_open_failed";
             attachment.ScannedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
             return;
         }
 
@@ -164,6 +167,7 @@ public sealed class AttachmentScanWorker : BackgroundService
             }
 
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.Infected, attachment, ct);
             return;
         }
 
@@ -199,6 +203,7 @@ public sealed class AttachmentScanWorker : BackgroundService
                 attachment.ThreatName = ex.GetType().Name;
                 attachment.ScannedAt = DateTimeOffset.UtcNow;
                 await db.SaveChangesAsync(ct);
+                await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
                 return;
             }
         }
@@ -218,6 +223,7 @@ public sealed class AttachmentScanWorker : BackgroundService
             };
             attachment.ScannedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
             return;
         }
 
@@ -262,6 +268,15 @@ public sealed class AttachmentScanWorker : BackgroundService
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (attachment.Status == AttachmentStatus.Infected)
+        {
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.Infected, attachment, ct);
+        }
+        else if (attachment.Status == AttachmentStatus.ScanFailed)
+        {
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
+        }
     }
 
     // Transient = "the scanner could not be reached or didn't reply in

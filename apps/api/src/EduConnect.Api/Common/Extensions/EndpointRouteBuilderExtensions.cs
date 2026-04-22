@@ -68,6 +68,7 @@ using EduConnect.Api.Features.Push.UnregisterPushSubscription;
 using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
+using EduConnect.Api.Features.Attachments.DownloadAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 using EduConnect.Api.Features.Exams.CreateExam;
 using EduConnect.Api.Features.Exams.UpdateExam;
@@ -273,9 +274,12 @@ public static class EndpointRouteBuilderExtensions
             return result;
         });
 
-        group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle).WithName("RequestUploadUrlV2");
+        group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle)
+            .WithName("RequestUploadUrlV2")
+            .RequireRateLimiting("attachments-upload-url");
         group.MapPost("/attach", AttachFileToEntityEndpoint.Handle).WithName("AttachFileToEntity");
         group.MapGet("/", GetAttachmentsForEntityEndpoint.Handle).WithName("GetAttachmentsForEntity");
+        group.MapGet("/{id:guid}/download", DownloadAttachmentEndpoint.Handle).WithName("DownloadAttachment");
         group.MapDelete("/{id}", DeleteAttachmentEndpoint.Handle).WithName("DeleteAttachment");
     }
 

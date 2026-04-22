@@ -5,6 +5,7 @@ using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using EduConnect.Api.Infrastructure.Services.Scanning;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -38,7 +39,8 @@ public class AttachmentScanFlowTests
         await using var readContext = new AppDbContext(options, teacher);
         var handler = new GetAttachmentsForEntityQueryHandler(
             readContext, teacher, storage.Object,
-            Options.Create(new StorageOptions()));
+            Options.Create(new StorageOptions()),
+            new HttpContextAccessor());
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -111,7 +113,8 @@ public class AttachmentScanFlowTests
         await using var readContext = new AppDbContext(options, parent);
         var handler = new GetAttachmentsForEntityQueryHandler(
             readContext, parent, storage.Object,
-            Options.Create(new StorageOptions()));
+            Options.Create(new StorageOptions()),
+            new HttpContextAccessor());
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
