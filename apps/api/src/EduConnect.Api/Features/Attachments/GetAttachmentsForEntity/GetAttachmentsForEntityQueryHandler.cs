@@ -5,27 +5,39 @@ using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 
 public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachmentsForEntityQuery, List<AttachmentDto>>
 {
+    // Compliance-grade audit logging is required for downloads of student
+    // submissions and official notices, so the response routes those
+    // download URLs through the API's audit-logging redirect endpoint.
+    // Homework attachments stay on direct presigned URLs — the surface is
+    // teacher-facing and per-download auditing isn't worth the extra hop.
+    private static readonly HashSet<string> EntityTypesRequiringAuditRedirect =
+        new(StringComparer.OrdinalIgnoreCase) { "homework_submission", "notice" };
+
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly IStorageService _storageService;
     private readonly StorageOptions _storageOptions;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public GetAttachmentsForEntityQueryHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
         IStorageService storageService,
-        IOptions<StorageOptions> storageOptions)
+        IOptions<StorageOptions> storageOptions,
+        IHttpContextAccessor httpContextAccessor)
     {
         _context = context;
         _currentUserService = currentUserService;
         _storageService = storageService;
         _storageOptions = storageOptions.Value;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<List<AttachmentDto>> Handle(GetAttachmentsForEntityQuery request, CancellationToken cancellationToken)
@@ -71,18 +83,22 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
 
         var result = new List<AttachmentDto>(attachments.Count);
 
+        var routeThroughAudit = EntityTypesRequiringAuditRedirect.Contains(request.EntityType);
+
         foreach (var attachment in attachments)
         {
             string? downloadUrl = null;
             if (attachment.Status == AttachmentStatus.Available)
             {
-                downloadUrl = await _storageService.GeneratePresignedDownloadUrlAsync(
-                    attachment.StorageKey,
-                    TimeSpan.FromMinutes(_storageOptions.PresignedDownloadExpiryMinutes),
-                    attachment.FileName,
-                    attachment.ContentType,
-                    AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
-                    cancellationToken);
+                downloadUrl = routeThroughAudit
+                    ? BuildAuditRedirectUrl(attachment.Id)
+                    : await _storageService.GeneratePresignedDownloadUrlAsync(
+                        attachment.StorageKey,
+                        TimeSpan.FromMinutes(_storageOptions.PresignedDownloadExpiryMinutes),
+                        attachment.FileName,
+                        attachment.ContentType,
+                        AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
+                        cancellationToken);
             }
 
             result.Add(new AttachmentDto(
@@ -100,6 +116,22 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
 
     private static bool CanViewInProgressScans(string? role) =>
         role == "Admin" || role == "Teacher";
+
+    private string BuildAuditRedirectUrl(Guid attachmentId)
+    {
+        // Build an absolute URL so the FE's anchor `href` resolves to the
+        // API origin and not to whatever app origin the user is currently
+        // on. Falls back to a relative URL when there's no HttpContext
+        // (e.g. running from a background hostedservice scope), which
+        // shouldn't happen for the GET handler but keeps the code safe.
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request is null)
+        {
+            return $"/api/attachments/{attachmentId}/download";
+        }
+
+        return $"{request.Scheme}://{request.Host}/api/attachments/{attachmentId}/download";
+    }
 
     private async Task EnsureHomeworkAccessAsync(Guid homeworkId, CancellationToken cancellationToken)
     {

@@ -211,6 +211,7 @@ public class AttachmentScanRetryTests
             {
                 if (serviceType == typeof(IStorageService)) return _storage;
                 if (serviceType == typeof(IAttachmentScanner)) return _scanner;
+                if (serviceType == typeof(IAttachmentBlockedNotifier)) return NoOpAttachmentBlockedNotifier.Instance;
                 if (serviceType == typeof(AppDbContext))
                 {
                     _ctx ??= new AppDbContext(_options);
