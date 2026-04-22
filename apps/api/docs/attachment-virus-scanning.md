@@ -28,11 +28,12 @@ time).
 
 ```
 Client                          API                            Storage
-  │── POST request-upload-url ──▶│
+  │── POST request-upload-url-v2 ▶│
   │                              │── INSERT attachments (Pending)
-  │◀── presigned PUT URL ────────│
+  │◀── { uploadUrl, attachmentId }│   (no storageKey — client PUTs directly)
   │── PUT file ──────────────────────────────────────────────▶│
   │── POST attach ───────────────▶│
+  │                              │── HeadObject(key) — verify size/type
   │                              │── UPDATE attachments (linked)
   │                              │── ChannelAttachmentScanQueue.Enqueue(id)
   │◀── 200 OK ───────────────────│
@@ -40,14 +41,31 @@ Client                          API                            Storage
                                   │       (worker)              │
                                   │── GetObject(key) ──────────▶│
                                   │◀── stream ──────────────────│
+                                  │── magic-byte pre-check
                                   │── INSTREAM to clamd ──▶ reply
                                   │── UPDATE attachments (Available|Infected|ScanFailed)
                                   │── (if Infected) DeleteObject(key) ─▶│
 ```
 
-Until the worker sets `status=Available`, `GetAttachmentsForEntity`
-refuses to hand out a presigned download URL for the row — so the
-parent-facing download path can never point at an unscanned byte.
+`GetAttachmentsForEntity` only mints a presigned download URL for rows
+with `status=Available` — so the read path can never point at an
+unscanned (or infected) byte. From Phase 4 (frontend UX parity), admins
+and teachers also see Pending and ScanFailed rows in the response (with
+a `null` `downloadUrl`) so the UI can render "scanning…" / "blocked"
+badges; parents and other roles still see only Available rows.
+
+### V2 upload response shape
+
+`POST /api/attachments/request-upload-url-v2` returns:
+
+```json
+{ "uploadUrl": "https://…", "attachmentId": "<guid>" }
+```
+
+There is no `storageKey` field — the client uses the presigned URL
+directly to PUT the file, then references the attachment by
+`attachmentId` when calling `/attach`. The storage key is an
+implementation detail of the API.
 
 ## Deploying ClamAV
 

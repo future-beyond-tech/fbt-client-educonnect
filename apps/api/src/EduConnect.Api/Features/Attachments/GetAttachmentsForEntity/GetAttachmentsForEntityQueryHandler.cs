@@ -39,17 +39,29 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
             await EnsureHomeworkSubmissionAccessAsync(request.EntityId, cancellationToken);
         }
 
-        // Phase 5 — only expose attachments that passed the virus scan.
-        // Pending / Infected / ScanFailed rows are filtered out here so no
-        // code path downstream can hand out a presigned URL for an
-        // unscanned (or infected) object. Admin review of blocked
-        // attachments is a follow-up surface.
+        // Status visibility (Phase 4 remediation):
+        //  - Admin / Teacher: see Available + Pending + ScanFailed so the
+        //    UI can show "scanning…" / "blocked" badges. Infected rows
+        //    stay hidden — admins are notified out-of-band (Phase 6).
+        //  - Parent / everyone else: only Available, so a child- or
+        //    parent-facing surface never hints at a scan in progress.
+        // Presigned URLs are only minted for Available rows regardless of
+        // role, so the read path can never hand out an unscanned object.
+        var visibleStatuses = CanViewInProgressScans(_currentUserService.Role)
+            ? new[]
+            {
+                AttachmentStatus.Available,
+                AttachmentStatus.Pending,
+                AttachmentStatus.ScanFailed,
+            }
+            : new[] { AttachmentStatus.Available };
+
         var attachments = await _context.Attachments
             .Where(a =>
                 a.EntityId == request.EntityId &&
                 a.EntityType == request.EntityType &&
                 a.SchoolId == _currentUserService.SchoolId &&
-                a.Status == AttachmentStatus.Available)
+                visibleStatuses.Contains(a.Status))
             .OrderBy(a => a.UploadedAt)
             .ToListAsync(cancellationToken);
 
@@ -57,13 +69,17 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
 
         foreach (var attachment in attachments)
         {
-            var downloadUrl = await _storageService.GeneratePresignedDownloadUrlAsync(
-                attachment.StorageKey,
-                TimeSpan.FromHours(1),
-                attachment.FileName,
-                attachment.ContentType,
-                AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
-                cancellationToken);
+            string? downloadUrl = null;
+            if (attachment.Status == AttachmentStatus.Available)
+            {
+                downloadUrl = await _storageService.GeneratePresignedDownloadUrlAsync(
+                    attachment.StorageKey,
+                    TimeSpan.FromHours(1),
+                    attachment.FileName,
+                    attachment.ContentType,
+                    AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
+                    cancellationToken);
+            }
 
             result.Add(new AttachmentDto(
                 attachment.Id,
@@ -71,11 +87,15 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
                 attachment.ContentType,
                 attachment.SizeBytes,
                 downloadUrl,
-                attachment.UploadedAt));
+                attachment.UploadedAt,
+                attachment.Status));
         }
 
         return result;
     }
+
+    private static bool CanViewInProgressScans(string? role) =>
+        role == "Admin" || role == "Teacher";
 
     private async Task EnsureHomeworkAccessAsync(Guid homeworkId, CancellationToken cancellationToken)
     {

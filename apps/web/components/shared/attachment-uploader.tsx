@@ -22,6 +22,7 @@ import {
   getAcceptedFiles,
   getAttachmentEmptyLabel,
   getAttachmentHelperText,
+  getAttachmentTypeRejectionMessage,
   isAllowedContentType,
   isPdfAttachment,
   isWordAttachment,
@@ -222,12 +223,7 @@ export function AttachmentUploader({
 
       for (const file of filesToUpload) {
         if (!isAllowedContentType(entityType, file.type)) {
-          addFileError(
-            file,
-            entityType === "homework"
-              ? "Only PDF and Word documents are allowed."
-              : "Only JPEG, PNG, WebP, and PDF files are allowed."
-          );
+          addFileError(file, getAttachmentTypeRejectionMessage(entityType));
           continue;
         }
 
@@ -266,12 +262,7 @@ export function AttachmentUploader({
           return;
         }
 
-        addFileError(
-          file,
-          entityType === "homework"
-            ? "Only PDF and Word documents are allowed."
-            : "Only JPEG, PNG, WebP, and PDF files are allowed."
-        );
+        addFileError(file, getAttachmentTypeRejectionMessage(entityType));
       });
     },
     [addFileError, entityType]
