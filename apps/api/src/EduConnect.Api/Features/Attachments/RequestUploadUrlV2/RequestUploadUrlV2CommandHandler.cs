@@ -63,6 +63,7 @@ public class RequestUploadUrlV2CommandHandler : IRequestHandler<RequestUploadUrl
         var uploadUrl = await _storageService.GeneratePresignedUploadUrlAsync(
             storageKey,
             request.ContentType,
+            request.SizeBytes,
             TimeSpan.FromMinutes(_storageOptions.PresignedUploadExpiryMinutes),
             cancellationToken);
 

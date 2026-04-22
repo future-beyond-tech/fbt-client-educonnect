@@ -6,6 +6,8 @@ using EduConnect.Api.Infrastructure.Services;
 using EduConnect.Api.Infrastructure.Services.Scanning;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -129,7 +131,7 @@ public class AttachmentScanFlowTests
     }
 
     [Fact]
-    public async Task NoOpAttachmentScanner_returns_clean_and_drains_stream()
+    public async Task NoOpAttachmentScanner_fails_closed_with_Error_verdict_and_drains_stream()
     {
         var scanner = new NoOpAttachmentScanner(NullLogger<NoOpAttachmentScanner>.Instance);
         var payload = new byte[4096];
@@ -138,10 +140,56 @@ public class AttachmentScanFlowTests
 
         var result = await scanner.ScanAsync(stream);
 
-        result.IsClean.Should().BeTrue();
+        result.IsClean.Should().BeFalse("the dev/CI stub must not silently approve uploads");
+        result.IsError.Should().BeTrue();
+        result.Verdict.Should().Be(ScanVerdict.Error);
         result.Engine.Should().Be(NoOpAttachmentScanner.EngineName);
-        result.ThreatName.Should().BeNull();
-        stream.Position.Should().Be(payload.Length, "the scanner should drain the entire stream");
+        result.ThreatName.Should().Be(NoOpAttachmentScanner.NoOpThreatName);
+        stream.Position.Should().Be(payload.Length, "the scanner should still drain the entire stream");
+    }
+
+    [Fact]
+    public void AttachmentScannerRegistration_throws_when_scanner_disabled_in_Production()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var options = new AttachmentScannerOptions { Enabled = false };
+        var environment = new FakeHostEnvironment(Environments.Production);
+
+        var act = () => services.AddAttachmentScanner(options, environment);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*CLAMAV_ENABLED must be true in Production*");
+    }
+
+    [Fact]
+    public void AttachmentScannerRegistration_registers_NoOp_in_Development()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var options = new AttachmentScannerOptions { Enabled = false };
+        var environment = new FakeHostEnvironment(Environments.Development);
+
+        services.AddAttachmentScanner(options, environment);
+
+        using var provider = services.BuildServiceProvider();
+        var scanner = provider.GetRequiredService<IAttachmentScanner>();
+        scanner.Should().BeOfType<NoOpAttachmentScanner>();
+    }
+
+    private sealed class FakeHostEnvironment : IHostEnvironment
+    {
+        public FakeHostEnvironment(string environmentName)
+        {
+            EnvironmentName = environmentName;
+        }
+
+        public string EnvironmentName { get; set; }
+        public string ApplicationName { get; set; } = "EduConnect.Api.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+            new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
     [Fact]

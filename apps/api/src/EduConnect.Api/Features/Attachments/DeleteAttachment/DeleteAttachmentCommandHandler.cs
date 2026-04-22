@@ -57,16 +57,20 @@ public class DeleteAttachmentCommandHandler : IRequestHandler<DeleteAttachmentCo
                 throw new NotFoundException("Homework", attachment.EntityId.Value.ToString());
             }
 
+            // Lock attachments once the homework leaves the editable stages.
+            // Applies to admins as well — consistent with the notice branch
+            // below and the documented contract that "published = locked."
+            // The break-glass path is to unpublish, delete, then republish.
+            if (homework.Status != "Draft" && homework.Status != "Rejected")
+            {
+                throw new ForbiddenException("Attachments can only be deleted while homework is editable.");
+            }
+
             if (_currentUserService.Role == "Teacher")
             {
                 if (homework.AssignedById != _currentUserService.UserId)
                 {
                     throw new ForbiddenException("You can only delete attachments from homework you created.");
-                }
-
-                if (homework.Status != "Draft" && homework.Status != "Rejected")
-                {
-                    throw new ForbiddenException("Attachments can only be deleted while homework is editable.");
                 }
             }
         }

@@ -71,6 +71,7 @@ public class HomeworkAttachmentFlowTests
             .Setup(service => service.GeneratePresignedUploadUrlAsync(
                 It.IsAny<string>(),
                 "application/pdf",
+                2048L,
                 It.IsAny<TimeSpan>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://upload.example.com");
@@ -400,6 +401,132 @@ public class HomeworkAttachmentFlowTests
         var response = await handler.Handle(
             new DeleteAttachmentCommand(attachmentId),
             CancellationToken.None);
+
+        response.Message.Should().Be("Attachment deleted successfully.");
+        (await context.Attachments.AnyAsync(a => a.Id == attachmentId)).Should().BeFalse();
+        storageService.VerifyAll();
+    }
+
+    [Fact]
+    public async Task DeleteAttachment_AdminCannotDeleteAttachmentFromPublishedHomework()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var homeworkId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin", adminId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                CreateClass(classId, schoolId, "9", "A")
+            ],
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000050", "Teacher", "teacher@test.com")
+            ],
+            homeworks:
+            [
+                CreateHomework(homeworkId, schoolId, classId, teacherId, "Published")
+            ],
+            attachments:
+            [
+                new AttachmentEntity
+                {
+                    Id = attachmentId,
+                    SchoolId = schoolId,
+                    EntityId = homeworkId,
+                    EntityType = "homework",
+                    StorageKey = "school/homework/file.pdf",
+                    FileName = "file.pdf",
+                    ContentType = "application/pdf",
+                    SizeBytes = 1024,
+                    UploadedById = teacherId,
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var storageService = new Mock<IStorageService>(MockBehavior.Strict);
+        var handler = new DeleteAttachmentCommandHandler(
+            context,
+            currentUser,
+            storageService.Object,
+            Mock.Of<ILogger<DeleteAttachmentCommandHandler>>());
+
+        var act = () => handler.Handle(new DeleteAttachmentCommand(attachmentId), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ForbiddenException>()
+            .WithMessage("Attachments can only be deleted while homework is editable.");
+
+        storageService.VerifyNoOtherCalls();
+        (await context.Attachments.AnyAsync(a => a.Id == attachmentId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteAttachment_AdminCanDeleteAttachmentFromDraftHomework()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var homeworkId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Admin", adminId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            classes:
+            [
+                CreateClass(classId, schoolId, "9", "B")
+            ],
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000051", "Teacher", "teacher@test.com")
+            ],
+            homeworks:
+            [
+                CreateHomework(homeworkId, schoolId, classId, teacherId, "Draft")
+            ],
+            attachments:
+            [
+                new AttachmentEntity
+                {
+                    Id = attachmentId,
+                    SchoolId = schoolId,
+                    EntityId = homeworkId,
+                    EntityType = "homework",
+                    StorageKey = "school/homework/draft.pdf",
+                    FileName = "draft.pdf",
+                    ContentType = "application/pdf",
+                    SizeBytes = 1024,
+                    UploadedById = teacherId,
+                    UploadedAt = DateTimeOffset.UtcNow,
+                    Status = AttachmentStatus.Available
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var storageService = new Mock<IStorageService>(MockBehavior.Strict);
+        storageService
+            .Setup(service => service.DeleteObjectAsync("school/homework/draft.pdf", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var handler = new DeleteAttachmentCommandHandler(
+            context,
+            currentUser,
+            storageService.Object,
+            Mock.Of<ILogger<DeleteAttachmentCommandHandler>>());
+
+        var response = await handler.Handle(new DeleteAttachmentCommand(attachmentId), CancellationToken.None);
 
         response.Message.Should().Be("Attachment deleted successfully.");
         (await context.Attachments.AnyAsync(a => a.Id == attachmentId)).Should().BeFalse();
