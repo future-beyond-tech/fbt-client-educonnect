@@ -186,6 +186,7 @@ builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IA
 // in the queue before the worker starts draining new uploads.
 builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanReconciler>();
 builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanWorker>();
+builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentStorageReconciler>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();

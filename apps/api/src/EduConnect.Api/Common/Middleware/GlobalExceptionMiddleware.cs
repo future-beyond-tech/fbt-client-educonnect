@@ -72,6 +72,10 @@ public class GlobalExceptionMiddleware
             NotFoundException notFoundEx => (404, "Not Found", notFoundEx.Message, null),
             ForbiddenException forbiddenEx => (403, "Forbidden", forbiddenEx.Message, null),
             UnauthorizedException unauthorizedEx => (401, "Unauthorized", unauthorizedEx.Message, null),
+            // Storage backend (S3/R2/MinIO) failed — surface as 502 so the
+            // caller knows it's an upstream issue, not a server-side bug.
+            StorageException storageEx => (502, "Bad Gateway",
+                _env.IsProduction() ? "Object storage is unavailable." : storageEx.Message, null),
             _ => (500, "Internal Server Error",
                 _env.IsProduction() ? "An unexpected error occurred." : exception.Message, null)
         };
