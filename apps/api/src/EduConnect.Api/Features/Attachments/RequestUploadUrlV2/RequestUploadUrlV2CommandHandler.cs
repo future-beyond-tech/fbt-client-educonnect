@@ -1,4 +1,3 @@
-using System.Text;
 using EduConnect.Api.Common.Auth;
 using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Infrastructure.Database;
@@ -38,7 +37,7 @@ public class RequestUploadUrlV2CommandHandler : IRequestHandler<RequestUploadUrl
             throw new ForbiddenException("Only admins and teachers can upload attachments.");
         }
 
-        var sanitizedFileName = SanitizeFileName(request.FileName);
+        var sanitizedFileName = FileNameSanitizer.Sanitize(request.FileName);
         var extension = Path.GetExtension(sanitizedFileName);
         var attachmentId = Guid.NewGuid();
         var storageKey = $"{_currentUserService.SchoolId}/{request.EntityType}/{attachmentId}-{sanitizedFileName}";
@@ -75,24 +74,5 @@ public class RequestUploadUrlV2CommandHandler : IRequestHandler<RequestUploadUrl
             extension);
 
         return new RequestUploadUrlV2Response(uploadUrl, attachmentId);
-    }
-
-    private static string SanitizeFileName(string fileName)
-    {
-        var safeFileName = Path.GetFileName(fileName).Trim();
-        if (string.IsNullOrWhiteSpace(safeFileName))
-        {
-            return "file";
-        }
-
-        var builder = new StringBuilder(safeFileName.Length);
-        foreach (var character in safeFileName)
-        {
-            builder.Append(Path.GetInvalidFileNameChars().Contains(character)
-                ? '-'
-                : character);
-        }
-
-        return builder.ToString();
     }
 }
