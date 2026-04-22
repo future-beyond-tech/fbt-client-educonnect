@@ -19,6 +19,13 @@ public class AttachmentEntity
     public DateTimeOffset? ScannedAt { get; set; }
     public string? ThreatName { get; set; }
 
+    // Postgres' xmin system column doubles as a row-version. EF wires it
+    // up via UseXminAsConcurrencyToken in AttachmentConfiguration so two
+    // concurrent writers (e.g. the scan worker plus a reconciler) can't
+    // step on each other's status updates — the loser sees a
+    // DbUpdateConcurrencyException and re-reads.
+    public uint Xmin { get; set; }
+
     public SchoolEntity? School { get; set; }
     public UserEntity? UploadedBy { get; set; }
 }

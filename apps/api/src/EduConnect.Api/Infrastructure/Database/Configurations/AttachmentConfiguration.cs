@@ -41,6 +41,16 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<AttachmentEntity
         builder.Property(x => x.ScannedAt);
         builder.Property(x => x.ThreatName).HasMaxLength(256);
 
+        // Concurrency token via Postgres' system xmin column. No backing
+        // schema change required — xmin lives on every relation. Lets the
+        // scan worker and any future second writer detect lost updates
+        // instead of silently overwriting each other's status.
+        builder.Property(x => x.Xmin)
+            .IsRowVersion()
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate();
+
         builder.HasIndex(x => x.Status)
             .HasDatabaseName("ix_attachments_status")
             .HasFilter("status <> 'Available'");

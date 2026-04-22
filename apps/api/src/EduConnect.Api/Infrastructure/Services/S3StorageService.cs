@@ -1,5 +1,6 @@
 using Amazon.S3;
 using Amazon.S3.Model;
+using EduConnect.Api.Common.Exceptions;
 using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Infrastructure.Services;
@@ -43,14 +44,21 @@ public class S3StorageService : IStorageService
         // enforcement to the storage backend.
         request.Headers["Content-Length"] = sizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-        var url = _s3Client.GetPreSignedURL(request);
+        try
+        {
+            var url = _s3Client.GetPreSignedURL(request);
 
-        _logger.LogInformation(
-            "Generated presigned upload URL for key {Key} pinned to {SizeBytes} bytes",
-            key,
-            sizeBytes);
+            _logger.LogInformation(
+                "Generated presigned upload URL for key {Key} pinned to {SizeBytes} bytes",
+                key,
+                sizeBytes);
 
-        return Task.FromResult(url);
+            return Task.FromResult(url);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException($"Failed to mint presigned upload URL for key {key}.", ex);
+        }
     }
 
     public Task<string> GeneratePresignedDownloadUrlAsync(
@@ -86,9 +94,15 @@ public class S3StorageService : IStorageService
             }
         }
 
-        var url = _s3Client.GetPreSignedURL(request);
-
-        return Task.FromResult(url);
+        try
+        {
+            var url = _s3Client.GetPreSignedURL(request);
+            return Task.FromResult(url);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException($"Failed to mint presigned download URL for key {key}.", ex);
+        }
     }
 
     public async Task DeleteObjectAsync(string key, CancellationToken cancellationToken = default)
@@ -99,22 +113,36 @@ public class S3StorageService : IStorageService
             Key = key
         };
 
-        await _s3Client.DeleteObjectAsync(request, cancellationToken);
+        try
+        {
+            await _s3Client.DeleteObjectAsync(request, cancellationToken);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException($"Failed to delete object with key {key}.", ex);
+        }
 
         _logger.LogInformation("Deleted object with key {Key}", key);
     }
 
     public async Task<Stream> OpenObjectReadStreamAsync(string key, CancellationToken cancellationToken = default)
     {
-        var response = await _s3Client.GetObjectAsync(new GetObjectRequest
+        try
         {
-            BucketName = _storageOptions.BucketName,
-            Key = key,
-        }, cancellationToken);
+            var response = await _s3Client.GetObjectAsync(new GetObjectRequest
+            {
+                BucketName = _storageOptions.BucketName,
+                Key = key,
+            }, cancellationToken);
 
-        // Caller disposes — wrapping ensures the S3 response is released
-        // when the stream is closed.
-        return response.ResponseStream;
+            // Caller disposes — wrapping ensures the S3 response is released
+            // when the stream is closed.
+            return response.ResponseStream;
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException($"Failed to open object stream for key {key}.", ex);
+        }
     }
 
     public async Task<StorageObjectMetadata?> GetObjectMetadataAsync(
@@ -136,6 +164,10 @@ public class S3StorageService : IStorageService
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException($"Failed to load object metadata for key {key}.", ex);
         }
     }
 }
