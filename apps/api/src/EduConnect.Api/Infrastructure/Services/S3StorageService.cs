@@ -1,6 +1,8 @@
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3.Util;
 using EduConnect.Api.Common.Exceptions;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Infrastructure.Services;
@@ -8,17 +10,94 @@ namespace EduConnect.Api.Infrastructure.Services;
 public class S3StorageService : IStorageService
 {
     private readonly IAmazonS3 _s3Client;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly StorageOptions _storageOptions;
     private readonly ILogger<S3StorageService> _logger;
 
     public S3StorageService(
         IAmazonS3 s3Client,
+        IHttpClientFactory httpClientFactory,
         IOptions<StorageOptions> storageOptions,
         ILogger<S3StorageService> logger)
     {
         _s3Client = s3Client;
+        _httpClientFactory = httpClientFactory;
         _storageOptions = storageOptions.Value;
         _logger = logger;
+    }
+
+    public async Task EnsureUploadTargetAvailableAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var bucketExists = await AmazonS3Util.DoesS3BucketExistV2Async(
+                _s3Client,
+                _storageOptions.BucketName);
+
+            if (!bucketExists)
+            {
+                throw new StorageException(
+                    $"Storage bucket '{_storageOptions.BucketName}' is unavailable or the configured credentials cannot access it.");
+            }
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new StorageException(
+                $"Failed to reach storage bucket '{_storageOptions.BucketName}'.",
+                ex);
+        }
+    }
+
+    public async Task UploadObjectAsync(
+        string key,
+        Stream content,
+        string contentType,
+        long sizeBytes,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (content.CanSeek)
+        {
+            content.Position = 0;
+        }
+
+        var uploadUrl = await GeneratePresignedUploadUrlAsync(
+            key,
+            contentType,
+            sizeBytes,
+            TimeSpan.FromMinutes(_storageOptions.PresignedUploadExpiryMinutes),
+            cancellationToken);
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, uploadUrl);
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        streamContent.Headers.ContentLength = sizeBytes;
+        request.Content = streamContent;
+
+        using var httpClient = _httpClientFactory.CreateClient();
+        using var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var detail = string.IsNullOrWhiteSpace(body)
+                ? $"{(int)response.StatusCode} {response.ReasonPhrase}"
+                : $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}";
+
+            throw new StorageException(
+                $"Failed to upload object with key {key}. Storage returned {detail}");
+        }
+
+        _logger.LogInformation(
+            "Uploaded object with key {Key} via server-side fallback ({SizeBytes} bytes)",
+            key,
+            sizeBytes);
     }
 
     public Task<string> GeneratePresignedUploadUrlAsync(

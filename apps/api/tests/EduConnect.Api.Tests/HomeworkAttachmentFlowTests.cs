@@ -3,6 +3,7 @@ using EduConnect.Api.Common.Exceptions;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
+using EduConnect.Api.Features.Attachments.UploadAttachmentContent;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
@@ -69,6 +70,9 @@ public class HomeworkAttachmentFlowTests
         await using var context = new AppDbContext(options, currentUser);
         var storageService = new Mock<IStorageService>(MockBehavior.Strict);
         storageService
+            .Setup(service => service.EnsureUploadTargetAvailableAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        storageService
             .Setup(service => service.GeneratePresignedUploadUrlAsync(
                 It.IsAny<string>(),
                 "application/pdf",
@@ -100,6 +104,169 @@ public class HomeworkAttachmentFlowTests
         attachment.FileName.Should().Be("worksheet.pdf");
 
         storageService.VerifyAll();
+    }
+
+    [Fact]
+    public async Task RequestUploadUrlV2Handler_DoesNotPersistAttachmentWhenStorageIsUnavailable()
+    {
+        var schoolId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Teacher", teacherId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000049", "Teacher User", "teacher@test.com")
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var storageService = new Mock<IStorageService>(MockBehavior.Strict);
+        storageService
+            .Setup(service => service.EnsureUploadTargetAvailableAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new StorageException("storage unavailable"));
+
+        var handler = new RequestUploadUrlV2CommandHandler(
+            context,
+            currentUser,
+            storageService.Object,
+            Options.Create(new StorageOptions()),
+            Mock.Of<ILogger<RequestUploadUrlV2CommandHandler>>());
+
+        var act = () => handler.Handle(
+            new RequestUploadUrlV2Command(
+                "worksheet.pdf",
+                "application/pdf",
+                2048,
+                "homework"),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<StorageException>()
+            .WithMessage("storage unavailable");
+
+        (await context.Attachments.AnyAsync()).Should().BeFalse();
+        storageService.Verify(service => service.GeneratePresignedUploadUrlAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<long>(),
+            It.IsAny<TimeSpan>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        storageService.VerifyAll();
+    }
+
+    [Fact]
+    public async Task UploadAttachmentContentHandler_UploadsPreparedAttachmentForCurrentUser()
+    {
+        var schoolId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Teacher", teacherId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000050", "Teacher User", "teacher@test.com")
+            ],
+            attachments:
+            [
+                new AttachmentEntity
+                {
+                    Id = attachmentId,
+                    SchoolId = schoolId,
+                    EntityId = null,
+                    EntityType = "notice",
+                    StorageKey = $"{schoolId}/notice/{attachmentId}-poster.pdf",
+                    FileName = "poster.pdf",
+                    ContentType = "application/pdf",
+                    SizeBytes = 2048,
+                    UploadedById = teacherId,
+                    UploadedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var storageService = new Mock<IStorageService>(MockBehavior.Strict);
+        storageService
+            .Setup(service => service.EnsureUploadTargetAvailableAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        storageService
+            .Setup(service => service.UploadObjectAsync(
+                It.Is<string>(key => key.Contains(attachmentId.ToString())),
+                It.IsAny<Stream>(),
+                "application/pdf",
+                2048L,
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var handler = new UploadAttachmentContentCommandHandler(
+            context,
+            currentUser,
+            storageService.Object,
+            Mock.Of<ILogger<UploadAttachmentContentCommandHandler>>());
+
+        await using var stream = new MemoryStream(new byte[2048]);
+        var response = await handler.Handle(
+            new UploadAttachmentContentCommand(attachmentId, 2048, stream),
+            CancellationToken.None);
+
+        response.Message.Should().Be("File uploaded successfully.");
+        storageService.VerifyAll();
+    }
+
+    [Fact]
+    public async Task UploadAttachmentContentHandler_RejectsMismatchedSize()
+    {
+        var schoolId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var currentUser = CreateCurrentUser(schoolId, "Teacher", teacherId);
+        var options = CreateOptions();
+
+        await SeedAsync(
+            options,
+            schoolId,
+            users:
+            [
+                CreateTeacherUser(teacherId, schoolId, "9000000051", "Teacher User", "teacher@test.com")
+            ],
+            attachments:
+            [
+                new AttachmentEntity
+                {
+                    Id = attachmentId,
+                    SchoolId = schoolId,
+                    EntityId = null,
+                    EntityType = "notice",
+                    StorageKey = $"{schoolId}/notice/{attachmentId}-poster.pdf",
+                    FileName = "poster.pdf",
+                    ContentType = "application/pdf",
+                    SizeBytes = 2048,
+                    UploadedById = teacherId,
+                    UploadedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        await using var context = new AppDbContext(options, currentUser);
+        var storageService = new Mock<IStorageService>(MockBehavior.Strict);
+        var handler = new UploadAttachmentContentCommandHandler(
+            context,
+            currentUser,
+            storageService.Object,
+            Mock.Of<ILogger<UploadAttachmentContentCommandHandler>>());
+
+        await using var stream = new MemoryStream(new byte[1024]);
+        var act = () => handler.Handle(
+            new UploadAttachmentContentCommand(attachmentId, 1024, stream),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Uploaded file size does not match the prepared attachment.");
+        storageService.VerifyNoOtherCalls();
     }
 
     [Fact]

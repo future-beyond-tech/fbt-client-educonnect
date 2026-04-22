@@ -11,20 +11,40 @@ function originOrEmpty(url: string | undefined): string {
   }
 }
 
+function originsFromCsv(value: string | undefined): string[] {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((entry) => originOrEmpty(entry.trim()))
+    .filter(Boolean);
+}
+
 function buildCsp(nonce: string): string {
   const isProd = process.env.NODE_ENV === "production";
 
   const apiOrigin = originOrEmpty(process.env.NEXT_PUBLIC_API_URL);
   const mediaOrigin = originOrEmpty(process.env.NEXT_PUBLIC_MEDIA_BASE_URL);
+  const uploadOrigins = Array.from(
+    new Set([
+      originOrEmpty(process.env.S3_SERVICE_URL),
+      ...originsFromCsv(process.env.NEXT_PUBLIC_ATTACHMENT_UPLOAD_ORIGINS),
+    ].filter(Boolean))
+  );
   const sentryEnabled = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN?.trim());
 
-  const connectSrc = [
-    "'self'",
-    apiOrigin,
-    sentryEnabled ? "https://*.sentry.io https://*.ingest.sentry.io" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const connectSrc = Array.from(
+    new Set([
+      "'self'",
+      apiOrigin,
+      // Browser uploads go directly to storage via presigned URLs, so CSP
+      // must allow the storage origin in addition to the API origin.
+      ...uploadOrigins,
+      ...(sentryEnabled
+        ? ["https://*.sentry.io", "https://*.ingest.sentry.io"]
+        : []),
+    ].filter(Boolean))
+  ).join(" ");
 
   const imgSrc = ["'self'", "data:", "blob:", mediaOrigin]
     .filter(Boolean)

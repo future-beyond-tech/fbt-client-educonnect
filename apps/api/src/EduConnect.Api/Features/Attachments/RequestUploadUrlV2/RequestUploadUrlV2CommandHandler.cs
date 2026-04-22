@@ -56,8 +56,7 @@ public class RequestUploadUrlV2CommandHandler : IRequestHandler<RequestUploadUrl
             UploadedAt = DateTimeOffset.UtcNow
         };
 
-        _context.Attachments.Add(attachment);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _storageService.EnsureUploadTargetAvailableAsync(cancellationToken);
 
         var uploadUrl = await _storageService.GeneratePresignedUploadUrlAsync(
             storageKey,
@@ -65,6 +64,9 @@ public class RequestUploadUrlV2CommandHandler : IRequestHandler<RequestUploadUrl
             request.SizeBytes,
             TimeSpan.FromMinutes(_storageOptions.PresignedUploadExpiryMinutes),
             cancellationToken);
+
+        _context.Attachments.Add(attachment);
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "Upload URL v2 generated: attachment {AttachmentId} for {EntityType} by user {UserId} with extension {Extension}",

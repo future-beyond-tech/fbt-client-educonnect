@@ -55,7 +55,13 @@ function apiBaseUrl(): string {
 
 async function doRefresh(): Promise<RefreshResult | null> {
   try {
-    const response = await fetch(`${apiBaseUrl()}/api/auth/refresh`, {
+    // Same-origin refresh: the HttpOnly refresh cookie is written onto the
+    // Next.js origin at login, so we hit the Next.js Route Handler (which
+    // proxies the call to the real API with the cookie attached) rather
+    // than the backend directly. Hitting the backend origin would arrive
+    // cookieless and return 401 on every page load — that was the original
+    // logout-on-refresh bug.
+    const response = await fetch(`/api/auth/refresh`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

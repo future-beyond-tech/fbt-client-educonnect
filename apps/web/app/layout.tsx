@@ -97,7 +97,14 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Browsers move nonce values into an internal slot and blank the
+            content attribute after parsing, so React sees an expected mismatch
+            during hydration unless we suppress it on this bootstrap script. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
       </head>
       <body className={`${manrope.variable} ${spaceGrotesk.variable} antialiased`}>
         <ThemeProvider>

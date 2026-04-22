@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { AlertCircle, CheckCircle2, FileText, ImageIcon, UploadCloud, X } from "lucide-react";
-import { ApiError, apiDelete, apiPost } from "@/lib/api-client";
+import { ApiError, apiDelete, apiPost, apiPostMultipart } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import type {
   DeleteAttachmentResponse,
   RequestUploadUrlRequest,
   RequestUploadUrlResponse,
+  UploadAttachmentContentResponse,
 } from "@/lib/types/attachment";
 import {
   MAX_ATTACHMENTS_PER_ENTITY,
@@ -51,6 +52,16 @@ interface AttachmentUploaderProps {
   disabled?: boolean;
 }
 
+class PresignedUploadError extends Error {
+  constructor(
+    message: string,
+    public readonly shouldFallbackToApi: boolean
+  ) {
+    super(message);
+    this.name = "PresignedUploadError";
+  }
+}
+
 function uploadToPresignedUrl(
   uploadUrl: string,
   file: File,
@@ -73,12 +84,54 @@ function uploadToPresignedUrl(
         return;
       }
 
-      reject(new Error("Failed to upload file to storage."));
+      const statusLabel = xhr.statusText?.trim()
+        ? `${xhr.status} ${xhr.statusText.trim()}`
+        : `HTTP ${xhr.status}`;
+
+      reject(
+        new PresignedUploadError(
+          `Failed to upload file to storage (${statusLabel}).`,
+          false
+        )
+      );
     };
 
-    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.onerror = () =>
+      reject(
+        new PresignedUploadError(
+          "Could not reach attachment storage. Check that the storage service is available and allows browser uploads."
+          ,
+          true
+        )
+      );
     xhr.send(file);
   });
+}
+
+async function uploadViaApi(
+  attachmentId: string,
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+  onProgress(15);
+
+  await apiPostMultipart<UploadAttachmentContentResponse>(
+    `${API_ENDPOINTS.attachmentsUploadContent}/${attachmentId}/upload`,
+    formData
+  );
+
+  onProgress(100);
+}
+
+function shouldUploadViaApiFirst(uploadUrl: string): boolean {
+  try {
+    const { hostname } = new URL(uploadUrl);
+    return hostname.endsWith(".r2.cloudflarestorage.com");
+  } catch {
+    return false;
+  }
 }
 
 export function AttachmentUploader({
@@ -156,9 +209,32 @@ export function AttachmentUploader({
 
         updateProgressItem(trackingId, { progress: 10 });
 
-        await uploadToPresignedUrl(uploadUrlResponse.uploadUrl, file, (progress) => {
-          updateProgressItem(trackingId, { progress });
-        });
+        const useApiFirst = shouldUploadViaApiFirst(uploadUrlResponse.uploadUrl);
+
+        try {
+          if (useApiFirst) {
+            await uploadViaApi(uploadUrlResponse.attachmentId, file, (progress) => {
+              updateProgressItem(trackingId, { progress });
+            });
+          } else {
+            await uploadToPresignedUrl(uploadUrlResponse.uploadUrl, file, (progress) => {
+              updateProgressItem(trackingId, { progress });
+            });
+          }
+        } catch (error) {
+          if (
+            !useApiFirst &&
+            error instanceof PresignedUploadError &&
+            error.shouldFallbackToApi
+          ) {
+            updateProgressItem(trackingId, { progress: 15 });
+            await uploadViaApi(uploadUrlResponse.attachmentId, file, (progress) => {
+              updateProgressItem(trackingId, { progress });
+            });
+          } else {
+            throw error;
+          }
+        }
 
         updateProgressItem(trackingId, { progress: 100, status: "attaching" });
 

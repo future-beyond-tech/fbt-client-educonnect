@@ -21,6 +21,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── ClamAV (virus scanning for attachments) ─
+  clamav:
+    image: clamav/clamav:stable
+    container_name: educonnect-clamav
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      # clamdcheck.sh is shipped in the official image; returns 0 once clamd accepts connections.
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      # First boot pulls the virus signature DB via freshclam (~2-3 min); be patient.
+      start_period: 240s
+
   # ── .NET API ───────────────────────────────
   api:
     build:
@@ -30,6 +48,8 @@ services:
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     ports:
       - "5000:8080"
@@ -41,6 +61,18 @@ services:
       JWT_AUDIENCE: educonnect-client
       CORS_ALLOWED_ORIGINS: "http://localhost:3000"
       SENTRY_DSN: ""
+      # ── Cloudflare R2 (file attachments) ──
+      # Values come from .env.docker — populate S3_SECRET_KEY there before running.
+      S3_BUCKET_NAME: "${S3_BUCKET_NAME:-educonnect-attachments}"
+      AWS_REGION: "${AWS_REGION:-auto}"
+      S3_SERVICE_URL: "${S3_SERVICE_URL}"
+      S3_ACCESS_KEY: "${S3_ACCESS_KEY}"
+      S3_SECRET_KEY: "${S3_SECRET_KEY}"
+      # ── ClamAV ──
+      CLAMAV_ENABLED: "${CLAMAV_ENABLED:-true}"
+      CLAMAV_HOST: "${CLAMAV_HOST:-clamav}"
+      CLAMAV_PORT: "${CLAMAV_PORT:-3310}"
+      CLAMAV_TIMEOUT_SECONDS: "${CLAMAV_TIMEOUT_SECONDS:-30}"
 
   # ── Next.js Web ────────────────────────────
   web:
@@ -62,3 +94,4 @@ services:
 
 volumes:
   pgdata:
+  clamav_db:

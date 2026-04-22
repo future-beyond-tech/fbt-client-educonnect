@@ -133,6 +133,7 @@ if (!string.IsNullOrWhiteSpace(storageOptions.ServiceUrl))
         var config = new Amazon.S3.AmazonS3Config
         {
             ServiceURL = storageOptions.ServiceUrl,
+            AuthenticationRegion = storageOptions.Region,
             ForcePathStyle = true
         };
         return new Amazon.S3.AmazonS3Client(

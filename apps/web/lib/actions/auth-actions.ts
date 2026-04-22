@@ -1,9 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { loginSchema, type LoginInput } from "@/lib/validation/login";
-
-const REFRESH_COOKIE_NAME = "refresh_token";
+import {
+  clearRefreshCookie,
+  forwardedRefreshCookieHeader,
+  proxyRefreshCookie,
+} from "@/lib/auth/refresh-cookie";
 
 export interface LoginSuccessData {
   accessToken: string;
@@ -21,59 +23,6 @@ function apiBase(): string {
     throw new Error("NEXT_PUBLIC_API_URL is not defined");
   }
   return baseUrl;
-}
-
-/**
- * Parses a single Set-Cookie header value into a minimal attribute map.
- * We only care about name/value and Expires — HttpOnly, Secure, SameSite
- * and Path are re-applied as app invariants via cookies().set() rather
- * than trusted from the upstream header.
- */
-function parseSetCookie(raw: string): { name: string; value: string; expires?: Date } | null {
-  const [pair, ...attrs] = raw.split(";").map((s) => s.trim());
-  if (!pair) return null;
-  const eq = pair.indexOf("=");
-  if (eq <= 0) return null;
-  const name = pair.slice(0, eq);
-  const value = pair.slice(eq + 1);
-
-  let expires: Date | undefined;
-  for (const attr of attrs) {
-    const parts = attr.split("=", 2).map((s) => s?.trim() ?? "");
-    const k = parts[0] ?? "";
-    const v = parts[1] ?? "";
-    if (k.toLowerCase() === "expires" && v) {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) expires = d;
-    }
-  }
-
-  return { name, value, expires };
-}
-
-async function proxyRefreshCookie(response: Response): Promise<void> {
-  const setCookies = response.headers.getSetCookie();
-  for (const entry of setCookies) {
-    const parsed = parseSetCookie(entry);
-    if (!parsed || parsed.name !== REFRESH_COOKIE_NAME) continue;
-
-    const cookieStore = await cookies();
-    cookieStore.set({
-      name: parsed.name,
-      value: parsed.value,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      expires: parsed.expires,
-    });
-  }
-}
-
-async function forwardedRefreshCookieHeader(): Promise<string> {
-  const cookieStore = await cookies();
-  const refresh = cookieStore.get(REFRESH_COOKIE_NAME);
-  return refresh ? `${REFRESH_COOKIE_NAME}=${refresh.value}` : "";
 }
 
 function mapBackendValidationErrors(
@@ -199,8 +148,7 @@ export async function mintBackendAccessToken(): Promise<string | null> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      const cookieStore = await cookies();
-      cookieStore.delete(REFRESH_COOKIE_NAME);
+      await clearRefreshCookie();
     }
     return null;
   }
@@ -226,7 +174,6 @@ export async function logoutAction(): Promise<{ ok: true }> {
     // is what actually ends the session from the browser's perspective.
   }
 
-  const cookieStore = await cookies();
-  cookieStore.delete(REFRESH_COOKIE_NAME);
+  await clearRefreshCookie();
   return { ok: true };
 }

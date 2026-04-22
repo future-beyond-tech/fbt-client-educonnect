@@ -66,6 +66,7 @@ using EduConnect.Api.Features.Push.GetVapidPublicKey;
 using EduConnect.Api.Features.Push.RegisterPushSubscription;
 using EduConnect.Api.Features.Push.UnregisterPushSubscription;
 using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
+using EduConnect.Api.Features.Attachments.UploadAttachmentContent;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
 using EduConnect.Api.Features.Attachments.DownloadAttachment;
@@ -277,6 +278,9 @@ public static class EndpointRouteBuilderExtensions
         group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle)
             .WithName("RequestUploadUrlV2")
             .RequireRateLimiting("attachments-upload-url");
+        group.MapPost("/{attachmentId:guid}/upload", UploadAttachmentContentEndpoint.Handle)
+            .WithName("UploadAttachmentContent")
+            .DisableAntiforgery();
         group.MapPost("/attach", AttachFileToEntityEndpoint.Handle).WithName("AttachFileToEntity");
         group.MapGet("/", GetAttachmentsForEntityEndpoint.Handle).WithName("GetAttachmentsForEntity");
         group.MapGet("/{id:guid}/download", DownloadAttachmentEndpoint.Handle).WithName("DownloadAttachment");

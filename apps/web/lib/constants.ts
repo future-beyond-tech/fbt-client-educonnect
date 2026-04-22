@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
   notificationsUnreadCount: "/api/notifications/unread-count",
   notificationsReadAll: "/api/notifications/read-all",
   attachmentsRequestUploadV2: "/api/attachments/request-upload-url-v2",
+  attachmentsUploadContent: "/api/attachments",
   attachmentsAttach: "/api/attachments/attach",
   attachments: "/api/attachments",
   leaveApplications: "/api/attendance/leave",
