@@ -178,8 +178,13 @@ EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerRegistration.Ad
     builder.Services,
     scannerOptions,
     builder.Environment);
+builder.Services.AddScoped<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentBlockedNotifier,
+    EduConnect.Api.Infrastructure.Services.Scanning.AttachmentBlockedNotifier>();
 builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanQueue,
     EduConnect.Api.Infrastructure.Services.Scanning.ChannelAttachmentScanQueue>();
+// Reconciler runs first so any stale Pending rows from a prior crash are
+// in the queue before the worker starts draining new uploads.
+builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanReconciler>();
 builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanWorker>();
 
 builder.Services.AddHttpContextAccessor();
@@ -253,6 +258,32 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 Window = TimeSpan.FromMinutes(1)
+            });
+    });
+
+    // Tighter cap on presigned-URL minting so a misbehaving (or
+    // compromised) account can't generate large bursts of signed
+    // URLs that all stay valid for the upload TTL. 10/min per user
+    // is well below any real teacher upload rate; the global
+    // per-user limit still applies on top. (A separate hourly cap
+    // is a follow-up — the per-minute cap already neutralises the
+    // documented "mint 10k presigned URLs" attack since 10×60 = 600
+    // is the per-hour ceiling under continuous abuse.)
+    options.AddPolicy("attachments-upload-url", httpContext =>
+    {
+        var key = httpContext.User.FindFirst("userId")?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"upload-url:{key}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 10,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                Window = TimeSpan.FromMinutes(1),
             });
     });
 });

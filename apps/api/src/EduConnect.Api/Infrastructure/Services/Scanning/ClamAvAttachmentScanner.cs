@@ -82,17 +82,30 @@ public sealed class ClamAvAttachmentScanner : IAttachmentScanner
 
             return ParseReply(replyBuilder.ToString().Trim('\0', ' ', '\n', '\r'));
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogError("ClamAV scan timed out after {Timeout}s against {Host}:{Port}",
+            // Caller cancellation — propagate so the worker can shut down
+            // cleanly without the scanner masking the cancellation as an
+            // Error verdict.
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            // Internal timeout (linked CTS fired). Surface as a typed
+            // TimeoutException so the worker's retry loop can recognise
+            // it as transient.
+            _logger.LogWarning(
+                "ClamAV scan timed out after {Timeout}s against {Host}:{Port}",
                 _options.TimeoutSeconds, _options.Host, _options.Port);
-            return new ScanResult(ScanVerdict.Error, EngineName, "scan_timeout");
+            throw new TimeoutException(
+                $"ClamAV scan timed out after {_options.TimeoutSeconds}s against {_options.Host}:{_options.Port}",
+                ex);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "ClamAV scan failed against {Host}:{Port}", _options.Host, _options.Port);
-            return new ScanResult(ScanVerdict.Error, EngineName, ex.GetType().Name);
-        }
+        // SocketException, IOException and any other I/O failure
+        // propagate to the caller. The worker's retry loop classifies
+        // them as transient (worth a retry) or terminal (mark
+        // ScanFailed). Catching them here would deny the worker the
+        // chance to retry across a transient blip.
     }
 
     private ScanResult ParseReply(string reply)

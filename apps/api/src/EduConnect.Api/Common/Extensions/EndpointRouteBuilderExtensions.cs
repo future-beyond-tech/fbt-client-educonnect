@@ -65,10 +65,10 @@ using EduConnect.Api.Features.Notifications.MarkAllNotificationsRead;
 using EduConnect.Api.Features.Push.GetVapidPublicKey;
 using EduConnect.Api.Features.Push.RegisterPushSubscription;
 using EduConnect.Api.Features.Push.UnregisterPushSubscription;
-using EduConnect.Api.Features.Attachments.RequestUploadUrl;
 using EduConnect.Api.Features.Attachments.RequestUploadUrlV2;
 using EduConnect.Api.Features.Attachments.AttachFileToEntity;
 using EduConnect.Api.Features.Attachments.DeleteAttachment;
+using EduConnect.Api.Features.Attachments.DownloadAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 using EduConnect.Api.Features.Exams.CreateExam;
 using EduConnect.Api.Features.Exams.UpdateExam;
@@ -262,10 +262,24 @@ public static class EndpointRouteBuilderExtensions
     {
         var group = app.MapGroup("/api/attachments").WithTags("Attachments").RequireAuthorization();
 
-        group.MapPost("/request-upload-url", RequestUploadUrlEndpoint.Handle).WithName("RequestUploadUrl");
-        group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle).WithName("RequestUploadUrlV2");
+        // Every attachment response carries presigned URLs / mutation
+        // results. None of them are cacheable: the URL embeds an
+        // expiring signature and the mutations change tenant state.
+        // private, no-store keeps shared caches and the browser cache
+        // out of the loop entirely.
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            var result = await next(context);
+            context.HttpContext.Response.Headers.CacheControl = "private, no-store";
+            return result;
+        });
+
+        group.MapPost("/request-upload-url-v2", RequestUploadUrlV2Endpoint.Handle)
+            .WithName("RequestUploadUrlV2")
+            .RequireRateLimiting("attachments-upload-url");
         group.MapPost("/attach", AttachFileToEntityEndpoint.Handle).WithName("AttachFileToEntity");
         group.MapGet("/", GetAttachmentsForEntityEndpoint.Handle).WithName("GetAttachmentsForEntity");
+        group.MapGet("/{id:guid}/download", DownloadAttachmentEndpoint.Handle).WithName("DownloadAttachment");
         group.MapDelete("/{id}", DeleteAttachmentEndpoint.Handle).WithName("DeleteAttachment");
     }
 

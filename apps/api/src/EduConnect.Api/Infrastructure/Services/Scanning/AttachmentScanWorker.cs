@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -18,18 +19,39 @@ namespace EduConnect.Api.Infrastructure.Services.Scanning;
 /// </summary>
 public sealed class AttachmentScanWorker : BackgroundService
 {
+    // Total scan attempts on transient I/O failures (network blip, daemon
+    // restart, request timeout). 3 attempts with 2/4s back-offs covers the
+    // typical clamd restart window without unduly stalling other jobs.
+    internal const int MaxScanAttempts = 3;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IAttachmentScanQueue _queue;
     private readonly ILogger<AttachmentScanWorker> _logger;
+    private readonly Func<int, TimeSpan> _retryBackoff;
 
     public AttachmentScanWorker(
         IServiceScopeFactory scopeFactory,
         IAttachmentScanQueue queue,
         ILogger<AttachmentScanWorker> logger)
+        : this(scopeFactory, queue, logger,
+            // Exponential back-off: 2s after the 1st failure, 4s after the
+            // 2nd, never reached after the 3rd (loop exits).
+            attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)))
+    {
+    }
+
+    // Internal ctor lets tests inject a zero back-off so they don't sit
+    // through 6+ seconds of Task.Delay per retry exhaustion case.
+    internal AttachmentScanWorker(
+        IServiceScopeFactory scopeFactory,
+        IAttachmentScanQueue queue,
+        ILogger<AttachmentScanWorker> logger,
+        Func<int, TimeSpan> retryBackoff)
     {
         _scopeFactory = scopeFactory;
         _queue = queue;
         _logger = logger;
+        _retryBackoff = retryBackoff;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -70,6 +92,7 @@ public sealed class AttachmentScanWorker : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storage = scope.ServiceProvider.GetRequiredService<IStorageService>();
         var scanner = scope.ServiceProvider.GetRequiredService<IAttachmentScanner>();
+        var blockedNotifier = scope.ServiceProvider.GetRequiredService<IAttachmentBlockedNotifier>();
 
         // IgnoreQueryFilters: we don't have a tenant context in the worker
         // scope, so the EF global query filter would otherwise return
@@ -110,8 +133,10 @@ public sealed class AttachmentScanWorker : BackgroundService
                 "Could not stream attachment {AttachmentId} from storage for scanning",
                 attachmentId);
             attachment.Status = AttachmentStatus.ScanFailed;
+            attachment.ThreatName = "storage_open_failed";
             attachment.ScannedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
             return;
         }
 
@@ -142,42 +167,84 @@ public sealed class AttachmentScanWorker : BackgroundService
             }
 
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.Infected, attachment, ct);
             return;
         }
 
-        ScanResult result;
-        try
+        ScanResult? result = null;
+        Exception? lastTransientFailure = null;
+        for (var attempt = 1; attempt <= MaxScanAttempts; attempt++)
         {
-            result = await scanner.ScanAsync(buffered, ct);
+            try
+            {
+                buffered.Position = 0;
+                result = await scanner.ScanAsync(buffered, ct);
+                lastTransientFailure = null;
+                break;
+            }
+            catch (Exception ex) when (IsTransientScannerFailure(ex))
+            {
+                lastTransientFailure = ex;
+                if (attempt == MaxScanAttempts) break;
+
+                var backoff = _retryBackoff(attempt);
+                _logger.LogWarning(ex,
+                    "Scanner transient failure (attempt {Attempt}/{Max}) for {AttachmentId}; retrying in {DelaySeconds}s",
+                    attempt, MaxScanAttempts, attachmentId, backoff.TotalSeconds);
+                await Task.Delay(backoff, ct);
+            }
+            catch (Exception ex)
+            {
+                // Non-transient (e.g. parse / protocol bug) — no point retrying.
+                _logger.LogError(ex,
+                    "Scanner failed (non-transient) for attachment {AttachmentId}",
+                    attachmentId);
+                attachment.Status = AttachmentStatus.ScanFailed;
+                attachment.ThreatName = ex.GetType().Name;
+                attachment.ScannedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(ct);
+                await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
+                return;
+            }
         }
-        catch (Exception ex)
+
+        if (result is null)
         {
-            _logger.LogError(ex,
-                "Scanner threw for attachment {AttachmentId}",
-                attachmentId);
+            _logger.LogError(lastTransientFailure,
+                "Scanner failed after {Max} transient retries for attachment {AttachmentId}",
+                MaxScanAttempts, attachmentId);
             attachment.Status = AttachmentStatus.ScanFailed;
+            attachment.ThreatName = lastTransientFailure switch
+            {
+                TimeoutException   => "scan_timeout",
+                SocketException    => "scanner_unreachable",
+                IOException        => "scanner_io_error",
+                _                  => lastTransientFailure?.GetType().Name ?? "unknown",
+            };
             attachment.ScannedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
             return;
         }
 
         attachment.ScannedAt = DateTimeOffset.UtcNow;
 
-        if (result.IsClean)
+        var verdict = result;
+        if (verdict.IsClean)
         {
             attachment.Status = AttachmentStatus.Available;
             _logger.LogInformation(
                 "Attachment {AttachmentId} cleared by {Engine}",
-                attachmentId, result.Engine);
+                attachmentId, verdict.Engine);
         }
-        else if (result.IsInfected)
+        else if (verdict.IsInfected)
         {
             attachment.Status = AttachmentStatus.Infected;
-            attachment.ThreatName = result.ThreatName;
+            attachment.ThreatName = verdict.ThreatName;
 
             _logger.LogWarning(
                 "Attachment {AttachmentId} flagged as infected by {Engine}: {Threat}. Deleting from storage.",
-                attachmentId, result.Engine, result.ThreatName);
+                attachmentId, verdict.Engine, verdict.ThreatName);
 
             try
             {
@@ -194,12 +261,29 @@ public sealed class AttachmentScanWorker : BackgroundService
         else
         {
             attachment.Status = AttachmentStatus.ScanFailed;
-            attachment.ThreatName = result.ThreatName;
+            attachment.ThreatName = verdict.ThreatName;
             _logger.LogError(
                 "Attachment {AttachmentId} scan failed via {Engine}: {Detail}",
-                attachmentId, result.Engine, result.ThreatName);
+                attachmentId, verdict.Engine, verdict.ThreatName);
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (attachment.Status == AttachmentStatus.Infected)
+        {
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.Infected, attachment, ct);
+        }
+        else if (attachment.Status == AttachmentStatus.ScanFailed)
+        {
+            await blockedNotifier.NotifyAsync(AttachmentBlockedKind.ScanFailed, attachment, ct);
+        }
     }
+
+    // Transient = "the scanner could not be reached or didn't reply in
+    // time." Things like a malformed protocol response are not retried
+    // (separate catch in the retry loop) since they indicate a bug.
+    private static bool IsTransientScannerFailure(Exception ex) =>
+        ex is SocketException
+            or IOException
+            or TimeoutException;
 }
