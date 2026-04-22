@@ -1,3 +1,9 @@
+export type AttachmentStatus =
+  | "Pending"
+  | "Available"
+  | "Infected"
+  | "ScanFailed";
+
 export interface AttachmentItem {
   id: string;
   fileName: string;
@@ -5,9 +11,13 @@ export interface AttachmentItem {
   sizeBytes: number;
   downloadUrl: string;
   uploadedAt: string;
+  status: AttachmentStatus;
 }
 
-export type AttachmentEntityType = "homework" | "notice";
+export type AttachmentEntityType =
+  | "homework"
+  | "homework_submission"
+  | "notice";
 
 export interface RequestUploadUrlRequest {
   fileName: string;
@@ -48,6 +58,18 @@ export const HOMEWORK_ALLOWED_CONTENT_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
 
+// Mirrors AttachmentFeatureRules.HomeworkSubmissionAllowedContentTypes on
+// the API. Submissions accept the homework set plus common image formats
+// (photo of handwritten work).
+export const HOMEWORK_SUBMISSION_ALLOWED_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+] as const;
+
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 export const MAX_ATTACHMENTS_PER_ENTITY = 5;
 
@@ -63,6 +85,14 @@ export const ATTACHMENT_ACCEPT = {
     "application/msword": [".doc"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
   },
+  homework_submission: {
+    "image/jpeg": [".jpg", ".jpeg"],
+    "image/png": [".png"],
+    "image/webp": [".webp"],
+    "application/pdf": [".pdf"],
+    "application/msword": [".doc"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  },
 } as const;
 
 export type NoticeAllowedContentType =
@@ -71,16 +101,25 @@ export type NoticeAllowedContentType =
 export type HomeworkAllowedContentType =
   (typeof HOMEWORK_ALLOWED_CONTENT_TYPES)[number];
 
+export type HomeworkSubmissionAllowedContentType =
+  (typeof HOMEWORK_SUBMISSION_ALLOWED_CONTENT_TYPES)[number];
+
 export type AllowedContentType =
   | NoticeAllowedContentType
-  | HomeworkAllowedContentType;
+  | HomeworkAllowedContentType
+  | HomeworkSubmissionAllowedContentType;
 
 export function getAllowedContentTypes(
   entityType: AttachmentEntityType
 ): readonly string[] {
-  return entityType === "homework"
-    ? HOMEWORK_ALLOWED_CONTENT_TYPES
-    : NOTICE_ALLOWED_CONTENT_TYPES;
+  switch (entityType) {
+    case "homework":
+      return HOMEWORK_ALLOWED_CONTENT_TYPES;
+    case "homework_submission":
+      return HOMEWORK_SUBMISSION_ALLOWED_CONTENT_TYPES;
+    case "notice":
+      return NOTICE_ALLOWED_CONTENT_TYPES;
+  }
 }
 
 export function getAcceptedFiles(
@@ -117,15 +156,38 @@ export function isWordAttachment(contentType: string): boolean {
 export function getAttachmentHelperText(
   entityType: AttachmentEntityType
 ): string {
-  return entityType === "homework"
-    ? "PDF, DOC, or DOCX — max 10MB each"
-    : "JPEG, PNG, WebP, or PDF — max 10MB each";
+  switch (entityType) {
+    case "homework":
+      return "PDF, DOC, or DOCX — max 10MB each";
+    case "homework_submission":
+      return "PDF, DOC, DOCX, or image — max 10MB each";
+    case "notice":
+      return "JPEG, PNG, WebP, or PDF — max 10MB each";
+  }
 }
 
 export function getAttachmentEmptyLabel(
   entityType: AttachmentEntityType
 ): string {
-  return entityType === "homework"
-    ? "Drag and drop homework files here, or browse"
-    : "Drag and drop notice files here, or browse";
+  switch (entityType) {
+    case "homework":
+      return "Drag and drop homework files here, or browse";
+    case "homework_submission":
+      return "Drag and drop your submission files here, or browse";
+    case "notice":
+      return "Drag and drop notice files here, or browse";
+  }
+}
+
+export function getAttachmentTypeRejectionMessage(
+  entityType: AttachmentEntityType
+): string {
+  switch (entityType) {
+    case "homework":
+      return "Only PDF and Word documents are allowed.";
+    case "homework_submission":
+      return "Only PDF, Word documents, and images are allowed.";
+    case "notice":
+      return "Only JPEG, PNG, WebP, and PDF files are allowed.";
+  }
 }

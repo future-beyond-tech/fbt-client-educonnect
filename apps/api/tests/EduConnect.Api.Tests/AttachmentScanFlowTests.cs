@@ -17,7 +17,109 @@ namespace EduConnect.Api.Tests;
 public class AttachmentScanFlowTests
 {
     [Fact]
-    public async Task GetAttachmentsForEntity_filters_out_non_available_rows()
+    public async Task GetAttachmentsForEntity_returns_in_progress_statuses_to_teachers_with_download_url_only_for_Available()
+    {
+        var (options, _, homeworkId, teacherId) = await SeedHomeworkWithAllStatusesAsync();
+        var teacher = new CurrentUserService
+        {
+            SchoolId = (await new AppDbContext(options).Schools.Select(s => s.Id).FirstAsync()),
+            UserId = teacherId,
+            Role = "Teacher",
+            Name = "Teacher",
+        };
+
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://signed/");
+
+        await using var readContext = new AppDbContext(options, teacher);
+        var handler = new GetAttachmentsForEntityQueryHandler(readContext, teacher, storage.Object);
+
+        var result = await handler.Handle(
+            new GetAttachmentsForEntityQuery(homeworkId, "homework"),
+            CancellationToken.None);
+
+        // Teacher sees Pending + Available + ScanFailed; Infected stays
+        // hidden (admins are notified out-of-band).
+        result.Select(r => r.Status).Should().BeEquivalentTo(new[]
+        {
+            AttachmentStatus.Pending,
+            AttachmentStatus.Available,
+            AttachmentStatus.ScanFailed,
+        });
+
+        // Presigned URL minted only for the Available row — the read path
+        // never hands out an unscanned object even when the badge is shown.
+        result.Single(r => r.Status == AttachmentStatus.Available).DownloadUrl
+            .Should().Be("https://signed/");
+        result.Single(r => r.Status == AttachmentStatus.Pending).DownloadUrl.Should().BeNull();
+        result.Single(r => r.Status == AttachmentStatus.ScanFailed).DownloadUrl.Should().BeNull();
+
+        storage.Verify(
+            s => s.GeneratePresignedDownloadUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAttachmentsForEntity_returns_only_Available_to_parents()
+    {
+        var (options, schoolId, homeworkId, teacherId) = await SeedHomeworkWithAllStatusesAsync();
+
+        var parentId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var classId = await new AppDbContext(options).Homeworks
+            .Where(h => h.Id == homeworkId).Select(h => h.ClassId).FirstAsync();
+
+        await using (var ctx = new AppDbContext(options))
+        {
+            ctx.Users.Add(new UserEntity
+            {
+                Id = parentId, SchoolId = schoolId, Phone = "09000000099",
+                Name = "Parent", Role = "Parent",
+            });
+            ctx.Students.Add(new StudentEntity
+            {
+                Id = studentId, SchoolId = schoolId, ClassId = classId,
+                Name = "Child", RollNumber = "001", IsActive = true,
+            });
+            ctx.ParentStudentLinks.Add(new ParentStudentLinkEntity
+            {
+                Id = Guid.NewGuid(), SchoolId = schoolId,
+                ParentId = parentId, StudentId = studentId, Relationship = "parent",
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        var parent = new CurrentUserService
+        {
+            SchoolId = schoolId, UserId = parentId, Role = "Parent", Name = "Parent",
+        };
+
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://signed/");
+
+        await using var readContext = new AppDbContext(options, parent);
+        var handler = new GetAttachmentsForEntityQueryHandler(readContext, parent, storage.Object);
+
+        var result = await handler.Handle(
+            new GetAttachmentsForEntityQuery(homeworkId, "homework"),
+            CancellationToken.None);
+
+        result.Should().ContainSingle(
+            "parents should never see Pending / Infected / ScanFailed rows");
+        result[0].Status.Should().Be(AttachmentStatus.Available);
+        result[0].DownloadUrl.Should().Be("https://signed/");
+    }
+
+    private static async Task<(DbContextOptions<AppDbContext> Options, Guid SchoolId, Guid HomeworkId, Guid TeacherId)>
+        SeedHomeworkWithAllStatusesAsync()
     {
         var schoolId = Guid.NewGuid();
         var classId = Guid.NewGuid();
@@ -29,105 +131,73 @@ public class AttachmentScanFlowTests
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
-        var currentUser = new CurrentUserService
+        await using var context = new AppDbContext(options);
+        context.Schools.Add(new SchoolEntity
         {
+            Id = schoolId,
+            Name = "Test School",
+            Code = "TEST",
+            Address = "",
+            ContactPhone = "",
+            ContactEmail = "",
+        });
+        context.Classes.Add(new ClassEntity
+        {
+            Id = classId,
             SchoolId = schoolId,
-            UserId = teacherId,
-            Role = "Teacher",
-            Name = "Test Teacher",
-        };
-
-        await using (var context = new AppDbContext(options, currentUser))
+            Name = "6",
+            Section = "A",
+            AcademicYear = "2026",
+        });
+        context.Users.Add(new UserEntity
         {
-            context.Schools.Add(new SchoolEntity
-            {
-                Id = schoolId,
-                Name = "Test School",
-                Code = "TEST",
-                Address = "",
-                ContactPhone = "",
-                ContactEmail = "",
-            });
-            context.Classes.Add(new ClassEntity
-            {
-                Id = classId,
-                SchoolId = schoolId,
-                Name = "6",
-                Section = "A",
-                AcademicYear = "2026",
-            });
-            context.Users.Add(new UserEntity
-            {
-                Id = teacherId,
-                SchoolId = schoolId,
-                Name = "Teacher",
-                Phone = "09000000001",
-                Role = "Teacher",
-            });
-            context.Homeworks.Add(new HomeworkEntity
-            {
-                Id = homeworkId,
-                SchoolId = schoolId,
-                ClassId = classId,
-                Subject = "Math",
-                Title = "HW 1",
-                Description = "",
-                DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)),
-                Status = "Published",
-                AssignedById = teacherId,
-            });
+            Id = teacherId,
+            SchoolId = schoolId,
+            Name = "Teacher",
+            Phone = "09000000001",
+            Role = "Teacher",
+        });
+        context.Homeworks.Add(new HomeworkEntity
+        {
+            Id = homeworkId,
+            SchoolId = schoolId,
+            ClassId = classId,
+            Subject = "Math",
+            Title = "HW 1",
+            Description = "",
+            DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)),
+            Status = "Published",
+            AssignedById = teacherId,
+        });
 
-            foreach (var status in new[]
+        var nowSeed = DateTimeOffset.UtcNow;
+        var i = 0;
+        foreach (var status in new[]
+        {
+            AttachmentStatus.Pending,
+            AttachmentStatus.Available,
+            AttachmentStatus.Infected,
+            AttachmentStatus.ScanFailed,
+        })
+        {
+            context.Attachments.Add(new AttachmentEntity
             {
-                AttachmentStatus.Pending,
-                AttachmentStatus.Available,
-                AttachmentStatus.Infected,
-                AttachmentStatus.ScanFailed,
-            })
-            {
-                context.Attachments.Add(new AttachmentEntity
-                {
-                    Id = Guid.NewGuid(),
-                    SchoolId = schoolId,
-                    EntityId = homeworkId,
-                    EntityType = "homework",
-                    StorageKey = $"test/{status}.pdf",
-                    FileName = $"{status}.pdf",
-                    ContentType = "application/pdf",
-                    SizeBytes = 100,
-                    UploadedById = teacherId,
-                    UploadedAt = DateTimeOffset.UtcNow,
-                    Status = status,
-                });
-            }
-
-            await context.SaveChangesAsync();
+                Id = Guid.NewGuid(),
+                SchoolId = schoolId,
+                EntityId = homeworkId,
+                EntityType = "homework",
+                StorageKey = $"test/{status}.pdf",
+                FileName = $"{status}.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 100,
+                UploadedById = teacherId,
+                UploadedAt = nowSeed.AddSeconds(i++),
+                Status = status,
+            });
         }
 
-        var storage = new Mock<IStorageService>(MockBehavior.Strict);
-        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
-                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("https://signed/");
-
-        await using var readContext = new AppDbContext(options, currentUser);
-        var handler = new GetAttachmentsForEntityQueryHandler(readContext, currentUser, storage.Object);
-
-        var result = await handler.Handle(
-            new GetAttachmentsForEntityQuery(homeworkId, "homework"),
-            CancellationToken.None);
-
-        result.Should().ContainSingle(
-            "only rows with Status=Available should be handed out for download");
-        result[0].FileName.Should().Be($"{AttachmentStatus.Available}.pdf");
-
-        // Presigned URL must have been requested exactly once — the Pending,
-        // Infected, and ScanFailed rows never reach the storage service.
-        storage.Verify(
-            s => s.GeneratePresignedDownloadUrlAsync(
-                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        await context.SaveChangesAsync();
+        return (options, schoolId, homeworkId, teacherId);
     }
 
     [Fact]
