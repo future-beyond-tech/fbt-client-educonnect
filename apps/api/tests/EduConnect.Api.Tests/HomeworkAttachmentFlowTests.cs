@@ -71,6 +71,7 @@ public class HomeworkAttachmentFlowTests
             .Setup(service => service.GeneratePresignedUploadUrlAsync(
                 It.IsAny<string>(),
                 "application/pdf",
+                2048L,
                 It.IsAny<TimeSpan>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://upload.example.com");

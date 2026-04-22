@@ -23,6 +23,7 @@ public class S3StorageService : IStorageService
     public Task<string> GeneratePresignedUploadUrlAsync(
         string key,
         string contentType,
+        long sizeBytes,
         TimeSpan expiresIn,
         CancellationToken cancellationToken = default)
     {
@@ -35,9 +36,19 @@ public class S3StorageService : IStorageService
             ContentType = contentType
         };
 
+        // Pin the signed request to the exact byte count so S3 rejects any
+        // PUT whose Content-Length header differs. The AWS SDK v3 PUT-URL
+        // path does not expose content-length-range (that's POST-policy);
+        // including Content-Length in the signed headers delegates
+        // enforcement to the storage backend.
+        request.Headers["Content-Length"] = sizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
         var url = _s3Client.GetPreSignedURL(request);
 
-        _logger.LogInformation("Generated presigned upload URL for key {Key}", key);
+        _logger.LogInformation(
+            "Generated presigned upload URL for key {Key} pinned to {SizeBytes} bytes",
+            key,
+            sizeBytes);
 
         return Task.FromResult(url);
     }
@@ -104,5 +115,27 @@ public class S3StorageService : IStorageService
         // Caller disposes — wrapping ensures the S3 response is released
         // when the stream is closed.
         return response.ResponseStream;
+    }
+
+    public async Task<StorageObjectMetadata?> GetObjectMetadataAsync(
+        string key,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _s3Client.GetObjectMetadataAsync(new GetObjectMetadataRequest
+            {
+                BucketName = _storageOptions.BucketName,
+                Key = key,
+            }, cancellationToken);
+
+            return new StorageObjectMetadata(
+                response.ContentLength,
+                response.Headers.ContentType);
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
     }
 }
