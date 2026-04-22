@@ -175,7 +175,8 @@ public class HomeworkAttachmentFlowTests
         var handler = new GetAttachmentsForEntityQueryHandler(
             context,
             currentUser,
-            storageService.Object);
+            storageService.Object,
+            Options.Create(new StorageOptions()));
 
         var act = () => handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -270,7 +271,8 @@ public class HomeworkAttachmentFlowTests
         var handler = new GetAttachmentsForEntityQueryHandler(
             context,
             currentUser,
-            storageService.Object);
+            storageService.Object,
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),

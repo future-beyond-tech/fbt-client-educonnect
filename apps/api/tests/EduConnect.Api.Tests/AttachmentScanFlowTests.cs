@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -35,7 +36,9 @@ public class AttachmentScanFlowTests
             .ReturnsAsync("https://signed/");
 
         await using var readContext = new AppDbContext(options, teacher);
-        var handler = new GetAttachmentsForEntityQueryHandler(readContext, teacher, storage.Object);
+        var handler = new GetAttachmentsForEntityQueryHandler(
+            readContext, teacher, storage.Object,
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -106,7 +109,9 @@ public class AttachmentScanFlowTests
             .ReturnsAsync("https://signed/");
 
         await using var readContext = new AppDbContext(options, parent);
-        var handler = new GetAttachmentsForEntityQueryHandler(readContext, parent, storage.Object);
+        var handler = new GetAttachmentsForEntityQueryHandler(
+            readContext, parent, storage.Object,
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),

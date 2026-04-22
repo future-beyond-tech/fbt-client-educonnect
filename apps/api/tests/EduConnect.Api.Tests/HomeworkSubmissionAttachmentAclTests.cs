@@ -6,6 +6,7 @@ using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -129,7 +130,8 @@ public class HomeworkSubmissionAttachmentAclTests
         var handler = new GetAttachmentsForEntityQueryHandler(
             context,
             currentUser,
-            storage.Object);
+            storage.Object,
+            Options.Create(new StorageOptions()));
 
         return await handler.Handle(
             new GetAttachmentsForEntityQuery(submissionId, "homework_submission"),

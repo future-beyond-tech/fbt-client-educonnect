@@ -16,7 +16,7 @@ public class RequestUploadUrlV2CommandValidator : AbstractValidator<RequestUploa
         RuleFor(x => x.EntityType)
             .NotEmpty().WithMessage("Entity type is required.")
             .Must(entityType => AttachmentFeatureRules.SupportedEntityTypes.Contains(entityType))
-            .WithMessage("Entity type must be 'homework' or 'notice'.");
+            .WithMessage($"Entity type must be one of: {string.Join(", ", AttachmentFeatureRules.SupportedEntityTypes)}.");
 
         RuleFor(x => x.ContentType)
             .NotEmpty().WithMessage("Content type is required.")
