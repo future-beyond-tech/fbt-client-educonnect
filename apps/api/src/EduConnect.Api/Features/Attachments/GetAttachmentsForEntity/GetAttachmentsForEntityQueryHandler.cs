@@ -5,6 +5,7 @@ using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 
@@ -13,15 +14,18 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
     private readonly AppDbContext _context;
     private readonly CurrentUserService _currentUserService;
     private readonly IStorageService _storageService;
+    private readonly StorageOptions _storageOptions;
 
     public GetAttachmentsForEntityQueryHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
-        IStorageService storageService)
+        IStorageService storageService,
+        IOptions<StorageOptions> storageOptions)
     {
         _context = context;
         _currentUserService = currentUserService;
         _storageService = storageService;
+        _storageOptions = storageOptions.Value;
     }
 
     public async Task<List<AttachmentDto>> Handle(GetAttachmentsForEntityQuery request, CancellationToken cancellationToken)
@@ -74,7 +78,7 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
             {
                 downloadUrl = await _storageService.GeneratePresignedDownloadUrlAsync(
                     attachment.StorageKey,
-                    TimeSpan.FromHours(1),
+                    TimeSpan.FromMinutes(_storageOptions.PresignedDownloadExpiryMinutes),
                     attachment.FileName,
                     attachment.ContentType,
                     AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
