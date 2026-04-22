@@ -180,6 +180,9 @@ EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScannerRegistration.Ad
     builder.Environment);
 builder.Services.AddSingleton<EduConnect.Api.Infrastructure.Services.Scanning.IAttachmentScanQueue,
     EduConnect.Api.Infrastructure.Services.Scanning.ChannelAttachmentScanQueue>();
+// Reconciler runs first so any stale Pending rows from a prior crash are
+// in the queue before the worker starts draining new uploads.
+builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanReconciler>();
 builder.Services.AddHostedService<EduConnect.Api.Infrastructure.Services.Scanning.AttachmentScanWorker>();
 
 builder.Services.AddHttpContextAccessor();

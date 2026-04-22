@@ -36,4 +36,13 @@ public sealed class AttachmentScannerOptions
     public string Host { get; set; } = "clamav";
     public int Port { get; set; } = 3310;
     public int TimeoutSeconds { get; set; } = 30;
+
+    // Grace window used by AttachmentScanReconciler to decide which
+    // Pending rows to re-enqueue at startup. Rows newer than this are
+    // skipped so we don't double-enqueue an attachment that's still in
+    // the middle of an attach handler call. The handler's enqueue is
+    // idempotent (the worker early-returns on non-Pending status), so
+    // overshooting is safe — undershooting (too long a window) just
+    // means longer recovery after a crash.
+    public int ReconciliationGraceMinutes { get; set; } = 2;
 }
