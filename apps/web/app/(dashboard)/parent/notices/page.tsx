@@ -206,7 +206,11 @@ export default function ParentNoticesPage(): React.ReactElement {
                       </p>
                     )}
                     <div className="mt-3">
-                      <AttachmentList entityId={notice.noticeId} entityType="notice" />
+                      <AttachmentList
+                        entityId={notice.noticeId}
+                        entityType="notice"
+                        publishedAt={notice.publishedAt}
+                      />
                     </div>
                     {notice.expiresAt && (
                       <p className="mt-3 text-xs text-muted-foreground">

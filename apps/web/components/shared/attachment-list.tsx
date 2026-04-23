@@ -26,6 +26,14 @@ import {
 interface AttachmentListProps {
   entityId: string;
   entityType: AttachmentEntityType;
+  /**
+   * When supplied, enables a short grace-window poll if the first fetch
+   * returns zero rows AND this timestamp is within the last 5 minutes —
+   * catches the race where the admin publishes before virus scans finish
+   * (parents never see Pending rows, so the Pending-based poll below
+   * wouldn't start on its own).
+   */
+  publishedAt?: string | null;
 }
 
 // Re-poll every 5s while any row is Pending. Cap total polling to keep
@@ -34,9 +42,18 @@ interface AttachmentListProps {
 const POLL_INTERVAL_MS = 5_000;
 const POLL_DEADLINE_MS = 2 * 60 * 1_000;
 
+// Grace-window poll for empty-on-publish: fire every 10s for up to 2 min
+// when the notice was published within the last 5 min. Narrower than the
+// Pending poll on purpose — parents never see Pending rows, so we'd
+// otherwise show "No attachments." until the page is reloaded manually.
+const GRACE_POLL_INTERVAL_MS = 10_000;
+const GRACE_POLL_DEADLINE_MS = 2 * 60 * 1_000;
+const GRACE_PUBLISH_WINDOW_MS = 5 * 60 * 1_000;
+
 export function AttachmentList({
   entityId,
   entityType,
+  publishedAt,
 }: AttachmentListProps): React.ReactElement {
   const [attachments, setAttachments] = React.useState<AttachmentItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -91,6 +108,35 @@ export function AttachmentList({
 
     return () => window.clearInterval(handle);
   }, [attachments, fetchAttachments]);
+
+  // Grace-window poll: after the initial fetch settles empty AND the
+  // notice was published in the last 5 min, keep re-fetching at 10s for
+  // up to 2 min in case a scan was still running at publish time.
+  // Unlocks the parent-side symptom where a freshly-published notice
+  // shows "No attachments." because every row is still Pending and
+  // filtered out server-side for the Parent role. Tears itself down the
+  // moment any row appears (or the deadline passes, or the component
+  // unmounts).
+  React.useEffect(() => {
+    if (isLoading) return;
+    if (attachments.length > 0) return;
+    if (!publishedAt) return;
+
+    const publishedAtMs = Date.parse(publishedAt);
+    if (Number.isNaN(publishedAtMs)) return;
+    if (Date.now() - publishedAtMs > GRACE_PUBLISH_WINDOW_MS) return;
+
+    const startedAt = Date.now();
+    const handle = window.setInterval(() => {
+      if (Date.now() - startedAt > GRACE_POLL_DEADLINE_MS) {
+        window.clearInterval(handle);
+        return;
+      }
+      void fetchAttachments(false);
+    }, GRACE_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(handle);
+  }, [attachments.length, fetchAttachments, isLoading, publishedAt]);
 
   if (isLoading) {
     return (
