@@ -22,7 +22,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `NEXT_PUBLIC_APP_URL=${baseURL} NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 pnpm exec next build && NEXT_PUBLIC_APP_URL=${baseURL} NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 HOSTNAME=127.0.0.1 PORT=${port} node .next/standalone/apps/web/server.js`,
+    // `next start` serves the production build plus `_next/static` assets
+    // directly from the app workspace. The standalone server path in this
+    // repo leaves chunk assets unreachable during Playwright runs, which
+    // prevents hydration and keeps every route on the auth-loading shell.
+    command: `NEXT_PUBLIC_APP_URL=${baseURL} NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 pnpm exec next build && NEXT_PUBLIC_APP_URL=${baseURL} NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,

@@ -8,7 +8,6 @@ using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -344,8 +343,7 @@ public class HomeworkAttachmentFlowTests
             context,
             currentUser,
             storageService.Object,
-            Options.Create(new StorageOptions()),
-            new HttpContextAccessor());
+            Options.Create(new StorageOptions()));
 
         var act = () => handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -441,8 +439,7 @@ public class HomeworkAttachmentFlowTests
             context,
             currentUser,
             storageService.Object,
-            Options.Create(new StorageOptions()),
-            new HttpContextAccessor());
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),

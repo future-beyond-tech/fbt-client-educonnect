@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace EduConnect.Api.Infrastructure.Services.Scanning;
 
@@ -38,6 +39,31 @@ public static class AttachmentScannerRegistration
         }
 
         services.AddSingleton<IAttachmentScanner, NoOpAttachmentScanner>();
+        // Surface the fail-closed posture on every startup so operators in
+        // dev/staging don't silently wonder why every parent sees zero
+        // attachments. Admins get the same hint surfaced in the attachment
+        // list DTO via AttachmentDto.ScanFailureReason.
+        services.AddHostedService<NoOpScannerStartupWarning>();
         return services;
     }
+}
+
+internal sealed class NoOpScannerStartupWarning : IHostedService
+{
+    private readonly ILogger<NoOpScannerStartupWarning> _logger;
+
+    public NoOpScannerStartupWarning(ILogger<NoOpScannerStartupWarning> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(
+            "NoOpAttachmentScanner is active — every uploaded attachment will be automatically marked Available " +
+            "without scanning. Set CLAMAV_ENABLED=true (with CLAMAV_HOST / CLAMAV_PORT) to enable real virus scanning.");
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

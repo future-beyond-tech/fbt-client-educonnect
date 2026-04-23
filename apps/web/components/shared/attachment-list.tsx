@@ -2,10 +2,15 @@
 
 import * as React from "react";
 import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  buildAttachmentDownloadUrl,
+  normalizeAttachmentViewUrl,
+} from "@/lib/attachment-url";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AlertTriangle,
+  Eye,
   Download,
   FileText,
   ImageIcon,
@@ -26,6 +31,14 @@ import {
 interface AttachmentListProps {
   entityId: string;
   entityType: AttachmentEntityType;
+  /**
+   * When supplied, enables a short grace-window poll if the first fetch
+   * returns zero rows AND this timestamp is within the last 5 minutes —
+   * catches the race where the admin publishes before virus scans finish
+   * (parents never see Pending rows, so the Pending-based poll below
+   * wouldn't start on its own).
+   */
+  publishedAt?: string | null;
 }
 
 // Re-poll every 5s while any row is Pending. Cap total polling to keep
@@ -34,9 +47,18 @@ interface AttachmentListProps {
 const POLL_INTERVAL_MS = 5_000;
 const POLL_DEADLINE_MS = 2 * 60 * 1_000;
 
+// Grace-window poll for empty-on-publish: fire every 10s for up to 2 min
+// when the notice was published within the last 5 min. Narrower than the
+// Pending poll on purpose — parents never see Pending rows, so we'd
+// otherwise show "No attachments." until the page is reloaded manually.
+const GRACE_POLL_INTERVAL_MS = 10_000;
+const GRACE_POLL_DEADLINE_MS = 2 * 60 * 1_000;
+const GRACE_PUBLISH_WINDOW_MS = 5 * 60 * 1_000;
+
 export function AttachmentList({
   entityId,
   entityType,
+  publishedAt,
 }: AttachmentListProps): React.ReactElement {
   const [attachments, setAttachments] = React.useState<AttachmentItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -91,6 +113,35 @@ export function AttachmentList({
 
     return () => window.clearInterval(handle);
   }, [attachments, fetchAttachments]);
+
+  // Grace-window poll: after the initial fetch settles empty AND the
+  // notice was published in the last 5 min, keep re-fetching at 10s for
+  // up to 2 min in case a scan was still running at publish time.
+  // Unlocks the parent-side symptom where a freshly-published notice
+  // shows "No attachments." because every row is still Pending and
+  // filtered out server-side for the Parent role. Tears itself down the
+  // moment any row appears (or the deadline passes, or the component
+  // unmounts).
+  React.useEffect(() => {
+    if (isLoading) return;
+    if (attachments.length > 0) return;
+    if (!publishedAt) return;
+
+    const publishedAtMs = Date.parse(publishedAt);
+    if (Number.isNaN(publishedAtMs)) return;
+    if (Date.now() - publishedAtMs > GRACE_PUBLISH_WINDOW_MS) return;
+
+    const startedAt = Date.now();
+    const handle = window.setInterval(() => {
+      if (Date.now() - startedAt > GRACE_POLL_DEADLINE_MS) {
+        window.clearInterval(handle);
+        return;
+      }
+      void fetchAttachments(false);
+    }, GRACE_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(handle);
+  }, [attachments.length, fetchAttachments, isLoading, publishedAt]);
 
   if (isLoading) {
     return (
@@ -161,7 +212,15 @@ function AttachmentRow({
   getFileIcon,
 }: AttachmentRowProps): React.ReactElement {
   const isAvailable = attachment.status === "Available";
-  const opensInNewTab = !isWordAttachment(attachment.contentType);
+  const viewUrl =
+    isAvailable && attachment.downloadUrl
+      ? normalizeAttachmentViewUrl(attachment.downloadUrl)
+      : "";
+  const downloadUrl =
+    isAvailable && attachment.downloadUrl
+      ? buildAttachmentDownloadUrl(attachment.downloadUrl)
+      : "";
+  const canPreview = !isWordAttachment(attachment.contentType);
   const baseClass =
     "flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.4)] dark:bg-card/86";
 
@@ -178,29 +237,37 @@ function AttachmentRow({
           {formatFileSize(attachment.sizeBytes)}
         </p>
       </div>
-      <StatusBadge status={attachment.status} />
-      {isAvailable && attachment.downloadUrl ? (
-        <Download
-          className="h-4 w-4 shrink-0 text-muted-foreground"
-          aria-hidden="true"
-        />
-      ) : null}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <StatusBadge status={attachment.status} />
+        {isAvailable && viewUrl ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {canPreview ? (
+              <a
+                href={viewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label={`View ${attachment.fileName}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                View
+              </a>
+            ) : null}
+            <a
+              href={canPreview ? downloadUrl : viewUrl}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Download ${attachment.fileName}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Download
+            </a>
+          </div>
+        ) : null}
+      </div>
     </>
   );
-
-  if (isAvailable && attachment.downloadUrl) {
-    return (
-      <a
-        href={attachment.downloadUrl}
-        target={opensInNewTab ? "_blank" : undefined}
-        rel={opensInNewTab ? "noopener noreferrer" : undefined}
-        className={`${baseClass} transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92`}
-        aria-label={`Download ${attachment.fileName}`}
-      >
-        {body}
-      </a>
-    );
-  }
 
   return (
     <div className={baseClass} aria-label={attachment.fileName}>

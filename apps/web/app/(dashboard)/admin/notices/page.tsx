@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { formatNoticeAudienceDetails, formatNoticeAudienceLabel } from "@/lib/notice-targeting";
@@ -8,10 +9,10 @@ import type {
   CreateNoticeRequest,
   CreateNoticeResponse,
   NoticeItem,
-  PublishNoticeResponse,
   UpdateNoticeRequest,
   UpdateNoticeResponse,
 } from "@/lib/types/notice";
+import type { AttachmentItem } from "@/lib/types/attachment";
 import type { ClassItem } from "@/lib/types/student";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ import {
 import { StatusBanner } from "@/components/shared/status-banner";
 import { AttachmentUploader, type UploadedFile } from "@/components/shared/attachment-uploader";
 import { AttachmentList } from "@/components/shared/attachment-list";
-import { Bell, Check, Paperclip, Pencil, Plus, Search, Send, X } from "lucide-react";
+import { Bell, Check, Eye, Paperclip, Pencil, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NoticeTargetAudience = "All" | "Class" | "Section";
@@ -82,17 +83,22 @@ export default function AdminNoticesPage(): React.ReactElement {
   const [createError, setCreateError] = React.useState("");
   const [isCreating, setIsCreating] = React.useState(false);
 
-  const [isPublishing, setIsPublishing] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState("");
 
   // List filter + search
   const [stateFilter, setStateFilter] = React.useState<"all" | "draft" | "published">("all");
   const [listSearch, setListSearch] = React.useState("");
 
-  // Dialog state for attach-after-create
+  // Manage-attachments dialog state. `attachmentsByNoticeId` is a per-notice
+  // cache so the Manage dialog opens with the draft's current files (delete
+  // + add operates on real rows) instead of starting from an empty list.
   const [attachDialogOpen, setAttachDialogOpen] = React.useState(false);
   const [newNoticeId, setNewNoticeId] = React.useState<string | null>(null);
-  const [newNoticeAttachments, setNewNoticeAttachments] = React.useState<UploadedFile[]>([]);
+  const [attachmentsByNoticeId, setAttachmentsByNoticeId] = React.useState<
+    Record<string, UploadedFile[]>
+  >({});
+  const [isLoadingAttachments, setIsLoadingAttachments] = React.useState(false);
+  const [attachmentLoadError, setAttachmentLoadError] = React.useState("");
 
   const classGroups = React.useMemo(() => {
     const grouped = new Map<string, ClassGroupOption>();
@@ -359,10 +365,73 @@ export default function AdminNoticesPage(): React.ReactElement {
     setCreateDialogOpen(true);
   };
 
+  const mapAttachmentsToUploaded = React.useCallback(
+    (items: AttachmentItem[]): UploadedFile[] =>
+      items.map((attachment) => ({
+        attachmentId: attachment.id,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+      })),
+    []
+  );
+
+  const loadNoticeAttachments = React.useCallback(
+    async (noticeId: string): Promise<void> => {
+      setIsLoadingAttachments(true);
+      setAttachmentLoadError("");
+
+      try {
+        const items = await apiGet<AttachmentItem[]>(
+          `${API_ENDPOINTS.attachments}?entityId=${noticeId}&entityType=notice`
+        );
+        setAttachmentsByNoticeId((prev) => ({
+          ...prev,
+          [noticeId]: mapAttachmentsToUploaded(items),
+        }));
+      } catch (err) {
+        setAttachmentLoadError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to load draft attachments."
+        );
+        setAttachmentsByNoticeId((prev) => ({
+          ...prev,
+          [noticeId]: prev[noticeId] ?? [],
+        }));
+      } finally {
+        setIsLoadingAttachments(false);
+      }
+    },
+    [mapAttachmentsToUploaded]
+  );
+
+  const openManageAttachmentsDialog = React.useCallback(
+    async (noticeId: string): Promise<void> => {
+      setSuccessMessage("");
+      setAttachmentLoadError("");
+      setNewNoticeId(noticeId);
+      setAttachDialogOpen(true);
+
+      // Preload the draft's current attachments so delete/add operates
+      // against the real files. The homework admin page uses the same
+      // load-on-demand pattern.
+      await loadNoticeAttachments(noticeId);
+    },
+    [loadNoticeAttachments]
+  );
+
+  const setAttachmentsForNotice = React.useCallback(
+    (noticeId: string, next: UploadedFile[]): void => {
+      setAttachmentsByNoticeId((prev) => ({ ...prev, [noticeId]: next }));
+    },
+    []
+  );
+
   const closeAttachDialog = (): void => {
     setAttachDialogOpen(false);
     setNewNoticeId(null);
-    setNewNoticeAttachments([]);
+    setAttachmentLoadError("");
     void fetchNotices();
   };
 
@@ -426,12 +495,18 @@ export default function AdminNoticesPage(): React.ReactElement {
       setSuccessMessage(savedMessage);
       setCreateDialogOpen(false);
       resetCreateForm();
-      // Reopen the Attach dialog so the admin can revise files in the same
-      // flow (create or edit).
-      setNewNoticeId(savedNoticeId);
-      setNewNoticeAttachments([]);
-      setAttachDialogOpen(true);
+      // Reopen the Manage dialog so the admin can revise files in the same
+      // flow (create or edit). On edit we preload the draft's current files
+      // so delete/add works against them; on create we start with the new
+      // draft's (empty) attachment list.
       void fetchNotices();
+      if (isEditing) {
+        void openManageAttachmentsDialog(savedNoticeId);
+      } else {
+        setAttachmentsByNoticeId((prev) => ({ ...prev, [savedNoticeId]: [] }));
+        setNewNoticeId(savedNoticeId);
+        setAttachDialogOpen(true);
+      }
     } catch (err) {
       const fallback = isEditing
         ? "Failed to update notice."
@@ -439,25 +514,6 @@ export default function AdminNoticesPage(): React.ReactElement {
       setCreateError(err instanceof ApiError ? err.message : fallback);
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const handlePublish = async (noticeId: string): Promise<void> => {
-    setSuccessMessage("");
-    setIsPublishing(noticeId);
-    try {
-      const response = await apiPut<PublishNoticeResponse>(
-        `${API_ENDPOINTS.notices}/${noticeId}/publish`,
-        { noticeId }
-      );
-      setSuccessMessage(response.message);
-      void fetchNotices();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to publish notice."
-      );
-    } finally {
-      setIsPublishing(null);
     }
   };
 
@@ -664,44 +720,42 @@ export default function AdminNoticesPage(): React.ReactElement {
                         >
                           {formatNoticeAudienceLabel(notice)}
                         </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditDialog(notice)}
-                          aria-label={`Edit draft ${notice.title}`}
-                          disabled={isPublishing === notice.noticeId}
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSuccessMessage("");
-                            setNewNoticeId(notice.noticeId);
-                            setNewNoticeAttachments([]);
-                            setAttachDialogOpen(true);
-                          }}
-                          aria-label={`Attach files to ${notice.title}`}
-                        >
-                          <Paperclip className="h-3 w-3" />
-                          Attach
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => void handlePublish(notice.noticeId)}
-                          disabled={isPublishing === notice.noticeId}
-                        >
-                          {isPublishing === notice.noticeId ? (
-                            <Spinner size="sm" />
-                          ) : (
-                            <>
-                              <Send className="h-3 w-3" />
-                              Publish
-                            </>
-                          )}
-                        </Button>
+                        {notice.capabilities.canEditDraft && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(notice)}
+                            aria-label={`Edit draft ${notice.title}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </Button>
+                        )}
+                        {notice.capabilities.canManageDraftAttachments && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              void openManageAttachmentsDialog(notice.noticeId);
+                            }}
+                            aria-label={`Manage attachments for ${notice.title}`}
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            Manage attachments
+                          </Button>
+                        )}
+                        {notice.capabilities.canPreviewDraft && (
+                          <Button
+                            size="sm"
+                            asChild
+                            aria-label={`Preview and publish ${notice.title}`}
+                          >
+                            <Link href={`/admin/notices/${notice.noticeId}/preview`}>
+                              <Eye className="h-3 w-3" />
+                              Preview & publish
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -1028,15 +1082,15 @@ export default function AdminNoticesPage(): React.ReactElement {
         </form>
       </Dialog>
 
-      {/* Attach files dialog */}
+      {/* Manage attachments dialog */}
       <Dialog
         open={attachDialogOpen}
         onOpenChange={(next) => {
           if (!next) closeAttachDialog();
           else setAttachDialogOpen(true);
         }}
-        title="Attach files"
-        description="Optionally attach images or PDFs to the draft notice before publishing."
+        title="Manage attachments"
+        description="Add, remove, or replace images and PDFs on this draft notice. Attachments can't be changed once the notice is published."
         size="lg"
         footer={
           <Button type="button" onClick={closeAttachDialog}>
@@ -1045,12 +1099,32 @@ export default function AdminNoticesPage(): React.ReactElement {
         }
       >
         {newNoticeId && (
-          <AttachmentUploader
-            entityId={newNoticeId}
-            entityType="notice"
-            existingAttachments={newNoticeAttachments}
-            onAttachmentsChange={setNewNoticeAttachments}
-          />
+          <>
+            {attachmentLoadError && (
+              <div className="mb-3">
+                <StatusBanner variant="warning">
+                  {attachmentLoadError}
+                </StatusBanner>
+              </div>
+            )}
+            {isLoadingAttachments && !attachmentsByNoticeId[newNoticeId] ? (
+              <div className="flex items-center gap-2 py-3">
+                <Spinner size="sm" />
+                <span className="text-sm text-muted-foreground">
+                  Loading attachments...
+                </span>
+              </div>
+            ) : (
+              <AttachmentUploader
+                entityId={newNoticeId}
+                entityType="notice"
+                existingAttachments={attachmentsByNoticeId[newNoticeId] ?? []}
+                onAttachmentsChange={(next) =>
+                  setAttachmentsForNotice(newNoticeId, next)
+                }
+              />
+            )}
+          </>
         )}
       </Dialog>
     </PageShell>

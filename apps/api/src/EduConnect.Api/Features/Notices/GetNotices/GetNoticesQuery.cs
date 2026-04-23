@@ -8,6 +8,12 @@ public record NoticeTargetClassDto(
     string Section,
     string AcademicYear);
 
+public record NoticeCapabilitiesDto(
+    bool CanEditDraft,
+    bool CanManageDraftAttachments,
+    bool CanPreviewDraft,
+    bool CanPublishDraft);
+
 public record NoticeDto(
     Guid NoticeId,
     string Title,
@@ -17,4 +23,6 @@ public record NoticeDto(
     bool IsPublished,
     DateTimeOffset? PublishedAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    NoticeCapabilitiesDto Capabilities,
+    int AttachmentCount = 0);
