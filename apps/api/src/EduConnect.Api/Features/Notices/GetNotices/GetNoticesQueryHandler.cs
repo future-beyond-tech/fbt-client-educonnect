@@ -39,14 +39,15 @@ public class GetNoticesQueryHandler : IRequestHandler<GetNoticesQuery, List<Noti
                 .Where(n => n.ExpiresAt == null || n.ExpiresAt > DateTimeOffset.UtcNow);
         }
 
-        var notices = await query
+        var rows = await query
             .OrderByDescending(n => n.PublishedAt ?? n.CreatedAt)
-            .Select(n => new NoticeDto(
+            .Select(n => new
+            {
                 n.Id,
                 n.Title,
                 n.Body,
                 n.TargetAudience,
-                n.TargetClasses
+                TargetClasses = n.TargetClasses
                     .OrderBy(targetClass => targetClass.TargetClass!.Name)
                     .ThenBy(targetClass => targetClass.TargetClass!.AcademicYear)
                     .ThenBy(targetClass => targetClass.TargetClass!.Section)
@@ -59,9 +60,23 @@ public class GetNoticesQueryHandler : IRequestHandler<GetNoticesQuery, List<Noti
                 n.IsPublished,
                 n.PublishedAt,
                 n.ExpiresAt,
-                n.CreatedAt))
+                n.CreatedAt,
+                n.PublishedById
+            })
             .ToListAsync(cancellationToken);
 
-        return notices;
+        return rows
+            .Select(n => new NoticeDto(
+                n.Id,
+                n.Title,
+                n.Body,
+                n.TargetAudience,
+                n.TargetClasses,
+                n.IsPublished,
+                n.PublishedAt,
+                n.ExpiresAt,
+                n.CreatedAt,
+                NoticeCapabilities.For(_currentUserService, n.IsPublished, n.PublishedById)))
+            .ToList();
     }
 }

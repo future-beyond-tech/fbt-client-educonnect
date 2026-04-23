@@ -41,17 +41,38 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+type SlottableProps = React.Attributes & {
+  className?: string;
+  [key: string]: unknown;
+};
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    { className, variant, size, asChild: _asChild, ...props },
+    { className, variant, size, asChild = false, children, ...props },
     ref
-  ): React.ReactElement => (
-    <button
-      className={cn(buttonVariants({ variant, size, className }))}
-      ref={ref}
-      {...props}
-    />
-  )
+  ): React.ReactElement => {
+    const resolvedClassName = cn(buttonVariants({ variant, size, className }));
+
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<SlottableProps>;
+      const mergedProps: SlottableProps = {
+        ...(props as unknown as SlottableProps),
+        className: cn(resolvedClassName, child.props.className),
+      };
+
+      return React.cloneElement(child, mergedProps);
+    }
+
+    return (
+      <button
+        className={resolvedClassName}
+        ref={ref}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  }
 );
 Button.displayName = "Button";
 

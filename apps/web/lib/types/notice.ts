@@ -5,6 +5,16 @@ export interface NoticeTargetClassItem {
   academicYear: string;
 }
 
+// Flags projected by the API so the admin UI matches the server's
+// per-user authorization rules without trial-and-error requests. See
+// NoticeCapabilities on the API side.
+export interface NoticeCapabilities {
+  canEditDraft: boolean;
+  canManageDraftAttachments: boolean;
+  canPreviewDraft: boolean;
+  canPublishDraft: boolean;
+}
+
 export interface NoticeItem {
   noticeId: string;
   title: string;
@@ -15,6 +25,7 @@ export interface NoticeItem {
   publishedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
+  capabilities: NoticeCapabilities;
 }
 
 export interface CreateNoticeRequest {

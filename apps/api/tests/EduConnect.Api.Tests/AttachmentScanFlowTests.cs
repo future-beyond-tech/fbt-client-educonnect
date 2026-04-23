@@ -126,6 +126,140 @@ public class AttachmentScanFlowTests
         result[0].DownloadUrl.Should().Be("https://signed/");
     }
 
+    [Fact]
+    public async Task GetAttachmentsForEntity_returns_notice_download_proxy_to_parents_for_published_targeted_notice()
+    {
+        var schoolId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var noticeId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
+        await using (var context = new AppDbContext(options))
+        {
+            context.Schools.Add(new SchoolEntity
+            {
+                Id = schoolId,
+                Name = "Test School",
+                Code = "TEST",
+                Address = "",
+                ContactPhone = "",
+                ContactEmail = "",
+            });
+            context.Classes.Add(new ClassEntity
+            {
+                Id = classId,
+                SchoolId = schoolId,
+                Name = "7",
+                Section = "A",
+                AcademicYear = "2026",
+            });
+            context.Users.AddRange(
+                new UserEntity
+                {
+                    Id = adminId,
+                    SchoolId = schoolId,
+                    Name = "Admin",
+                    Phone = "09000000011",
+                    Role = "Admin",
+                },
+                new UserEntity
+                {
+                    Id = parentId,
+                    SchoolId = schoolId,
+                    Name = "Parent",
+                    Phone = "09000000012",
+                    Role = "Parent",
+                });
+            context.Students.Add(new StudentEntity
+            {
+                Id = studentId,
+                SchoolId = schoolId,
+                ClassId = classId,
+                RollNumber = "001",
+                Name = "Child",
+                IsActive = true,
+            });
+            context.ParentStudentLinks.Add(new ParentStudentLinkEntity
+            {
+                Id = Guid.NewGuid(),
+                SchoolId = schoolId,
+                ParentId = parentId,
+                StudentId = studentId,
+                Relationship = "parent",
+            });
+            context.Notices.Add(new NoticeEntity
+            {
+                Id = noticeId,
+                SchoolId = schoolId,
+                Title = "Sports day",
+                Body = "See the schedule.",
+                TargetAudience = "Class",
+                PublishedById = adminId,
+                IsPublished = true,
+                PublishedAt = DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            context.NoticeTargetClasses.Add(new NoticeTargetClassEntity
+            {
+                SchoolId = schoolId,
+                NoticeId = noticeId,
+                ClassId = classId,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            context.Attachments.Add(new AttachmentEntity
+            {
+                Id = attachmentId,
+                SchoolId = schoolId,
+                EntityId = noticeId,
+                EntityType = "notice",
+                StorageKey = "test/notice.pdf",
+                FileName = "notice.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 2048,
+                UploadedById = adminId,
+                UploadedAt = DateTimeOffset.UtcNow,
+                Status = AttachmentStatus.Available,
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        var parent = new CurrentUserService
+        {
+            SchoolId = schoolId,
+            UserId = parentId,
+            Role = "Parent",
+            Name = "Parent",
+        };
+
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+
+        await using var readContext = new AppDbContext(options, parent);
+        var handler = new GetAttachmentsForEntityQueryHandler(
+            readContext, parent, storage.Object,
+            Options.Create(new StorageOptions()),
+            new HttpContextAccessor());
+
+        var result = await handler.Handle(
+            new GetAttachmentsForEntityQuery(noticeId, "notice"),
+            CancellationToken.None);
+
+        result.Should().ContainSingle();
+        result[0].Status.Should().Be(AttachmentStatus.Available);
+        result[0].DownloadUrl.Should().Be($"/api/attachments/{attachmentId}/download");
+
+        storage.VerifyNoOtherCalls();
+    }
+
     private static async Task<(DbContextOptions<AppDbContext> Options, Guid SchoolId, Guid HomeworkId, Guid TeacherId)>
         SeedHomeworkWithAllStatusesAsync()
     {
