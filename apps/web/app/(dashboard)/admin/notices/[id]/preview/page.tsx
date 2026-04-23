@@ -328,26 +328,19 @@ function AttachmentPreviewRow({
 
       {isAvailable && attachment.downloadUrl && isPdf && (
         <div className="mt-4 space-y-2">
-          <object
-            data={attachment.downloadUrl}
-            type="application/pdf"
-            aria-label={attachment.fileName}
+          {/*
+            Using <iframe> (not <object>) because middleware's CSP sets
+            object-src 'none'. frame-src is extended in middleware.ts to
+            allow the R2 media origin so the final redirect target is
+            embeddable. sandbox="" blocks script execution inside the
+            frame; browser PDF viewers don't need scripts.
+          */}
+          <iframe
+            src={attachment.downloadUrl}
+            title={attachment.fileName}
+            sandbox=""
             className="h-[640px] w-full rounded-[18px] border border-border/60 bg-muted/40"
-          >
-            <div className="flex items-center justify-between gap-3 rounded-[18px] border border-dashed border-border/60 bg-muted/30 p-4">
-              <p className="text-sm text-muted-foreground">
-                Your browser can&apos;t embed this PDF.
-              </p>
-              <a
-                href={attachment.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-primary underline-offset-2 hover:underline"
-              >
-                Open PDF
-              </a>
-            </div>
-          </object>
+          />
           <a
             href={attachment.downloadUrl}
             target="_blank"

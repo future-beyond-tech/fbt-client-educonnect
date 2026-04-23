@@ -50,6 +50,13 @@ function buildCsp(nonce: string): string {
     .filter(Boolean)
     .join(" ");
 
+  // Only emit frame-src when an explicit media origin is configured.
+  // Empty → omit the directive entirely so it falls back to default-src
+  // 'self' (existing behaviour). Admin notice-preview embeds PDFs in
+  // <iframe>; the audit-redirect endpoint 302s to the R2 media origin,
+  // so the embeddable target is mediaOrigin, not 'self'.
+  const frameSrc = mediaOrigin ? `'self' ${mediaOrigin}` : "";
+
   // 'strict-dynamic' lets nonced root scripts transitively load Next.js bundles
   // without needing each chunk hash listed. 'self' is ignored when strict-dynamic
   // is present but keeping it satisfies non-nonce-aware scanners.
@@ -71,6 +78,7 @@ function buildCsp(nonce: string): string {
     `font-src 'self' data:`,
     `connect-src ${connectSrc}`,
     `worker-src 'self' blob:`,
+    frameSrc ? `frame-src ${frameSrc}` : "",
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
