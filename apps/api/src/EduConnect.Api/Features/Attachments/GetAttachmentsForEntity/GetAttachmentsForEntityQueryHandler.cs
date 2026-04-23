@@ -4,6 +4,7 @@ using EduConnect.Api.Features.Attachments;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
+using EduConnect.Api.Infrastructure.Services.Scanning;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -101,6 +102,18 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
                         cancellationToken);
             }
 
+            // Admin-only hint so the UI can distinguish "scanner not wired
+            // up in this env" from a real scan error. Parents never see
+            // ScanFailed rows, so this stays null for them.
+            string? scanFailureReason = null;
+            if (attachment.Status == AttachmentStatus.ScanFailed &&
+                _currentUserService.Role == "Admin")
+            {
+                scanFailureReason = attachment.ThreatName == NoOpAttachmentScanner.NoOpThreatName
+                    ? "scanner-unavailable"
+                    : "scan-verdict-error";
+            }
+
             result.Add(new AttachmentDto(
                 attachment.Id,
                 attachment.FileName,
@@ -108,7 +121,8 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
                 attachment.SizeBytes,
                 downloadUrl,
                 attachment.UploadedAt,
-                attachment.Status));
+                attachment.Status,
+                scanFailureReason));
         }
 
         return result;
