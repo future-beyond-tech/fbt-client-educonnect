@@ -21,6 +21,8 @@ import { StatusBanner } from "@/components/shared/status-banner";
 import { Bell, Paperclip } from "lucide-react";
 import { AttachmentList } from "@/components/shared/attachment-list";
 
+const NOTICE_REFRESH_INTERVAL_MS = 30_000;
+
 export default function ParentNoticesPage(): React.ReactElement {
   const {
     children,
@@ -35,21 +37,67 @@ export default function ParentNoticesPage(): React.ReactElement {
   const [error, setError] = React.useState("");
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
-  const fetchNotices = React.useCallback(async () => {
-    setIsLoading(true);
-    setError("");
+  const fetchNotices = React.useCallback(async (showLoader = false) => {
+    if (showLoader) {
+      setIsLoading(true);
+    }
+
     try {
       const data = await apiGet<NoticeItem[]>(API_ENDPOINTS.notices);
       setNotices(data);
+      setExpandedId((currentExpandedId) =>
+        currentExpandedId &&
+        !data.some((notice) => notice.noticeId === currentExpandedId)
+          ? null
+          : currentExpandedId
+      );
+      setError("");
     } catch {
-      setError("Failed to load notices.");
+      if (showLoader) {
+        setError("Failed to load notices.");
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoader) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   React.useEffect(() => {
-    void fetchNotices();
+    void fetchNotices(true);
+  }, [fetchNotices]);
+
+  React.useEffect(() => {
+    const refreshSilently = (): void => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      void fetchNotices(false);
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "visible") {
+        void fetchNotices(false);
+      }
+    };
+
+    const interval = window.setInterval(
+      refreshSilently,
+      NOTICE_REFRESH_INTERVAL_MS
+    );
+
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
   }, [fetchNotices]);
 
   const visibleNotices = React.useMemo(() => {
