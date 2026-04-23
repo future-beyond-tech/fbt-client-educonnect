@@ -23,6 +23,7 @@ public static class DownloadAttachmentEndpoint
 {
     public static async Task<IResult> Handle(
         [FromRoute] Guid id,
+        [FromQuery] string? download,
         IMediator mediator,
         AppDbContext context,
         CurrentUserService currentUser,
@@ -101,7 +102,7 @@ public static class DownloadAttachmentEndpoint
             TimeSpan.FromMinutes(storageOptions.Value.PresignedDownloadExpiryMinutes),
             attachment.FileName,
             attachment.ContentType,
-            AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
+            ShouldForceDownload(download) || AttachmentFeatureRules.RequiresForcedDownload(attachment.ContentType),
             cancellationToken);
 
         // The audit signal: one log line per download with user + tenant +
@@ -117,6 +118,11 @@ public static class DownloadAttachmentEndpoint
 
         return Results.Redirect(presignedUrl, permanent: false);
     }
+
+    private static bool ShouldForceDownload(string? download) =>
+        download is not null &&
+        (download.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+         download.Equals("1", StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>

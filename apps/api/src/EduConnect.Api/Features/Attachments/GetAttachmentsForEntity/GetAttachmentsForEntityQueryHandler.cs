@@ -6,7 +6,6 @@ using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using EduConnect.Api.Infrastructure.Services.Scanning;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
@@ -25,20 +24,17 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
     private readonly CurrentUserService _currentUserService;
     private readonly IStorageService _storageService;
     private readonly StorageOptions _storageOptions;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public GetAttachmentsForEntityQueryHandler(
         AppDbContext context,
         CurrentUserService currentUserService,
         IStorageService storageService,
-        IOptions<StorageOptions> storageOptions,
-        IHttpContextAccessor httpContextAccessor)
+        IOptions<StorageOptions> storageOptions)
     {
         _context = context;
         _currentUserService = currentUserService;
         _storageService = storageService;
         _storageOptions = storageOptions.Value;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<List<AttachmentDto>> Handle(GetAttachmentsForEntityQuery request, CancellationToken cancellationToken)
@@ -131,20 +127,22 @@ public class GetAttachmentsForEntityQueryHandler : IRequestHandler<GetAttachment
     private static bool CanViewInProgressScans(string? role) =>
         role == "Admin" || role == "Teacher";
 
-    private string BuildAuditRedirectUrl(Guid attachmentId)
+    private static string BuildAuditRedirectUrl(Guid attachmentId)
     {
-        // Build an absolute URL so the FE's anchor `href` resolves to the
-        // API origin and not to whatever app origin the user is currently
-        // on. Falls back to a relative URL when there's no HttpContext
-        // (e.g. running from a background hostedservice scope), which
-        // shouldn't happen for the GET handler but keeps the code safe.
-        var request = _httpContextAccessor.HttpContext?.Request;
-        if (request is null)
-        {
-            return $"/api/attachments/{attachmentId}/download";
-        }
-
-        return $"{request.Scheme}://{request.Host}/api/attachments/{attachmentId}/download";
+        // Always a RELATIVE URL. The frontend renders this string as an
+        // anchor `href`; the browser resolves it against the current
+        // document origin (the Next.js web origin), which hits the
+        // same-origin proxy at apps/web/app/api/attachments/[id]/download/
+        // route.ts. That proxy reads the refresh cookie (set on the web
+        // origin only), mints a Bearer access token, and forwards to this
+        // API with Authorization.
+        //
+        // Do NOT return an absolute URL to the API host. Doing so makes
+        // the browser navigate directly to the API origin, which has no
+        // refresh cookie, no Authorization header, and therefore always
+        // returns 401 to parents. See: parent notice 401 incident,
+        // 2026-04.
+        return $"/api/attachments/{attachmentId}/download";
     }
 
     private async Task EnsureHomeworkAccessAsync(Guid homeworkId, CancellationToken cancellationToken)

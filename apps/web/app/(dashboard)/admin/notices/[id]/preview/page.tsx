@@ -4,6 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ApiError, apiGet, apiPut } from "@/lib/api-client";
+import {
+  buildAttachmentDownloadUrl,
+  normalizeAttachmentViewUrl,
+} from "@/lib/attachment-url";
 import { API_ENDPOINTS } from "@/lib/constants";
 import {
   formatNoticeAudienceDetails,
@@ -289,6 +293,14 @@ function AttachmentPreviewRow({
   const isAvailable = attachment.status === "Available";
   const isImage = attachment.contentType.startsWith("image/");
   const isPdf = isPdfAttachment(attachment.contentType);
+  const viewUrl =
+    isAvailable && attachment.downloadUrl
+      ? normalizeAttachmentViewUrl(attachment.downloadUrl)
+      : "";
+  const downloadUrl =
+    isAvailable && attachment.downloadUrl
+      ? buildAttachmentDownloadUrl(attachment.downloadUrl)
+      : "";
 
   return (
     <div className="rounded-[22px] border border-border/70 bg-card/72 p-4 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.4)] dark:bg-card/86">
@@ -317,16 +329,16 @@ function AttachmentPreviewRow({
         <StatusBadge status={attachment.status} />
       </div>
 
-      {isAvailable && attachment.downloadUrl && isImage && (
+      {isAvailable && viewUrl && isImage && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={attachment.downloadUrl}
+          src={viewUrl}
           alt={attachment.fileName}
           className="mt-4 max-h-[540px] w-full rounded-[18px] border border-border/60 object-contain bg-muted/40"
         />
       )}
 
-      {isAvailable && attachment.downloadUrl && isPdf && (
+      {isAvailable && viewUrl && isPdf && (
         <div className="mt-4 space-y-2">
           {/*
             Using <iframe> (not <object>) because middleware's CSP sets
@@ -336,18 +348,31 @@ function AttachmentPreviewRow({
             frame; browser PDF viewers don't need scripts.
           */}
           <iframe
-            src={attachment.downloadUrl}
+            src={viewUrl}
             title={attachment.fileName}
             sandbox=""
             className="h-[640px] w-full rounded-[18px] border border-border/60 bg-muted/40"
           />
+        </div>
+      )}
+
+      {isAvailable && viewUrl && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {(isImage || isPdf) && (
+            <a
+              href={viewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex text-xs font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Open in new tab
+            </a>
+          )}
           <a
-            href={attachment.downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={downloadUrl || viewUrl}
             className="inline-flex text-xs font-medium text-primary underline-offset-2 hover:underline"
           >
-            Open in new tab
+            Download file
           </a>
         </div>
       )}

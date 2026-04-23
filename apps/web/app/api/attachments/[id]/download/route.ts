@@ -63,7 +63,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const { id } = await params;
@@ -78,7 +78,13 @@ export async function GET(
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${apiBaseUrl()}/api/attachments/${id}/download`, {
+    const upstreamUrl = new URL(`${apiBaseUrl()}/api/attachments/${id}/download`);
+    const requestUrl = new URL(request.url);
+    for (const [key, value] of requestUrl.searchParams.entries()) {
+      upstreamUrl.searchParams.append(key, value);
+    }
+
+    upstream = await fetch(upstreamUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,

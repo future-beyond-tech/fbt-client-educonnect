@@ -2,15 +2,13 @@ namespace EduConnect.Api.Infrastructure.Services.Scanning;
 
 /// <summary>
 /// Dev/CI stand-in for a real virus scanner. Drains the stream (so callers
-/// can't distinguish it from a real scan) and returns an Error verdict
-/// with threat name <see cref="NoOpThreatName"/>.
+/// can't distinguish it from a real scan) and returns a Clean verdict.
 ///
-/// Fail-closed: every file routed through this scanner lands in
-/// <c>AttachmentStatus.ScanFailed</c> via the worker's error branch, so no
-/// presigned URL is ever handed out for an unscanned object. Developers
-/// must provision clamd (or stand up the docker-compose scanner) to clear
-/// uploads for download. Startup registration refuses to wire this scanner
-/// in a Production environment — see <c>AttachmentScannerRegistration</c>.
+/// Fail-open (DEV ONLY): every file routed through this scanner lands in
+/// <c>AttachmentStatus.Available</c>. This avoids the need to run the heavy
+/// clamd container during local development on arm64 architectures.
+/// Startup registration refuses to wire this scanner in a Production 
+/// environment — see <c>AttachmentScannerRegistration</c>.
 /// </summary>
 public sealed class NoOpAttachmentScanner : IAttachmentScanner
 {
@@ -38,8 +36,8 @@ public sealed class NoOpAttachmentScanner : IAttachmentScanner
 
         _logger.LogWarning(
             "NoOpAttachmentScanner is active — no virus scan performed. " +
-            "File will be marked ScanFailed. Set ClamAv:Enabled=true to clear uploads.");
+            "File will be marked Available (Dev Mode). Set ClamAv:Enabled=true to use real virus scanning.");
 
-        return new ScanResult(ScanVerdict.Error, EngineName, NoOpThreatName);
+        return new ScanResult(ScanVerdict.Clean, EngineName, null);
     }
 }

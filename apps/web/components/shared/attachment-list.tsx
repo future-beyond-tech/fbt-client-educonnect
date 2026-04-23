@@ -2,10 +2,15 @@
 
 import * as React from "react";
 import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  buildAttachmentDownloadUrl,
+  normalizeAttachmentViewUrl,
+} from "@/lib/attachment-url";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AlertTriangle,
+  Eye,
   Download,
   FileText,
   ImageIcon,
@@ -207,7 +212,15 @@ function AttachmentRow({
   getFileIcon,
 }: AttachmentRowProps): React.ReactElement {
   const isAvailable = attachment.status === "Available";
-  const opensInNewTab = !isWordAttachment(attachment.contentType);
+  const viewUrl =
+    isAvailable && attachment.downloadUrl
+      ? normalizeAttachmentViewUrl(attachment.downloadUrl)
+      : "";
+  const downloadUrl =
+    isAvailable && attachment.downloadUrl
+      ? buildAttachmentDownloadUrl(attachment.downloadUrl)
+      : "";
+  const canPreview = !isWordAttachment(attachment.contentType);
   const baseClass =
     "flex items-center gap-3 rounded-[20px] border border-border/70 bg-card/72 p-3 shadow-[0_14px_30px_-28px_rgba(15,40,69,0.4)] dark:bg-card/86";
 
@@ -224,29 +237,37 @@ function AttachmentRow({
           {formatFileSize(attachment.sizeBytes)}
         </p>
       </div>
-      <StatusBadge status={attachment.status} />
-      {isAvailable && attachment.downloadUrl ? (
-        <Download
-          className="h-4 w-4 shrink-0 text-muted-foreground"
-          aria-hidden="true"
-        />
-      ) : null}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <StatusBadge status={attachment.status} />
+        {isAvailable && viewUrl ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {canPreview ? (
+              <a
+                href={viewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label={`View ${attachment.fileName}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                View
+              </a>
+            ) : null}
+            <a
+              href={canPreview ? downloadUrl : viewUrl}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Download ${attachment.fileName}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Download
+            </a>
+          </div>
+        ) : null}
+      </div>
     </>
   );
-
-  if (isAvailable && attachment.downloadUrl) {
-    return (
-      <a
-        href={attachment.downloadUrl}
-        target={opensInNewTab ? "_blank" : undefined}
-        rel={opensInNewTab ? "noopener noreferrer" : undefined}
-        className={`${baseClass} transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/92`}
-        aria-label={`Download ${attachment.fileName}`}
-      >
-        {body}
-      </a>
-    );
-  }
 
   return (
     <div className={baseClass} aria-label={attachment.fileName}>

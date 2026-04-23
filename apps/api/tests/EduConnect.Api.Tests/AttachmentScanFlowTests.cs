@@ -1,11 +1,12 @@
 using EduConnect.Api.Common.Auth;
+using EduConnect.Api.Features.Attachments.DownloadAttachment;
 using EduConnect.Api.Features.Attachments.GetAttachmentsForEntity;
 using EduConnect.Api.Infrastructure.Database;
 using EduConnect.Api.Infrastructure.Database.Entities;
 using EduConnect.Api.Infrastructure.Services;
 using EduConnect.Api.Infrastructure.Services.Scanning;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -39,8 +40,7 @@ public class AttachmentScanFlowTests
         await using var readContext = new AppDbContext(options, teacher);
         var handler = new GetAttachmentsForEntityQueryHandler(
             readContext, teacher, storage.Object,
-            Options.Create(new StorageOptions()),
-            new HttpContextAccessor());
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -113,8 +113,7 @@ public class AttachmentScanFlowTests
         await using var readContext = new AppDbContext(options, parent);
         var handler = new GetAttachmentsForEntityQueryHandler(
             readContext, parent, storage.Object,
-            Options.Create(new StorageOptions()),
-            new HttpContextAccessor());
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(homeworkId, "homework"),
@@ -246,8 +245,7 @@ public class AttachmentScanFlowTests
         await using var readContext = new AppDbContext(options, parent);
         var handler = new GetAttachmentsForEntityQueryHandler(
             readContext, parent, storage.Object,
-            Options.Create(new StorageOptions()),
-            new HttpContextAccessor());
+            Options.Create(new StorageOptions()));
 
         var result = await handler.Handle(
             new GetAttachmentsForEntityQuery(noticeId, "notice"),
@@ -258,6 +256,261 @@ public class AttachmentScanFlowTests
         result[0].DownloadUrl.Should().Be($"/api/attachments/{attachmentId}/download");
 
         storage.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task DownloadAttachmentEndpoint_forces_download_disposition_when_requested()
+    {
+        var schoolId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
+        await using (var context = new AppDbContext(options))
+        {
+            context.Schools.Add(new SchoolEntity
+            {
+                Id = schoolId,
+                Name = "Test School",
+                Code = "TEST",
+                Address = "",
+                ContactPhone = "",
+                ContactEmail = "",
+            });
+            context.Users.Add(new UserEntity
+            {
+                Id = adminId,
+                SchoolId = schoolId,
+                Name = "Admin",
+                Phone = "09000000015",
+                Role = "Admin",
+            });
+            context.Attachments.Add(new AttachmentEntity
+            {
+                Id = attachmentId,
+                SchoolId = schoolId,
+                StorageKey = "test/notice.pdf",
+                FileName = "notice.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 4096,
+                UploadedById = adminId,
+                UploadedAt = DateTimeOffset.UtcNow,
+                Status = AttachmentStatus.Available,
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        var currentUser = new CurrentUserService
+        {
+            SchoolId = schoolId,
+            UserId = adminId,
+            Role = "Admin",
+            Name = "Admin",
+        };
+
+        var mediator = new Mock<IMediator>(MockBehavior.Strict);
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
+                "test/notice.pdf",
+                It.IsAny<TimeSpan>(),
+                "notice.pdf",
+                "application/pdf",
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://signed.example.com/file.pdf");
+
+        await using var readContext = new AppDbContext(options, currentUser);
+        await DownloadAttachmentEndpoint.Handle(
+            attachmentId,
+            "true",
+            mediator.Object,
+            readContext,
+            currentUser,
+            storage.Object,
+            Options.Create(new StorageOptions
+            {
+                PresignedDownloadExpiryMinutes = 15,
+            }),
+            NullLogger<DownloadAttachmentLog>.Instance,
+            CancellationToken.None);
+
+        storage.VerifyAll();
+        mediator.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task DownloadAttachmentEndpoint_defaults_to_inline_disposition_when_download_is_not_requested()
+    {
+        var schoolId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
+        await using (var context = new AppDbContext(options))
+        {
+            context.Schools.Add(new SchoolEntity
+            {
+                Id = schoolId,
+                Name = "Test School",
+                Code = "TEST",
+                Address = "",
+                ContactPhone = "",
+                ContactEmail = "",
+            });
+            context.Users.Add(new UserEntity
+            {
+                Id = adminId,
+                SchoolId = schoolId,
+                Name = "Admin",
+                Phone = "09000000016",
+                Role = "Admin",
+            });
+            context.Attachments.Add(new AttachmentEntity
+            {
+                Id = attachmentId,
+                SchoolId = schoolId,
+                StorageKey = "test/preview.pdf",
+                FileName = "preview.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 4096,
+                UploadedById = adminId,
+                UploadedAt = DateTimeOffset.UtcNow,
+                Status = AttachmentStatus.Available,
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        var currentUser = new CurrentUserService
+        {
+            SchoolId = schoolId,
+            UserId = adminId,
+            Role = "Admin",
+            Name = "Admin",
+        };
+
+        var mediator = new Mock<IMediator>(MockBehavior.Strict);
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
+                "test/preview.pdf",
+                It.IsAny<TimeSpan>(),
+                "preview.pdf",
+                "application/pdf",
+                false,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://signed.example.com/preview.pdf");
+
+        await using var readContext = new AppDbContext(options, currentUser);
+        await DownloadAttachmentEndpoint.Handle(
+            attachmentId,
+            null,
+            mediator.Object,
+            readContext,
+            currentUser,
+            storage.Object,
+            Options.Create(new StorageOptions
+            {
+                PresignedDownloadExpiryMinutes = 15,
+            }),
+            NullLogger<DownloadAttachmentLog>.Instance,
+            CancellationToken.None);
+
+        storage.VerifyAll();
+        mediator.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task DownloadAttachmentEndpoint_accepts_legacy_numeric_download_flag()
+    {
+        var schoolId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
+        await using (var context = new AppDbContext(options))
+        {
+            context.Schools.Add(new SchoolEntity
+            {
+                Id = schoolId,
+                Name = "Test School",
+                Code = "TEST",
+                Address = "",
+                ContactPhone = "",
+                ContactEmail = "",
+            });
+            context.Users.Add(new UserEntity
+            {
+                Id = adminId,
+                SchoolId = schoolId,
+                Name = "Admin",
+                Phone = "09000000017",
+                Role = "Admin",
+            });
+            context.Attachments.Add(new AttachmentEntity
+            {
+                Id = attachmentId,
+                SchoolId = schoolId,
+                StorageKey = "test/legacy.pdf",
+                FileName = "legacy.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 4096,
+                UploadedById = adminId,
+                UploadedAt = DateTimeOffset.UtcNow,
+                Status = AttachmentStatus.Available,
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        var currentUser = new CurrentUserService
+        {
+            SchoolId = schoolId,
+            UserId = adminId,
+            Role = "Admin",
+            Name = "Admin",
+        };
+
+        var mediator = new Mock<IMediator>(MockBehavior.Strict);
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        storage.Setup(s => s.GeneratePresignedDownloadUrlAsync(
+                "test/legacy.pdf",
+                It.IsAny<TimeSpan>(),
+                "legacy.pdf",
+                "application/pdf",
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://signed.example.com/legacy.pdf");
+
+        await using var readContext = new AppDbContext(options, currentUser);
+        await DownloadAttachmentEndpoint.Handle(
+            attachmentId,
+            "1",
+            mediator.Object,
+            readContext,
+            currentUser,
+            storage.Object,
+            Options.Create(new StorageOptions
+            {
+                PresignedDownloadExpiryMinutes = 15,
+            }),
+            NullLogger<DownloadAttachmentLog>.Instance,
+            CancellationToken.None);
+
+        storage.VerifyAll();
+        mediator.VerifyNoOtherCalls();
     }
 
     private static async Task<(DbContextOptions<AppDbContext> Options, Guid SchoolId, Guid HomeworkId, Guid TeacherId)>

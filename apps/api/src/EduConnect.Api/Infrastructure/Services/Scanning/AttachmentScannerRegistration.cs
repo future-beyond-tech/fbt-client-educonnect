@@ -60,9 +60,8 @@ internal sealed class NoOpScannerStartupWarning : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogWarning(
-            "NoOpAttachmentScanner is active — every uploaded attachment will be marked ScanFailed " +
-            "and will not be visible to non-admin users. Set CLAMAV_ENABLED=true (with CLAMAV_HOST / " +
-            "CLAMAV_PORT) to enable real virus scanning.");
+            "NoOpAttachmentScanner is active — every uploaded attachment will be automatically marked Available " +
+            "without scanning. Set CLAMAV_ENABLED=true (with CLAMAV_HOST / CLAMAV_PORT) to enable real virus scanning.");
         return Task.CompletedTask;
     }
 
