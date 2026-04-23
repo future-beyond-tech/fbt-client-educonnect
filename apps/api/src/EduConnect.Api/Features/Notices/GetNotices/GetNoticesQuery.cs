@@ -24,4 +24,5 @@ public record NoticeDto(
     DateTimeOffset? PublishedAt,
     DateTimeOffset? ExpiresAt,
     DateTimeOffset CreatedAt,
-    NoticeCapabilitiesDto Capabilities);
+    NoticeCapabilitiesDto Capabilities,
+    int AttachmentCount = 0);

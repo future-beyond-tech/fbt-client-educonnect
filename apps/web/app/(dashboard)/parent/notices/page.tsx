@@ -18,7 +18,7 @@ import {
   PageShell,
 } from "@/components/shared/page-shell";
 import { StatusBanner } from "@/components/shared/status-banner";
-import { Bell } from "lucide-react";
+import { Bell, Paperclip } from "lucide-react";
 import { AttachmentList } from "@/components/shared/attachment-list";
 
 export default function ParentNoticesPage(): React.ReactElement {
@@ -167,12 +167,24 @@ export default function ParentNoticesPage(): React.ReactElement {
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg">{notice.title}</CardTitle>
-                    <Badge
-                      variant="outline"
-                      className="border-[rgb(var(--success)/0.3)] bg-[rgb(var(--success)/0.15)] text-[rgb(var(--success))]"
-                    >
-                      {formatNoticeAudienceLabel(notice)}
-                    </Badge>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {notice.attachmentCount > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 border-[rgb(var(--muted-foreground)/0.25)] bg-[rgb(var(--muted))] text-[rgb(var(--muted-foreground))]"
+                          aria-label={`${notice.attachmentCount} attachment${notice.attachmentCount === 1 ? "" : "s"}`}
+                        >
+                          <Paperclip className="h-3 w-3" aria-hidden="true" />
+                          {notice.attachmentCount}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="border-[rgb(var(--success)/0.3)] bg-[rgb(var(--success)/0.15)] text-[rgb(var(--success))]"
+                      >
+                        {formatNoticeAudienceLabel(notice)}
+                      </Badge>
+                    </div>
                   </div>
                   {notice.publishedAt && (
                     <p className="text-xs text-muted-foreground">

@@ -26,6 +26,7 @@ export interface NoticeItem {
   expiresAt: string | null;
   createdAt: string;
   capabilities: NoticeCapabilities;
+  attachmentCount: number;
 }
 
 export interface CreateNoticeRequest {
